@@ -15,13 +15,17 @@ let alarmTimer = null;
 let audioCtx = null;
 let soundUnlocked = false;
 let lastNewOrderSignature = "";
+
 const pendingAvailabilityWrites = new Map();
+const DAILY_MISSING_PHONE = "16507224407";
 
 function applyAdminTheme() {
   const theme = localStorage.getItem(STORAGE_ADMIN_THEME) || "dark";
   const isDark = theme === "dark";
+
   document.body.classList.toggle("dark-mode", isDark);
   document.body.classList.toggle("light-mode", !isDark);
+
   const btn = $("#adminThemeToggleBtn");
   if (btn) btn.textContent = isDark ? "Modo claro" : "Modo oscuro";
 }
@@ -55,17 +59,27 @@ function saveOrders(orders) {
 
 async function backendRequest(path, options = {}) {
   if (!BACKEND_URL) return null;
+
   const response = await fetch(`${BACKEND_URL}${path}`, {
-    headers: { "Content-Type": "application/json", ...(options.headers || {}) },
+    headers: {
+      "Content-Type": "application/json",
+      ...(options.headers || {})
+    },
     ...options
   });
-  if (!response.ok) throw new Error(`Backend error ${response.status}`);
+
+  if (!response.ok) {
+    throw new Error(`Backend error ${response.status}`);
+  }
+
   if (response.status === 204) return null;
+
   return response.json();
 }
 
 function orderFromBackend(row) {
   if (!row) return null;
+
   return {
     ...(row.raw || {}),
     id: String(row.id),
@@ -98,6 +112,7 @@ async function syncOrdersFromBackend() {
   }
 
   if (!BACKEND_URL) return;
+
   try {
     const data = await backendRequest("/api/orders");
     const orders = (data?.orders || []).map(orderFromBackend).filter(Boolean);
@@ -123,8 +138,10 @@ async function syncAvailabilityFromBackend() {
   }
 
   if (!BACKEND_URL) return;
+
   try {
     const data = await backendRequest("/api/availability");
+
     if (data?.availability) {
       writeLocalAvailability(mergePendingAvailability(data.availability));
       renderAvailability();
@@ -143,9 +160,13 @@ async function updateOrderStatusBackend(orderId, status, extra = {}) {
   }
 
   if (!BACKEND_URL) return;
+
   await backendRequest(`/api/orders/${encodeURIComponent(orderId)}`, {
     method: "PATCH",
-    body: JSON.stringify({ status, ...extra })
+    body: JSON.stringify({
+      status,
+      ...extra
+    })
   });
 }
 
@@ -158,7 +179,10 @@ async function deleteOrderBackend(orderId) {
   }
 
   if (!BACKEND_URL) return;
-  await backendRequest(`/api/orders/${encodeURIComponent(orderId)}`, { method: "DELETE" });
+
+  await backendRequest(`/api/orders/${encodeURIComponent(orderId)}`, {
+    method: "DELETE"
+  });
 }
 
 function getAvailability() {
@@ -170,10 +194,14 @@ function hasOwn(object, key) {
 }
 
 function mergePendingAvailability(availability) {
-  const merged = { ...(availability || {}) };
+  const merged = {
+    ...(availability || {})
+  };
+
   pendingAvailabilityWrites.forEach((value, key) => {
     merged[key] = value;
   });
+
   return merged;
 }
 
@@ -183,8 +211,15 @@ function writeLocalAvailability(availability) {
 
 function availabilityValue(key, legacyKey = null) {
   const availability = getAvailability();
-  if (hasOwn(availability, key)) return availability[key] !== false;
-  if (legacyKey && hasOwn(availability, legacyKey)) return availability[legacyKey] !== false;
+
+  if (hasOwn(availability, key)) {
+    return availability[key] !== false;
+  }
+
+  if (legacyKey && hasOwn(availability, legacyKey)) {
+    return availability[legacyKey] !== false;
+  }
+
   return true;
 }
 
@@ -207,34 +242,46 @@ function removableAvailabilityKey(remove) {
 
 async function setAvailability(key, available, legacyKey = null) {
   const before = getAvailability();
-  const next = { ...before, [key]: Boolean(available) };
+
+  const next = {
+    ...before,
+    [key]: Boolean(available)
+  };
+
   pendingAvailabilityWrites.set(key, Boolean(available));
   writeLocalAvailability(next);
   renderAvailability();
 
   const db = window.FOGON_DB;
+
   try {
     if (db?.isReady()) {
       await db.setAvailability(key, available);
     } else if (BACKEND_URL) {
       await backendRequest(`/api/availability/${encodeURIComponent(key)}`, {
         method: "PUT",
-        body: JSON.stringify({ available })
+        body: JSON.stringify({
+          available
+        })
       });
     }
 
     pendingAvailabilityWrites.delete(key);
+
     if (legacyKey && legacyKey !== key && hasOwn(before, legacyKey)) {
       const cleaned = getAvailability();
       delete cleaned[legacyKey];
       writeLocalAvailability(cleaned);
     }
+
     await syncAvailabilityFromBackend();
   } catch (error) {
     pendingAvailabilityWrites.delete(key);
     writeLocalAvailability(before);
     renderAvailability();
+
     console.warn("No se pudo guardar disponibilidad:", error);
+
     alert("No se pudo guardar el cambio de disponibilidad. Revisa Supabase/RLS y vuelve a intentarlo.");
   }
 }
@@ -272,32 +319,44 @@ function kitchenOrders(orders = getOrders()) {
 function setSoundBanner(message = "") {
   const banner = $("#soundBanner");
   if (!banner) return;
+
   const text = banner.querySelector("p");
   if (message && text) text.innerHTML = message;
+
   banner.hidden = Boolean(soundUnlocked);
 }
 
 function unlockSound() {
   try {
     const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+
     if (!AudioContextClass) {
       soundUnlocked = false;
       setSoundBanner("<strong>Sonido no disponible</strong><br>Este navegador no permite Web Audio.");
       return false;
     }
-    if (!audioCtx) audioCtx = new AudioContextClass();
 
-    const resumeResult = audioCtx.state === "suspended" ? audioCtx.resume() : Promise.resolve();
-    Promise.resolve(resumeResult).then(() => {
-      soundUnlocked = audioCtx.state === "running";
-      setSoundBanner();
-    }).catch(() => {
-      soundUnlocked = false;
-      setSoundBanner("<strong>Activa el sonido</strong><br>Toca el panel una vez. El navegador bloqueó el audio hasta una interacción.");
-    });
+    if (!audioCtx) {
+      audioCtx = new AudioContextClass();
+    }
+
+    const resumeResult = audioCtx.state === "suspended"
+      ? audioCtx.resume()
+      : Promise.resolve();
+
+    Promise.resolve(resumeResult)
+      .then(() => {
+        soundUnlocked = audioCtx.state === "running";
+        setSoundBanner();
+      })
+      .catch(() => {
+        soundUnlocked = false;
+        setSoundBanner("<strong>Activa el sonido</strong><br>Toca el panel una vez. El navegador bloqueó el audio hasta una interacción.");
+      });
 
     soundUnlocked = audioCtx.state === "running" || audioCtx.state === "suspended";
     setSoundBanner();
+
     return true;
   } catch (_) {
     soundUnlocked = false;
@@ -309,8 +368,10 @@ function unlockSound() {
 function beep() {
   if (!soundUnlocked && !unlockSound()) return;
   if (!audioCtx) return;
+
   try {
     const now = audioCtx.currentTime;
+
     const master = audioCtx.createGain();
     master.gain.setValueAtTime(0.0001, now);
     master.gain.exponentialRampToValueAtTime(0.65, now + 0.025);
@@ -330,42 +391,69 @@ function beep() {
 
 function startAlarm() {
   const banner = $("#soundBanner");
-  if (!soundUnlocked && banner) banner.hidden = false;
+
+  if (!soundUnlocked && banner) {
+    banner.hidden = false;
+  }
+
   if (alarmTimer) return;
+
   beep();
+
   alarmTimer = setInterval(() => {
-    if (newOrders().length) beep();
-    else stopAlarm();
+    if (newOrders().length) {
+      beep();
+    } else {
+      stopAlarm();
+    }
   }, 1200);
 }
 
 function stopAlarm() {
-  if (alarmTimer) clearInterval(alarmTimer);
+  if (alarmTimer) {
+    clearInterval(alarmTimer);
+  }
+
   alarmTimer = null;
 }
 
 function updateAlarm() {
   const pending = newOrders();
   const signature = pending.map((order) => order.id).join("|");
+
   if (pending.length) {
-    if (signature !== lastNewOrderSignature) beep();
+    if (signature !== lastNewOrderSignature) {
+      beep();
+    }
+
     startAlarm();
   } else {
     stopAlarm();
   }
+
   lastNewOrderSignature = signature;
 }
 
 async function acceptOrder(orderId) {
   const acceptedAt = new Date().toISOString();
+
   const orders = getOrders().map((order) => (
     order.id === orderId
-      ? { ...order, status: "accepted", acceptedAt }
+      ? {
+          ...order,
+          status: "accepted",
+          acceptedAt
+        }
       : order
   ));
+
   saveOrders(orders);
+
   try {
-    await updateOrderStatusBackend(orderId, "accepted", { acceptedAt });
+    await updateOrderStatusBackend(orderId, "accepted", {
+      acceptedAt
+    });
+
     await syncOrdersFromBackend();
   } catch (error) {
     console.warn("No se pudo actualizar pedido en Supabase:", error);
@@ -374,14 +462,24 @@ async function acceptOrder(orderId) {
 
 async function markReady(orderId) {
   const readyAt = new Date().toISOString();
+
   const orders = getOrders().map((order) => (
     order.id === orderId
-      ? { ...order, status: "ready", readyAt }
+      ? {
+          ...order,
+          status: "ready",
+          readyAt
+        }
       : order
   ));
+
   saveOrders(orders);
+
   try {
-    await updateOrderStatusBackend(orderId, "ready", { readyAt });
+    await updateOrderStatusBackend(orderId, "ready", {
+      readyAt
+    });
+
     await syncOrdersFromBackend();
   } catch (error) {
     console.warn("No se pudo marcar listo en Supabase:", error);
@@ -390,11 +488,15 @@ async function markReady(orderId) {
 
 async function removeOrderEverywhere(orderId) {
   if (!confirm(`¿Marcar ${orderId} como entregado y quitarlo para todos?`)) return;
+
   const orders = getOrders().filter((order) => order.id !== orderId);
   setOrders(orders);
+
   const hidden = getKitchenHiddenIds().filter((id) => id !== orderId);
   setKitchenHiddenIds(hidden);
+
   renderAll();
+
   try {
     await deleteOrderBackend(orderId);
     await syncOrdersFromBackend();
@@ -414,33 +516,48 @@ function escapeHtml(value) {
 
 function normalizePhoneForWhatsApp(phone) {
   const digits = String(phone || "").replace(/\D/g, "");
+
   if (!digits) return "";
-  if (digits.length === 10) return `1${digits}`;
+
+  if (digits.length === 10) {
+    return `1${digits}`;
+  }
+
   return digits;
 }
 
 function readyMessage(order) {
   const name = order.customer?.name || "";
+
   if (order.language === "en") {
     return `Hi${name ? ` ${name}` : ""}, your order ${order.id} from El Fogon D' Geny is ready. Please pick it up at the truck window. Thank you.`;
   }
+
   return `Hola${name ? ` ${name}` : ""}, tu pedido ${order.id} de El Fogon D' Geny está listo. Pasa por la ventanilla del camión. Gracias.`;
 }
 
 async function sendReadyNotification(orderId) {
   const orders = getOrders();
   const order = orders.find((candidate) => candidate.id === orderId);
+
   if (!order) return;
 
   if (BACKEND_URL) {
     try {
       const response = await fetch(`${BACKEND_URL}/api/orders/${encodeURIComponent(order.id)}/ready`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json"
+        },
         body: JSON.stringify(order)
       });
-      if (!response.ok) throw new Error(`Backend error ${response.status}`);
+
+      if (!response.ok) {
+        throw new Error(`Backend error ${response.status}`);
+      }
+
       const result = await response.json();
+
       const updatedOrders = getOrders().map((candidate) => (
         candidate.id === orderId
           ? {
@@ -452,7 +569,9 @@ async function sendReadyNotification(orderId) {
             }
           : candidate
       ));
+
       saveOrders(updatedOrders);
+
       alert("Cliente notificado y Clover sincronizado si las credenciales están configuradas.");
       return;
     } catch (error) {
@@ -462,13 +581,15 @@ async function sendReadyNotification(orderId) {
     }
   }
 
-  // Modo local sin backend: fallback manual para pruebas. En producción debe usarse el backend.
   const phone = normalizePhoneForWhatsApp(order.customer?.phone);
+
   if (!phone) {
     alert("Este pedido no tiene teléfono válido para WhatsApp.");
     return;
   }
+
   markReady(orderId);
+
   window.open(`https://wa.me/${phone}?text=${encodeURIComponent(readyMessage(order))}`, "_blank");
 }
 
@@ -480,15 +601,19 @@ function paymentLabel(method) {
 
 function statusLabel(order) {
   const status = order.status || "new";
+
   if (status === "ready") return "Listo";
   if (status === "accepted") return "Aceptado";
+
   return "Nuevo";
 }
 
 function statusClass(order) {
   const status = order.status || "new";
+
   if (status === "ready") return "ready";
   if (status === "accepted") return "accepted";
+
   return "new";
 }
 
@@ -523,64 +648,100 @@ function updateCounters() {
 
 function renderOrders() {
   const orders = getOrders();
+
   updateCounters();
 
   const ordersList = $("#ordersList");
+
   if (!ordersList) return;
 
-  ordersList.innerHTML = orders.length ? orders.map((order) => {
-    const isNew = order.status === "new" || !order.status;
-    const isReady = order.status === "ready";
-    return `
-    <article class="order-card ${isNew ? "is-new" : "is-accepted"}">
-      <div class="order-head">
-        <div>
-          <strong>${escapeHtml(order.id)}</strong>
-          <p>${new Date(order.createdAt).toLocaleString()}</p>
-        </div>
-        <span class="order-status ${statusClass(order)}">${statusLabel(order)}</span>
-      </div>
-      <p><strong>${escapeHtml(order.customer?.name || "Sin nombre")}</strong> · ${escapeHtml(order.customer?.phone || "Sin teléfono")}</p>
-      <p><strong>Pago:</strong> ${escapeHtml(paymentLabel(order.paymentMethod))}</p>
-      <div class="order-items">
-        ${(order.items || []).map((item) => itemDetailsHtml(item)).join("")}
-      </div>
-      <div class="order-total">
-        <span>Total</span>
-        <strong>${money(order.totals?.total)}</strong>
-      </div>
-      ${isNew ? `<button class="primary-btn full accept-order" data-accept-order="${escapeHtml(order.id)}" type="button">Aceptar pedido y parar sonido</button>` : `<p class="accepted-note">${isReady ? "Pedido listo" : "Pedido aceptado"}${order.acceptedAt ? ` · ${new Date(order.acceptedAt).toLocaleTimeString()}` : ""}</p>`}
-      <div class="order-actions-row">
-        ${!isNew ? `<button class="secondary-btn" data-ready-order="${escapeHtml(order.id)}" type="button">Pedido listo / WhatsApp</button>` : ""}
-        <button class="secondary-btn danger-btn" data-deliver-order="${escapeHtml(order.id)}" type="button">Entregado / quitar para todos</button>
-      </div>
-    </article>`;
-  }).join("") : `<p class="empty-state">No hay pedidos todavía.</p>`;
+  ordersList.innerHTML = orders.length
+    ? orders.map((order) => {
+        const isNew = order.status === "new" || !order.status;
+        const isReady = order.status === "ready";
+
+        return `
+          <article class="order-card ${isNew ? "is-new" : "is-accepted"}">
+            <div class="order-head">
+              <div>
+                <strong>${escapeHtml(order.id)}</strong>
+                <p>${new Date(order.createdAt).toLocaleString()}</p>
+              </div>
+              <span class="order-status ${statusClass(order)}">${statusLabel(order)}</span>
+            </div>
+
+            <p><strong>${escapeHtml(order.customer?.name || "Sin nombre")}</strong> · ${escapeHtml(order.customer?.phone || "Sin teléfono")}</p>
+            <p><strong>Pago:</strong> ${escapeHtml(paymentLabel(order.paymentMethod))}</p>
+
+            <div class="order-items">
+              ${(order.items || []).map((item) => itemDetailsHtml(item)).join("")}
+            </div>
+
+            <div class="order-total">
+              <span>Total</span>
+              <strong>${money(order.totals?.total)}</strong>
+            </div>
+
+            ${isNew ? `
+              <button class="primary-btn full accept-order" data-accept-order="${escapeHtml(order.id)}" type="button">
+                Aceptar pedido y parar sonido
+              </button>
+            ` : `
+              <p class="accepted-note">
+                ${isReady ? "Pedido listo" : "Pedido aceptado"}${order.acceptedAt ? ` · ${new Date(order.acceptedAt).toLocaleTimeString()}` : ""}
+              </p>
+            `}
+
+            <div class="order-actions-row">
+              ${!isNew ? `
+                <button class="secondary-btn" data-ready-order="${escapeHtml(order.id)}" type="button">
+                  Pedido listo / WhatsApp
+                </button>
+              ` : ""}
+
+              <button class="secondary-btn danger-btn" data-deliver-order="${escapeHtml(order.id)}" type="button">
+                Entregado / quitar para todos
+              </button>
+            </div>
+          </article>
+        `;
+      }).join("")
+    : `<p class="empty-state">No hay pedidos todavía.</p>`;
 
   updateAlarm();
 }
 
 function renderKitchen() {
   const orders = getOrders();
+
   cleanKitchenHiddenIds(orders);
+
   const visibleOrders = kitchenOrders(orders);
+
   updateCounters();
 
   const kitchenList = $("#kitchenList");
+
   if (!kitchenList) return;
 
-  kitchenList.innerHTML = visibleOrders.length ? visibleOrders.map((order) => `
-    <article class="kitchen-order-card">
-      <div class="kitchen-order-head">
-        <strong>${escapeHtml(order.id)}</strong>
-        <span>${statusLabel(order)}</span>
-      </div>
-      <div class="kitchen-items">
-        ${(order.items || []).map((item) => itemDetailsHtml(item, true)).join("")}
-      </div>
-      <button class="secondary-btn full" data-kitchen-done="${escapeHtml(order.id)}" type="button">Terminado en cocina</button>
-    </article>
-  `).join("") : `<p class="empty-state">No hay comandas pendientes para cocina.</p>`;
+  kitchenList.innerHTML = visibleOrders.length
+    ? visibleOrders.map((order) => `
+        <article class="kitchen-order-card">
+          <div class="kitchen-order-head">
+            <strong>${escapeHtml(order.id)}</strong>
+            <span>${statusLabel(order)}</span>
+          </div>
+
+          <div class="kitchen-items">
+            ${(order.items || []).map((item) => itemDetailsHtml(item, true)).join("")}
+          </div>
+
+          <button class="secondary-btn full" data-kitchen-done="${escapeHtml(order.id)}" type="button">
+            Terminado en cocina
+          </button>
+        </article>
+      `).join("")
+    : `<p class="empty-state">No hay comandas pendientes para cocina.</p>`;
 }
 
 function collectOptionAvailabilityRows() {
@@ -588,12 +749,19 @@ function collectOptionAvailabilityRows() {
 
   function addRow(row) {
     if (!rowsByKey.has(row.key)) {
-      rowsByKey.set(row.key, { ...row, usedBy: new Set(row.usedBy || []) });
+      rowsByKey.set(row.key, {
+        ...row,
+        usedBy: new Set(row.usedBy || [])
+      });
+
       return;
     }
 
     const existing = rowsByKey.get(row.key);
-    (row.usedBy || []).forEach((name) => existing.usedBy.add(name));
+
+    (row.usedBy || []).forEach((name) => {
+      existing.usedBy.add(name);
+    });
   }
 
   MENU_ITEMS.forEach((item) => {
@@ -646,15 +814,25 @@ function collectOptionAvailabilityRows() {
 
 function rowMatchesQuery(row, query) {
   if (!query) return true;
-  const haystack = [row.es, row.en, row.detailEs, row.detailEn, ...(row.usedByList || [])].join(" ").toLowerCase();
+
+  const haystack = [
+    row.es,
+    row.en,
+    row.detailEs,
+    row.detailEn,
+    ...(row.usedByList || [])
+  ].join(" ").toLowerCase();
+
   return haystack.includes(query);
 }
 
 function availabilityRowHtml(row) {
   const checked = availabilityValue(row.key, row.legacyKey);
+
   const usedBy = row.usedByList?.length
     ? `Usado en: ${row.usedByList.slice(0, 5).join(", ")}${row.usedByList.length > 5 ? "…" : ""}`
     : row.detailEn || "";
+
   const isPending = pendingAvailabilityWrites.has(row.key);
 
   return `
@@ -664,7 +842,14 @@ function availabilityRowHtml(row) {
         <small>${escapeHtml(row.detailEs || row.en || "")}</small>
         ${row.kind !== "product" ? `<small>${escapeHtml(usedBy)}</small>` : ""}
       </span>
-      <input type="checkbox" data-availability-key="${escapeHtml(row.key)}" data-legacy-key="${escapeHtml(row.legacyKey || "")}" ${checked ? "checked" : ""} ${isPending ? "disabled" : ""}>
+
+      <input
+        type="checkbox"
+        data-availability-key="${escapeHtml(row.key)}"
+        data-legacy-key="${escapeHtml(row.legacyKey || "")}"
+        ${checked ? "checked" : ""}
+        ${isPending ? "disabled" : ""}
+      >
     </label>
   `;
 }
@@ -672,6 +857,7 @@ function availabilityRowHtml(row) {
 function renderAvailability() {
   const query = availabilityQuery.trim().toLowerCase();
   const availabilityList = $("#availabilityList");
+
   if (!availabilityList) return;
 
   const allOptionRows = collectOptionAvailabilityRows();
@@ -695,10 +881,12 @@ function renderAvailability() {
     sections.push(`
       <section class="availability-section availability-section-options">
         <h3>Subopciones, proteínas y extras <span>${optionRows.length}</span></h3>
+
         <p class="availability-note">
           Aquí puedes apagar opciones internas como “Pollo guisado”, “Bistec”, “Camarón”, “Aguacate extra”, acompañamientos y opciones para quitar ingredientes.
           Si apagas una opción, desaparece del modal del cliente en todos los productos donde se use.
         </p>
+
         ${optionRows.map(availabilityRowHtml).join("")}
       </section>
     `);
@@ -708,7 +896,11 @@ function renderAvailability() {
     sections.push(`
       <section class="availability-section availability-section-products">
         <h3>Productos completos <span>${productRows.length}</span></h3>
-        <p class="availability-note">Aquí apagas un plato completo cuando no esté disponible.</p>
+
+        <p class="availability-note">
+          Aquí apagas un plato completo cuando no esté disponible.
+        </p>
+
         ${productRows.map(availabilityRowHtml).join("")}
       </section>
     `);
@@ -722,6 +914,94 @@ function renderAvailability() {
   availabilityList.innerHTML = sections.length
     ? sections.join("")
     : `<p class="empty-state">No se encontraron subopciones en menu-data.js. Revisa que admin.html cargue menu-data.js antes de admin.js.</p>`;
+}
+
+function getAllAvailabilityRowsForReport() {
+  const productRows = MENU_ITEMS.map((item) => ({
+    key: productAvailabilityKey(item),
+    legacyKey: item.id,
+    kind: "product",
+    es: item.es,
+    en: item.en || item.es,
+    detailEs: "Producto completo",
+    usedByList: []
+  }));
+
+  const optionRows = collectOptionAvailabilityRows();
+
+  return [...productRows, ...optionRows];
+}
+
+function getMissingAvailabilityRows() {
+  const availability = getAvailability();
+
+  return getAllAvailabilityRowsForReport().filter((row) => {
+    if (hasOwn(availability, row.key) && availability[row.key] === false) {
+      return true;
+    }
+
+    if (row.legacyKey && hasOwn(availability, row.legacyKey) && availability[row.legacyKey] === false) {
+      return true;
+    }
+
+    return false;
+  });
+}
+
+function buildDailyMissingMessage() {
+  const missing = getMissingAvailabilityRows();
+  const now = new Date();
+
+  if (!missing.length) {
+    return [
+      "El Fogon D' Geny - Recuento de faltantes",
+      `Fecha: ${now.toLocaleDateString()}`,
+      "",
+      "No hay productos ni subopciones marcadas como agotadas."
+    ].join("\n");
+  }
+
+  const products = missing.filter((row) => row.kind === "product");
+  const suboptions = missing.filter((row) => row.kind !== "product");
+
+  const lines = [
+    "El Fogon D' Geny - Recuento de faltantes",
+    `Fecha: ${now.toLocaleDateString()}`,
+    "",
+    "Productos completos agotados:"
+  ];
+
+  if (products.length) {
+    products.forEach((row) => {
+      lines.push(`- ${row.es}`);
+    });
+  } else {
+    lines.push("- Ninguno");
+  }
+
+  lines.push("");
+  lines.push("Subopciones / proteínas / extras agotados:");
+
+  if (suboptions.length) {
+    suboptions.forEach((row) => {
+      const usedBy = row.usedByList?.length
+        ? ` — usado en: ${row.usedByList.slice(0, 4).join(", ")}${row.usedByList.length > 4 ? "..." : ""}`
+        : "";
+
+      lines.push(`- ${row.es}${usedBy}`);
+    });
+  } else {
+    lines.push("- Ninguna");
+  }
+
+  return lines.join("\n");
+}
+
+function sendDailyMissingReport() {
+  const message = buildDailyMissingMessage();
+  const url = `https://wa.me/${DAILY_MISSING_PHONE}?text=${encodeURIComponent(message)}`;
+
+  window.open(url, "_blank");
 }
 
 function renderAll() {
@@ -742,23 +1022,30 @@ function switchTab(tabName) {
   });
 }
 
-
 function showAdminPanel() {
   const login = $("#adminLogin");
   const panel = $("#adminPanel");
+
   if (login) {
     login.hidden = true;
     login.style.display = "none";
   }
+
   if (panel) {
     panel.hidden = false;
     panel.style.display = "";
   }
+
   unlockSound();
+
   setTimeout(() => {
     unlockSound();
-    if (newOrders().length) startAlarm();
+
+    if (newOrders().length) {
+      startAlarm();
+    }
   }, 150);
+
   renderAll();
   syncOrdersFromBackend();
   syncAvailabilityFromBackend();
@@ -769,6 +1056,7 @@ function initLogin() {
   const input = $("#pinInput");
   const loginButton = $("#loginButton");
   const error = $("#pinError");
+
   if (!form) {
     showAdminPanel();
     return;
@@ -776,20 +1064,29 @@ function initLogin() {
 
   function tryLogin(event) {
     if (event) event.preventDefault();
+
     unlockSound();
+
     const value = String(input?.value || "").trim();
+
     if (value !== ADMIN_PIN) {
       if (error) error.hidden = false;
+
       if (input) {
         input.focus();
         input.select();
       }
+
       return false;
     }
+
     if (error) error.hidden = true;
+
     sessionStorage.setItem("fogon_admin_unlocked", "true");
+
     showAdminPanel();
     beep();
+
     return true;
   }
 
@@ -799,11 +1096,18 @@ function initLogin() {
   }
 
   form.addEventListener("submit", tryLogin);
-  if (loginButton) loginButton.addEventListener("click", tryLogin);
+
+  if (loginButton) {
+    loginButton.addEventListener("click", tryLogin);
+  }
+
   if (input) {
     input.addEventListener("keydown", (event) => {
-      if (event.key === "Enter") tryLogin(event);
+      if (event.key === "Enter") {
+        tryLogin(event);
+      }
     });
+
     input.focus();
   }
 }
@@ -814,6 +1118,7 @@ function init() {
 
   document.addEventListener("pointerdown", unlockSound);
   document.addEventListener("keydown", unlockSound);
+
   document.addEventListener("visibilitychange", () => {
     if (!document.hidden) {
       unlockSound();
@@ -825,7 +1130,9 @@ function init() {
   if (banner) banner.hidden = true;
 
   const adminThemeBtn = $("#adminThemeToggleBtn");
-  if (adminThemeBtn) adminThemeBtn.addEventListener("click", toggleAdminTheme);
+  if (adminThemeBtn) {
+    adminThemeBtn.addEventListener("click", toggleAdminTheme);
+  }
 
   const clearOrdersBtn = $("#clearOrdersBtn");
   if (clearOrdersBtn) {
@@ -833,6 +1140,7 @@ function init() {
       if (confirm("¿Limpiar todos los pedidos? Esto también borra las comandas de cocina.")) {
         localStorage.setItem(STORAGE_ORDERS, "[]");
         localStorage.setItem(STORAGE_KITCHEN_HIDDEN, "[]");
+
         renderAll();
 
         if (window.FOGON_DB?.isReady()) {
@@ -851,7 +1159,10 @@ function init() {
   if (soundBtn) {
     soundBtn.addEventListener("click", () => {
       unlockSound();
-      if (newOrders().length) beep();
+
+      if (newOrders().length) {
+        beep();
+      }
     });
   }
 
@@ -865,29 +1176,59 @@ function init() {
 
   document.addEventListener("change", (event) => {
     const input = event.target.closest("[data-availability-key]");
-    if (input) setAvailability(input.dataset.availabilityKey, input.checked, input.dataset.legacyKey || null);
+
+    if (input) {
+      setAvailability(input.dataset.availabilityKey, input.checked, input.dataset.legacyKey || null);
+    }
   });
 
   document.addEventListener("click", (event) => {
+    const dailyMissingButton = event.target.closest("#sendDailyMissingBtn");
+    if (dailyMissingButton) {
+      event.preventDefault();
+      sendDailyMissingReport();
+      return;
+    }
+
     const tabButton = event.target.closest("[data-admin-tab]");
-    if (tabButton) switchTab(tabButton.dataset.adminTab);
+    if (tabButton) {
+      switchTab(tabButton.dataset.adminTab);
+      return;
+    }
 
     const acceptButton = event.target.closest("[data-accept-order]");
-    if (acceptButton) acceptOrder(acceptButton.dataset.acceptOrder);
+    if (acceptButton) {
+      acceptOrder(acceptButton.dataset.acceptOrder);
+      return;
+    }
 
     const readyButton = event.target.closest("[data-ready-order]");
-    if (readyButton) sendReadyNotification(readyButton.dataset.readyOrder);
+    if (readyButton) {
+      sendReadyNotification(readyButton.dataset.readyOrder);
+      return;
+    }
 
     const kitchenDoneButton = event.target.closest("[data-kitchen-done]");
-    if (kitchenDoneButton) hideKitchenOrder(kitchenDoneButton.dataset.kitchenDone);
+    if (kitchenDoneButton) {
+      hideKitchenOrder(kitchenDoneButton.dataset.kitchenDone);
+      return;
+    }
 
     const deliverButton = event.target.closest("[data-deliver-order]");
-    if (deliverButton) removeOrderEverywhere(deliverButton.dataset.deliverOrder);
+    if (deliverButton) {
+      removeOrderEverywhere(deliverButton.dataset.deliverOrder);
+      return;
+    }
   });
 
   window.addEventListener("storage", (event) => {
-    if (event.key === STORAGE_ORDERS || event.key === STORAGE_KITCHEN_HIDDEN || event.key === null) renderAll();
-    if (event.key === STORAGE_AVAILABILITY || event.key === null) renderAvailability();
+    if (event.key === STORAGE_ORDERS || event.key === STORAGE_KITCHEN_HIDDEN || event.key === null) {
+      renderAll();
+    }
+
+    if (event.key === STORAGE_AVAILABILITY || event.key === null) {
+      renderAvailability();
+    }
   });
 
   if (window.FOGON_DB?.isReady()) {
@@ -896,15 +1237,18 @@ function init() {
   }
 
   setInterval(() => {
-    if (window.FOGON_DB?.isReady() || BACKEND_URL) syncOrdersFromBackend();
-    else {
+    if (window.FOGON_DB?.isReady() || BACKEND_URL) {
+      syncOrdersFromBackend();
+    } else {
       renderOrders();
       renderKitchen();
     }
   }, 2500);
 
   setInterval(() => {
-    if (window.FOGON_DB?.isReady() || BACKEND_URL) syncAvailabilityFromBackend();
+    if (window.FOGON_DB?.isReady() || BACKEND_URL) {
+      syncAvailabilityFromBackend();
+    }
   }, 6000);
 }
 
