@@ -222,14 +222,6 @@ function renderMenu() {
   setupCategoryObserver();
 }
 
-    const closeCartButton = event.target.closest("#closeCartBtn");
-    if (closeCartButton) {
-      event.preventDefault();
-      event.stopPropagation();
-      closeCart();
-      return;
-    }
-
 let categoryObserver = null;
 function setupCategoryObserver() {
   if (categoryObserver) categoryObserver.disconnect();
@@ -565,7 +557,31 @@ async function saveOrder(paymentMethod) {
 function initEvents() {
   window.addEventListener("scroll", handlePageScroll, { passive: true });
 
+  const closeCartButton = $("#closeCartBtn");
+  if (closeCartButton) {
+    closeCartButton.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      closeCart();
+    });
+  }
+
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape") {
+      closeCart();
+      closeProduct();
+    }
+  });
+
   document.addEventListener("click", (event) => {
+    const closeCartBtn = event.target.closest("#closeCartBtn");
+    if (closeCartBtn) {
+      event.preventDefault();
+      event.stopPropagation();
+      closeCart();
+      return;
+    }
+
     const langButton = event.target.closest("[data-set-lang]");
     if (langButton) setLanguage(langButton.dataset.setLang);
 
@@ -579,9 +595,15 @@ function initEvents() {
     const productButton = event.target.closest("[data-product-id]");
     if (productButton) openProduct(productButton.dataset.productId);
 
-    if (event.target.closest(".modal-close") || event.target === $("#modalBackdrop")) closeProduct();
-    if (event.target.closest("#cartFab")) openCart();
-    if (event.target.closest("#closeCartBtn")) closeCart();
+    if (event.target.closest(".modal-close") || event.target === $("#modalBackdrop")) {
+      closeProduct();
+    }
+
+    const cartFab = event.target.closest("#cartFab");
+    if (cartFab) {
+      event.preventDefault();
+      openCart();
+    }
 
     const removeButton = event.target.closest("[data-remove-cart]");
     if (removeButton) {
@@ -590,7 +612,9 @@ function initEvents() {
     }
 
     const paymentButton = event.target.closest("[data-payment]");
-    if (paymentButton && state.pendingOrder) saveOrder(paymentButton.dataset.payment);
+    if (paymentButton && state.pendingOrder) {
+      saveOrder(paymentButton.dataset.payment);
+    }
   });
 
   document.addEventListener("submit", (event) => {
@@ -609,8 +633,11 @@ function initEvents() {
         event.target.reportValidity();
         return;
       }
+
       if (!state.cart.length) return;
+
       const totals = getTotals();
+
       openPayment({
         id: nextSimpleOrderId(),
         createdAt: new Date().toISOString(),
