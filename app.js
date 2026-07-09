@@ -59,10 +59,13 @@ function removableAvailabilityKey(remove) {
   return `remove:${remove.id}`;
 }
 
-function isProductAvailable(item) {
+function isProductVisible(item) {
   if (!item) return false;
-  const productEnabled = availabilityValue(productAvailabilityKey(item), item.id);
-  if (!productEnabled) return false;
+  return availabilityValue(productAvailabilityKey(item), item.id);
+}
+
+function isProductAvailable(item) {
+  if (!isProductVisible(item)) return false;
 
   return (item.optionGroups || []).every((group) => {
     if (!group.required) return true;
@@ -195,9 +198,14 @@ function productCardHtml(item) {
 
 function renderMenu() {
   const grid = $("#menuGrid");
+
   grid.innerHTML = CATEGORIES.map((category) => {
-    const items = MENU_ITEMS.filter((item) => item.category === category.id);
+    const items = MENU_ITEMS
+      .filter((item) => item.category === category.id)
+      .filter((item) => isProductVisible(item));
+
     if (!items.length) return "";
+
     return `
       <section class="category-section" id="cat-${category.id}" data-category-section="${category.id}">
         <div class="category-title">
@@ -210,8 +218,17 @@ function renderMenu() {
       </section>
     `;
   }).join("");
+
   setupCategoryObserver();
 }
+
+    const closeCartButton = event.target.closest("#closeCartBtn");
+    if (closeCartButton) {
+      event.preventDefault();
+      event.stopPropagation();
+      closeCart();
+      return;
+    }
 
 let categoryObserver = null;
 function setupCategoryObserver() {
