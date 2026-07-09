@@ -70,16 +70,26 @@
     </section>
 
     <section id="availabilityTab" class="admin-tab-panel" data-admin-panel="availability" hidden>
-      <div class="admin-card wide">
-        <div class="section-title">
-          <h2>Disponibilidad</h2>
-        </div>
-        <p class="admin-help">Apaga productos completos o subopciones internas como proteínas, acompañamientos y extras. Los cambios se reflejan en el menú público.</p>
-        <input id="availabilitySearch" class="search-input" type="search" placeholder="Buscar producto, proteína, extra o subopción...">
-        <div id="availabilityList" class="availability-list"></div>
-      </div>
-    </section>
-  </main>
+  <div class="admin-card wide">
+    <div class="section-title">
+      <h2>Disponibilidad</h2>
+    </div>
+
+    <div style="display:flex; gap:10px; flex-wrap:wrap; margin:0 0 14px;">
+      <button id="sendDailyMissingBtn" class="primary-btn" type="button">
+        Enviar faltantes del día por WhatsApp
+      </button>
+    </div>
+
+    <p class="admin-help">
+      Apaga productos completos o subopciones internas como proteínas, acompañamientos y extras. Los cambios se reflejan en el menú público.
+    </p>
+
+    <input id="availabilitySearch" class="search-input" type="search" placeholder="Buscar producto, proteína, extra o subopción...">
+
+    <div id="availabilityList" class="availability-list"></div>
+  </div>
+</section>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="supabase-config.js?v=18-mobile-fixed"></script>
