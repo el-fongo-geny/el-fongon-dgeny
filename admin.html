@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#111111">
+  <title>Panel iPad | El Fogon D' Geny</title>
+  <link rel="stylesheet" href="style.css?v=18-mobile-fixed">
+</head>
+<body class="admin-body dark-mode">
+  <main id="adminLogin" class="admin-login">
+    <form id="pinForm" class="admin-card login-card">
+      <p class="eyebrow">Panel iPad</p>
+      <h1>El Fogon D' Geny</h1>
+      <label>
+        <span>PIN</span>
+        <input id="pinInput" type="password" inputmode="numeric" autocomplete="off" placeholder="PIN" required>
+      </label>
+      <button id="loginButton" class="primary-btn full" type="submit">Entrar</button>
+      <p id="pinError" class="error-text" hidden>PIN incorrecto.</p>
+    </form>
+  </main>
+
+  <main id="adminPanel" class="admin-panel" hidden>
+    <header class="admin-header">
+      <div>
+        <p class="eyebrow">Panel iPad</p>
+        <h1>Pedidos, cocina y disponibilidad</h1>
+        <div class="admin-stats">
+          <span class="admin-pill">Pendientes: <strong id="pendingCount">0</strong></span>
+          <span class="admin-pill">En cocina: <strong id="kitchenCount">0</strong></span>
+        </div>
+      </div>
+      <div class="admin-actions">
+        <button id="adminThemeToggleBtn" class="secondary-btn" type="button">Modo claro</button>
+        <button id="clearOrdersBtn" class="secondary-btn danger-btn" type="button">Limpiar pedidos</button>
+      </div>
+    </header>
+
+    <div id="soundBanner" class="sound-banner" hidden>
+      <p><strong>Sonido del iPad</strong><br>El sonido se activa con el PIN. Mantén esta pestaña abierta; sonará en bucle con cada pedido nuevo hasta aceptar el pedido.</p>
+    </div>
+
+    <nav class="admin-tabs" aria-label="Secciones del panel">
+      <button class="admin-tab active" type="button" data-admin-tab="orders">Pedidos</button>
+      <button class="admin-tab" type="button" data-admin-tab="kitchen">Cocina</button>
+      <button class="admin-tab" type="button" data-admin-tab="availability">Disponibilidad</button>
+    </nav>
+
+    <section id="ordersTab" class="admin-tab-panel active" data-admin-panel="orders">
+      <div class="admin-card wide">
+        <div class="section-title">
+          <h2>Pedidos recibidos</h2>
+          <span id="orderCount">0</span>
+        </div>
+        <p class="admin-help">Aquí se ve el pedido completo: cliente, teléfono, total, pago y estado. Cuando marques “Entregado / quitar”, desaparece para todos.</p>
+        <div id="ordersList" class="orders-list"></div>
+      </div>
+    </section>
+
+    <section id="kitchenTab" class="admin-tab-panel" data-admin-panel="kitchen" hidden>
+      <div class="admin-card wide kitchen-card">
+        <div class="section-title">
+          <h2>Cocina</h2>
+          <span id="kitchenVisibleCount">0</span>
+        </div>
+        <p class="admin-help">Vista limpia para cocina. Solo muestra ID, platos y subopciones. “Terminado en cocina” oculta la comanda solo aquí; el pedido sigue en el panel principal.</p>
+        <div id="kitchenList" class="kitchen-list"></div>
+      </div>
+    </section>
+
+    <section id="availabilityTab" class="admin-tab-panel" data-admin-panel="availability" hidden>
+      <div class="admin-card wide">
+        <div class="section-title">
+          <h2>Disponibilidad</h2>
+        </div>
+        <p class="admin-help">Apaga un producto cuando esté agotado. El menú público lo mostrará como agotado y no dejará pedirlo.</p>
+        <input id="availabilitySearch" class="search-input" type="search" placeholder="Buscar producto...">
+        <div id="availabilityList" class="availability-list"></div>
+      </div>
+    </section>
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="supabase-config.js?v=18-mobile-fixed"></script>
+  <script src="supabase-client.js?v=18-mobile-fixed"></script>
+  <script src="backend-config.js?v=18-mobile-fixed"></script>
+  <script src="menu-data.js?v=18-mobile-fixed"></script>
+  <script src="admin.js?v=18-mobile-fixed"></script>
+</body>
+</html>
