@@ -15,6 +15,7 @@ let alarmTimer = null;
 let audioCtx = null;
 let soundUnlocked = false;
 let lastNewOrderSignature = "";
+const pendingAvailabilityWrites = new Map();
 
 function applyAdminTheme() {
   const theme = localStorage.getItem(STORAGE_ADMIN_THEME) || "dark";
@@ -112,8 +113,8 @@ async function syncAvailabilityFromBackend() {
 
   if (db?.isReady()) {
     try {
-      const availability = await db.fetchAvailability();
-      localStorage.setItem(STORAGE_AVAILABILITY, JSON.stringify(availability));
+      const availability = mergePendingAvailability(await db.fetchAvailability());
+      writeLocalAvailability(availability);
       renderAvailability();
     } catch (error) {
       console.warn("No se pudo sincronizar disponibilidad desde Supabase:", error);
@@ -125,7 +126,7 @@ async function syncAvailabilityFromBackend() {
   try {
     const data = await backendRequest("/api/availability");
     if (data?.availability) {
-      localStorage.setItem(STORAGE_AVAILABILITY, JSON.stringify(data.availability));
+      writeLocalAvailability(mergePendingAvailability(data.availability));
       renderAvailability();
     }
   } catch (error) {
@@ -164,31 +165,77 @@ function getAvailability() {
   return safeParse(STORAGE_AVAILABILITY, {});
 }
 
-async function setAvailability(itemId, available) {
+function hasOwn(object, key) {
+  return Object.prototype.hasOwnProperty.call(object || {}, key);
+}
+
+function mergePendingAvailability(availability) {
+  const merged = { ...(availability || {}) };
+  pendingAvailabilityWrites.forEach((value, key) => {
+    merged[key] = value;
+  });
+  return merged;
+}
+
+function writeLocalAvailability(availability) {
+  localStorage.setItem(STORAGE_AVAILABILITY, JSON.stringify(availability || {}));
+}
+
+function availabilityValue(key, legacyKey = null) {
   const availability = getAvailability();
-  availability[itemId] = available;
-  localStorage.setItem(STORAGE_AVAILABILITY, JSON.stringify(availability));
+  if (hasOwn(availability, key)) return availability[key] !== false;
+  if (legacyKey && hasOwn(availability, legacyKey)) return availability[legacyKey] !== false;
+  return true;
+}
+
+function productAvailabilityKey(itemOrId) {
+  const id = typeof itemOrId === "string" ? itemOrId : itemOrId?.id;
+  return `product:${id}`;
+}
+
+function optionAvailabilityKey(group, option) {
+  return `option:${group.id}:${option.id}`;
+}
+
+function extraAvailabilityKey(extra) {
+  return `extra:${extra.id}`;
+}
+
+function removableAvailabilityKey(remove) {
+  return `remove:${remove.id}`;
+}
+
+async function setAvailability(key, available, legacyKey = null) {
+  const before = getAvailability();
+  const next = { ...before, [key]: Boolean(available) };
+  pendingAvailabilityWrites.set(key, Boolean(available));
+  writeLocalAvailability(next);
   renderAvailability();
 
   const db = window.FOGON_DB;
-  if (db?.isReady()) {
-    try {
-      await db.setAvailability(itemId, available);
-    } catch (error) {
-      console.warn("No se pudo guardar disponibilidad en Supabase:", error);
-    }
-    return;
-  }
-
-  if (BACKEND_URL) {
-    try {
-      await backendRequest(`/api/availability/${encodeURIComponent(itemId)}`, {
+  try {
+    if (db?.isReady()) {
+      await db.setAvailability(key, available);
+    } else if (BACKEND_URL) {
+      await backendRequest(`/api/availability/${encodeURIComponent(key)}`, {
         method: "PUT",
         body: JSON.stringify({ available })
       });
-    } catch (error) {
-      console.warn("No se pudo guardar disponibilidad en el backend:", error);
     }
+
+    pendingAvailabilityWrites.delete(key);
+    if (legacyKey && legacyKey !== key && hasOwn(before, legacyKey)) {
+      const cleaned = getAvailability();
+      delete cleaned[legacyKey];
+      writeLocalAvailability(cleaned);
+    }
+    await syncAvailabilityFromBackend();
+  } catch (error) {
+    pendingAvailabilityWrites.delete(key);
+    writeLocalAvailability(before);
+    renderAvailability();
+    console.warn("No se pudo guardar disponibilidad:", error);
+    alert("No se pudo guardar el cambio de disponibilidad. Revisa Supabase/RLS y vuelve a intentarlo.");
   }
 }
 
@@ -536,24 +583,130 @@ function renderKitchen() {
   `).join("") : `<p class="empty-state">No hay comandas pendientes para cocina.</p>`;
 }
 
-function renderAvailability() {
-  const availability = getAvailability();
-  const query = availabilityQuery.trim().toLowerCase();
-  const items = MENU_ITEMS.filter((item) => {
-    const haystack = `${item.es} ${item.en}`.toLowerCase();
-    return haystack.includes(query);
+function collectOptionAvailabilityRows() {
+  const rowsByKey = new Map();
+
+  function addRow(row) {
+    if (!rowsByKey.has(row.key)) {
+      rowsByKey.set(row.key, { ...row, usedBy: new Set(row.usedBy || []) });
+      return;
+    }
+    const existing = rowsByKey.get(row.key);
+    (row.usedBy || []).forEach((name) => existing.usedBy.add(name));
+  }
+
+  MENU_ITEMS.forEach((item) => {
+    (item.optionGroups || []).forEach((group) => {
+      (group.options || []).forEach((option) => {
+        addRow({
+          key: optionAvailabilityKey(group, option),
+          kind: "option",
+          es: option.es,
+          en: option.en || option.es,
+          detailEs: `Subopción · ${group.es}`,
+          detailEn: `Option · ${group.en || group.es}`,
+          usedBy: [item.es]
+        });
+      });
+    });
+
+    (item.extras || []).forEach((extra) => {
+      addRow({
+        key: extraAvailabilityKey(extra),
+        kind: "extra",
+        es: extra.es,
+        en: extra.en || extra.es,
+        detailEs: "Extra",
+        detailEn: "Extra",
+        usedBy: [item.es]
+      });
+    });
+
+    (item.removables || []).forEach((remove) => {
+      addRow({
+        key: removableAvailabilityKey(remove),
+        kind: "remove",
+        es: remove.es,
+        en: remove.en || remove.es,
+        detailEs: "Opción para quitar ingrediente",
+        detailEn: "Remove ingredient option",
+        usedBy: [item.es]
+      });
+    });
   });
+
+  return Array.from(rowsByKey.values()).map((row) => ({
+    ...row,
+    usedByList: Array.from(row.usedBy).sort()
+  })).sort((a, b) => a.es.localeCompare(b.es, "es"));
+}
+
+function rowMatchesQuery(row, query) {
+  if (!query) return true;
+  const haystack = [row.es, row.en, row.detailEs, row.detailEn, ...(row.usedByList || [])].join(" ").toLowerCase();
+  return haystack.includes(query);
+}
+
+function availabilityRowHtml(row) {
+  const checked = availabilityValue(row.key, row.legacyKey);
+  const usedBy = row.usedByList?.length
+    ? `Usado en: ${row.usedByList.slice(0, 5).join(", ")}${row.usedByList.length > 5 ? "…" : ""}`
+    : row.detailEn || "";
+  const isPending = pendingAvailabilityWrites.has(row.key);
+
+  return `
+    <label class="availability-row ${row.kind === "product" ? "is-product" : "is-suboption"} ${isPending ? "is-pending" : ""}">
+      <span>
+        ${escapeHtml(row.es)}
+        <small>${escapeHtml(row.detailEs || row.en || "")}</small>
+        ${row.kind !== "product" ? `<small>${escapeHtml(usedBy)}</small>` : ""}
+      </span>
+      <input type="checkbox" data-availability-key="${escapeHtml(row.key)}" data-legacy-key="${escapeHtml(row.legacyKey || "")}" ${checked ? "checked" : ""} ${isPending ? "disabled" : ""}>
+    </label>
+  `;
+}
+
+function renderAvailability() {
+  const query = availabilityQuery.trim().toLowerCase();
   const availabilityList = $("#availabilityList");
   if (!availabilityList) return;
-  availabilityList.innerHTML = items.map((item) => {
-    const available = availability[item.id] !== false;
-    return `
-      <label class="availability-row">
-        <span>${escapeHtml(item.es)}<small>${escapeHtml(item.en)}</small></span>
-        <input type="checkbox" data-availability="${escapeHtml(item.id)}" ${available ? "checked" : ""}>
-      </label>
-    `;
-  }).join("");
+
+  const productRows = MENU_ITEMS.map((item) => ({
+    key: productAvailabilityKey(item),
+    legacyKey: item.id,
+    kind: "product",
+    es: item.es,
+    en: item.en || item.es,
+    detailEs: "Producto completo",
+    detailEn: "Full product",
+    usedByList: []
+  })).filter((row) => rowMatchesQuery(row, query));
+
+  const optionRows = collectOptionAvailabilityRows().filter((row) => rowMatchesQuery(row, query));
+
+  const sections = [];
+  if (productRows.length) {
+    sections.push(`
+      <section class="availability-section">
+        <h3>Productos completos</h3>
+        ${productRows.map(availabilityRowHtml).join("")}
+      </section>
+    `);
+  }
+
+  if (optionRows.length) {
+    sections.push(`
+      <section class="availability-section">
+        <h3>Subopciones, proteínas y extras</h3>
+        <p class="availability-note">Ejemplo: si desactivas “Pollo guisado”, desaparece como opción en todos los productos que lo usan.</p>
+        ${optionRows.map(availabilityRowHtml).join("")}
+      </section>
+    `);
+  }
+
+  availabilityList.innerHTML = sections.length
+    ? sections.join("")
+    : `<p class="empty-state">No hay productos ni subopciones con esa búsqueda.</p>`;
 }
 
 function renderAll() {
@@ -696,8 +849,8 @@ function init() {
   }
 
   document.addEventListener("change", (event) => {
-    const input = event.target.closest("[data-availability]");
-    if (input) setAvailability(input.dataset.availability, input.checked);
+    const input = event.target.closest("[data-availability-key]");
+    if (input) setAvailability(input.dataset.availabilityKey, input.checked, input.dataset.legacyKey || null);
   });
 
   document.addEventListener("click", (event) => {
