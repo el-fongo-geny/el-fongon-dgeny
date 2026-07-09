@@ -591,6 +591,7 @@ function collectOptionAvailabilityRows() {
       rowsByKey.set(row.key, { ...row, usedBy: new Set(row.usedBy || []) });
       return;
     }
+
     const existing = rowsByKey.get(row.key);
     (row.usedBy || []).forEach((name) => existing.usedBy.add(name));
   }
@@ -635,10 +636,12 @@ function collectOptionAvailabilityRows() {
     });
   });
 
-  return Array.from(rowsByKey.values()).map((row) => ({
-    ...row,
-    usedByList: Array.from(row.usedBy).sort()
-  })).sort((a, b) => a.es.localeCompare(b.es, "es"));
+  return Array.from(rowsByKey.values())
+    .map((row) => ({
+      ...row,
+      usedByList: Array.from(row.usedBy).sort()
+    }))
+    .sort((a, b) => a.es.localeCompare(b.es, "es"));
 }
 
 function rowMatchesQuery(row, query) {
@@ -671,6 +674,10 @@ function renderAvailability() {
   const availabilityList = $("#availabilityList");
   if (!availabilityList) return;
 
+  const allOptionRows = collectOptionAvailabilityRows();
+
+  const optionRows = allOptionRows.filter((row) => rowMatchesQuery(row, query));
+
   const productRows = MENU_ITEMS.map((item) => ({
     key: productAvailabilityKey(item),
     legacyKey: item.id,
@@ -682,31 +689,39 @@ function renderAvailability() {
     usedByList: []
   })).filter((row) => rowMatchesQuery(row, query));
 
-  const optionRows = collectOptionAvailabilityRows().filter((row) => rowMatchesQuery(row, query));
-
   const sections = [];
-  if (productRows.length) {
-    sections.push(`
-      <section class="availability-section">
-        <h3>Productos completos</h3>
-        ${productRows.map(availabilityRowHtml).join("")}
-      </section>
-    `);
-  }
 
   if (optionRows.length) {
     sections.push(`
-      <section class="availability-section">
-        <h3>Subopciones, proteínas y extras</h3>
-        <p class="availability-note">Ejemplo: si desactivas “Pollo guisado”, desaparece como opción en todos los productos que lo usan.</p>
+      <section class="availability-section availability-section-options">
+        <h3>Subopciones, proteínas y extras <span>${optionRows.length}</span></h3>
+        <p class="availability-note">
+          Aquí puedes apagar opciones internas como “Pollo guisado”, “Bistec”, “Camarón”, “Aguacate extra”, acompañamientos y opciones para quitar ingredientes.
+          Si apagas una opción, desaparece del modal del cliente en todos los productos donde se use.
+        </p>
         ${optionRows.map(availabilityRowHtml).join("")}
       </section>
     `);
   }
 
+  if (productRows.length) {
+    sections.push(`
+      <section class="availability-section availability-section-products">
+        <h3>Productos completos <span>${productRows.length}</span></h3>
+        <p class="availability-note">Aquí apagas un plato completo cuando no esté disponible.</p>
+        ${productRows.map(availabilityRowHtml).join("")}
+      </section>
+    `);
+  }
+
+  if (!sections.length && allOptionRows.length) {
+    availabilityList.innerHTML = `<p class="empty-state">No hay coincidencias con esa búsqueda. Borra el texto del buscador para ver productos y subopciones.</p>`;
+    return;
+  }
+
   availabilityList.innerHTML = sections.length
     ? sections.join("")
-    : `<p class="empty-state">No hay productos ni subopciones con esa búsqueda.</p>`;
+    : `<p class="empty-state">No se encontraron subopciones en menu-data.js. Revisa que admin.html cargue menu-data.js antes de admin.js.</p>`;
 }
 
 function renderAll() {
