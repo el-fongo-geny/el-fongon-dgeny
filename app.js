@@ -24,11 +24,62 @@ const itemDescription = (item) => item.description?.[state.lang] || item.descrip
 let lastAvailabilitySnapshot = localStorage.getItem("fogon_availability") || "{}";
 
 function getAvailability() {
-  return JSON.parse(localStorage.getItem("fogon_availability") || "{}");
+  try {
+    return JSON.parse(localStorage.getItem("fogon_availability") || "{}");
+  } catch (_) {
+    return {};
+  }
 }
 
-function isAvailable(itemId) {
-  return getAvailability()[itemId] !== false;
+function hasOwn(object, key) {
+  return Object.prototype.hasOwnProperty.call(object || {}, key);
+}
+
+function availabilityValue(key, legacyKey = null) {
+  const availability = getAvailability();
+  if (hasOwn(availability, key)) return availability[key] !== false;
+  if (legacyKey && hasOwn(availability, legacyKey)) return availability[legacyKey] !== false;
+  return true;
+}
+
+function productAvailabilityKey(itemOrId) {
+  const id = typeof itemOrId === "string" ? itemOrId : itemOrId?.id;
+  return `product:${id}`;
+}
+
+function optionAvailabilityKey(group, option) {
+  return `option:${group.id}:${option.id}`;
+}
+
+function extraAvailabilityKey(extra) {
+  return `extra:${extra.id}`;
+}
+
+function removableAvailabilityKey(remove) {
+  return `remove:${remove.id}`;
+}
+
+function isProductAvailable(item) {
+  if (!item) return false;
+  const productEnabled = availabilityValue(productAvailabilityKey(item), item.id);
+  if (!productEnabled) return false;
+
+  return (item.optionGroups || []).every((group) => {
+    if (!group.required) return true;
+    return (group.options || []).some((option) => availabilityValue(optionAvailabilityKey(group, option)));
+  });
+}
+
+function isOptionAvailable(group, option) {
+  return availabilityValue(optionAvailabilityKey(group, option));
+}
+
+function isExtraAvailable(extra) {
+  return availabilityValue(extraAvailabilityKey(extra));
+}
+
+function isRemovableAvailable(remove) {
+  return availabilityValue(removableAvailabilityKey(remove));
 }
 
 async function syncAvailabilityFromBackend() {
@@ -120,7 +171,7 @@ function renderCategories() {
 }
 
 function productCardHtml(item) {
-  const unavailable = !isAvailable(item.id);
+  const unavailable = !isProductAvailable(item);
   return `
     <article class="product-card ${unavailable ? "is-unavailable" : ""}">
       <button class="product-trigger" data-product-id="${item.id}" ${unavailable ? "disabled" : ""}>
@@ -201,12 +252,17 @@ function optionLabel(option) {
 
 function openProduct(itemId) {
   const item = MENU_ITEMS.find((product) => product.id === itemId);
-  if (!item || !isAvailable(item.id)) return;
+  if (!item || !isProductAvailable(item)) return;
+
   state.currentProduct = item;
   const modal = $("#productModal");
-  const groups = item.optionGroups || [];
-  const extras = item.extras || [];
-  const removables = item.removables || [];
+  const groups = (item.optionGroups || []).map((group) => ({
+    ...group,
+    options: (group.options || []).filter((option) => isOptionAvailable(group, option))
+  })).filter((group) => group.options.length || group.required);
+  const extras = (item.extras || []).filter((extra) => isExtraAvailable(extra));
+  const removables = (item.removables || []).filter((remove) => isRemovableAvailable(remove));
+
   modal.innerHTML = `
     <div class="modal-sheet">
       <button class="icon-btn modal-close" type="button" aria-label="Cerrar">×</button>
@@ -224,12 +280,12 @@ function openProduct(itemId) {
         ${groups.map((group) => `
           <fieldset>
             <legend>${group[state.lang] || group.es} <span>${group.required ? text("required") : text("optional")}</span></legend>
-            ${group.options.map((option) => `
+            ${group.options.length ? group.options.map((option) => `
               <label class="choice-row">
                 <input type="${group.type === "multi" ? "checkbox" : "radio"}" name="${group.id}" value="${option.id}" ${group.required ? "required" : ""}>
                 <span>${optionLabel(option)}</span>
               </label>
-            `).join("")}
+            `).join("") : `<p class="choice-empty">${state.lang === "en" ? "Not available right now." : "No disponible por ahora."}</p>`}
           </fieldset>
         `).join("")}
         ${extras.length ? `
