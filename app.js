@@ -560,6 +560,7 @@ function renderCart() {
   const cartFab = $("#cartFab");
   if (cartFab) {
     cartFab.setAttribute("aria-label", `${text("cart")}: ${cartQty}`);
+    cartFab.setAttribute("aria-expanded", String(isCartOpen()));
   }
 
   const container = $("#cartItems");
@@ -617,7 +618,7 @@ function handlePageScroll() {
     document.body.classList.remove("is-scrolling-down");
     document.body.classList.add("is-scrolling-up");
     state.cartFabCompact = false;
-  } else if (delta > 5) {
+  } else if (delta > 5 && !isCartOpen()) {
     document.body.classList.add("is-scrolling-down");
     document.body.classList.remove("is-scrolling-up");
     state.cartFabCompact = true;
@@ -646,6 +647,12 @@ function openCart() {
   if (cartPanel) {
     cartPanel.setAttribute("aria-hidden", "false");
   }
+
+  const cartFab = $("#cartFab");
+  if (cartFab) {
+    cartFab.classList.add("is-open");
+    cartFab.setAttribute("aria-expanded", "true");
+  }
 }
 
 function closeCart() {
@@ -654,6 +661,12 @@ function closeCart() {
   const cartPanel = $("#cartPanel");
   if (cartPanel) {
     cartPanel.setAttribute("aria-hidden", "true");
+  }
+
+  const cartFab = $("#cartFab");
+  if (cartFab) {
+    cartFab.classList.remove("is-open");
+    cartFab.setAttribute("aria-expanded", "false");
   }
 }
 
@@ -793,19 +806,19 @@ function initEvents() {
   });
 
   document.addEventListener("click", (event) => {
-    const closeCartButton = event.target.closest("#closeCartBtn");
-    if (closeCartButton) {
-      event.preventDefault();
-      event.stopPropagation();
-      closeCart();
-      return;
-    }
-
     const cartFab = event.target.closest("#cartFab");
     if (cartFab) {
       event.preventDefault();
       event.stopPropagation();
       toggleCart();
+      return;
+    }
+
+    const closeCartButton = event.target.closest("#closeCartBtn");
+    if (closeCartButton) {
+      event.preventDefault();
+      event.stopPropagation();
+      closeCart();
       return;
     }
 
@@ -849,7 +862,7 @@ function initEvents() {
       saveOrder(paymentButton.dataset.payment);
       return;
     }
-  });
+  }, true);
 
   document.addEventListener("submit", (event) => {
     if (event.target.id === "productForm") {
