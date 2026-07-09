@@ -13,8 +13,8 @@
 (function () {
   "use strict";
 
-  const SUPABASE_URL = "PEGA_AQUI_TU_SUPABASE_API_URL";
-  const SUPABASE_ANON_KEY = "PEGA_AQUI_TU_SUPABASE_ANON_PUBLIC_KEY";
+  const SUPABASE_URL = "https://jjfxjfkomcjgmhjzhwmc.supabase.co/rest/v1/";
+  const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpqZnhqZmtvbWNqZ21oanpod21jIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM1NDI4MzYsImV4cCI6MjA5OTExODgzNn0.IDw7xJrgxvvi1_u-hI8lybsw5sMNSQN1lNUreCLUvb0";
 
   window.FOGON_SUPABASE = {
     url: SUPABASE_URL,
