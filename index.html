@@ -3,185 +3,89 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="theme-color" content="#fbfaf7">
-  <title>El Fogon D' Geny | Menu</title>
-  <link rel="stylesheet" href="style.css?v=18-mobile-fixed">
-
-  <style>
-    /* Carrito visual premium */
-    .cart-fab {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      gap: 10px;
-      overflow: hidden;
-      position: fixed;
-      isolation: isolate;
-    }
-
-    .cart-fab::before {
-      content: "";
-      position: absolute;
-      inset: -40% -80%;
-      background: linear-gradient(115deg, transparent 35%, rgba(255,255,255,.38) 48%, transparent 62%);
-      transform: translateX(-55%);
-      animation: cartShine 4.8s ease-in-out infinite;
-      pointer-events: none;
-      z-index: -1;
-    }
-
-    .cart-icon-wrap {
-      width: 42px;
-      height: 42px;
-      flex: 0 0 42px;
-      display: grid;
-      place-items: center;
-      border-radius: 999px;
-      background:
-        radial-gradient(circle at 32% 24%, rgba(255,255,255,.95) 0 12%, rgba(255,255,255,.36) 13% 27%, transparent 28%),
-        linear-gradient(145deg, #ffe7b4 0%, #ffb347 42%, #df1f2d 100%);
-      box-shadow:
-        inset 0 1px 0 rgba(255,255,255,.72),
-        inset 0 -10px 18px rgba(99,25,8,.22),
-        0 10px 24px rgba(112,32,12,.28);
-      position: relative;
-    }
-
-    .cart-icon-wrap::after {
-      content: "";
-      position: absolute;
-      inset: 6px;
-      border-radius: inherit;
-      border: 1px solid rgba(255,255,255,.42);
-      pointer-events: none;
-    }
-
-    .cart-svg {
-      width: 25px;
-      height: 25px;
-      color: #fffaf2;
-      filter: drop-shadow(0 2px 2px rgba(79,20,8,.38));
-    }
-
-    #cartCount {
-      min-width: 28px;
-      height: 28px;
-      padding: 0 8px;
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      border-radius: 999px;
-      background: linear-gradient(180deg, #ffffff 0%, #fff1d2 100%);
-      color: #7a2409;
-      font-weight: 900;
-      box-shadow: inset 0 1px 0 rgba(255,255,255,.9), 0 4px 10px rgba(0,0,0,.18);
-    }
-
-    @keyframes cartShine {
-      0%, 55% { transform: translateX(-65%); opacity: 0; }
-      70% { opacity: 1; }
-      100% { transform: translateX(65%); opacity: 0; }
-    }
-
-    @media (max-width: 560px) {
-      .cart-fab { gap: 8px; }
-      .cart-icon-wrap { width: 38px; height: 38px; flex-basis: 38px; }
-      .cart-svg { width: 23px; height: 23px; }
-    }
-  </style>
+  <meta name="theme-color" content="#111111">
+  <title>Panel iPad | El Fogon D' Geny</title>
+  <link rel="stylesheet" href="style.css?v=19-availability">
 </head>
-<body>
-  <div id="languageGate" class="language-gate">
-    <div class="language-card">
-      <p class="eyebrow">El Fogon D' Geny</p>
-      <h1>Elige tu idioma</h1>
-      <p>Choose your language</p>
-      <div class="language-actions">
-        <button class="primary-btn" data-set-lang="es">Español</button>
-        <button class="secondary-btn" data-set-lang="en">English</button>
-      </div>
-    </div>
-  </div>
-
-  <header class="site-header">
-    <div class="brand-heading">
-      <img class="brand-logo" src="assets/images/logo.png" alt="El Fogon D' Geny" onerror="this.hidden=true">
-      <div class="brand-copy">
-        <p class="eyebrow">El Fogon D' Geny</p>
-        <h1 data-i18n="heroTitle">Menú</h1>
-        <p class="subtitle" data-i18n="heroSubtitle">Haz tu pedido y recógelo en la ventanilla del camión.</p>
-      </div>
-    </div>
-    <div class="header-actions">
-      <button id="themeToggleBtn" class="theme-toggle" type="button" aria-pressed="false" data-i18n="darkMode">Modo oscuro</button>
-      <div class="lang-switch" aria-label="Language">
-        <button data-set-lang="es">ES</button>
-        <button data-set-lang="en">EN</button>
-      </div>
-    </div>
-  </header>
-
-  <main class="menu-shell">
-    <nav id="categoryTabs" class="category-tabs" aria-label="Categorías"></nav>
-    <section id="menuGrid" class="menu-grid" aria-live="polite"></section>
+<body class="admin-body dark-mode">
+  <main id="adminLogin" class="admin-login">
+    <form id="pinForm" class="admin-card login-card">
+      <p class="eyebrow">Panel iPad</p>
+      <h1>El Fogon D' Geny</h1>
+      <label>
+        <span>PIN</span>
+        <input id="pinInput" type="password" inputmode="numeric" autocomplete="off" placeholder="PIN" required>
+      </label>
+      <button id="loginButton" class="primary-btn full" type="submit">Entrar</button>
+      <p id="pinError" class="error-text" hidden>PIN incorrecto.</p>
+    </form>
   </main>
 
-  <button id="cartFab" class="cart-fab" type="button" aria-label="Abrir carrito de compra">
-    <span class="cart-icon-wrap" aria-hidden="true">
-      <svg class="cart-svg" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <path d="M18 19.5h37l-4.6 20.1c-.7 3.1-3.4 5.3-6.6 5.3H26.6c-3.1 0-5.8-2.1-6.6-5.1L13.6 14H7.5" stroke="currentColor" stroke-width="5.4" stroke-linecap="round" stroke-linejoin="round"/>
-        <path d="M24.5 28.5h24.8M27 36h19.7" stroke="currentColor" stroke-width="4" stroke-linecap="round" opacity=".86"/>
-        <circle cx="27.5" cy="52" r="4.7" fill="currentColor"/>
-        <circle cx="46" cy="52" r="4.7" fill="currentColor"/>
-        <path d="M47 15.2c4.2 1.3 6.3 3.8 7.2 7.1" stroke="currentColor" stroke-width="3.4" stroke-linecap="round" opacity=".7"/>
-      </svg>
-    </span>
-    <span class="cart-label" data-i18n="cart">Carrito</span>
-    <strong id="cartCount">0</strong>
-  </button>
+  <main id="adminPanel" class="admin-panel" hidden>
+    <header class="admin-header">
+      <div>
+        <p class="eyebrow">Panel iPad</p>
+        <h1>Pedidos, cocina y disponibilidad</h1>
+        <div class="admin-stats">
+          <span class="admin-pill">Pendientes: <strong id="pendingCount">0</strong></span>
+          <span class="admin-pill">En cocina: <strong id="kitchenCount">0</strong></span>
+        </div>
+      </div>
+      <div class="admin-actions">
+        <button id="adminThemeToggleBtn" class="secondary-btn" type="button">Modo claro</button>
+        <button id="clearOrdersBtn" class="secondary-btn danger-btn" type="button">Limpiar pedidos</button>
+      </div>
+    </header>
 
-  <aside id="cartPanel" class="cart-panel" aria-hidden="true">
-    <div class="cart-header">
-      <h2 data-i18n="yourOrder">Tu pedido</h2>
-      <button id="closeCartBtn" class="icon-btn" type="button" aria-label="Cerrar">×</button>
+    <div id="soundBanner" class="sound-banner" hidden>
+      <p><strong>Sonido del iPad</strong><br>El sonido se activa con el PIN. Mantén esta pestaña abierta; sonará en bucle con cada pedido nuevo hasta aceptar el pedido.</p>
     </div>
-    <div id="cartItems" class="cart-items"></div>
-    <div class="cart-summary">
-      <div><span data-i18n="subtotal">Subtotal</span><strong id="subtotalValue">$0.00</strong></div>
-      <div><span data-i18n="tax">Impuestos</span><strong id="taxValue">$0.00</strong></div>
-      <div class="total-row"><span>Total</span><strong id="totalValue">$0.00</strong></div>
-    </div>
-    <form id="checkoutForm" class="checkout-form">
-      <label>
-        <span data-i18n="name">Nombre</span>
-        <input id="customerName" type="text" autocomplete="name" required>
-      </label>
-      <label>
-        <span data-i18n="phone">Teléfono</span>
-        <input id="customerPhone" type="tel" inputmode="tel" autocomplete="tel" placeholder="(650) 000-0000" required>
-      </label>
-      <p class="form-note" data-i18n="phoneNote">Te avisaremos por WhatsApp o mensaje cuando tu pedido esté listo.</p>
-      <button class="primary-btn full" type="submit" data-i18n="sendOrder">Enviar pedido</button>
-    </form>
-  </aside>
 
-  <div id="modalBackdrop" class="modal-backdrop" hidden></div>
-  <section id="productModal" class="product-modal" aria-hidden="true"></section>
+    <nav class="admin-tabs" aria-label="Secciones del panel">
+      <button class="admin-tab active" type="button" data-admin-tab="orders">Pedidos</button>
+      <button class="admin-tab" type="button" data-admin-tab="kitchen">Cocina</button>
+      <button class="admin-tab" type="button" data-admin-tab="availability">Disponibilidad</button>
+    </nav>
 
-  <section id="paymentModal" class="payment-modal" aria-hidden="true">
-    <div class="payment-card">
-      <h2 data-i18n="paymentTitle">¿Cómo pagarás?</h2>
-      <p data-i18n="paymentSubtitle">El pago se realiza en la ventanilla.</p>
-      <button class="primary-btn full" data-payment="card" data-i18n="cardAtWindow">Tarjeta en ventanilla</button>
-      <button class="secondary-btn full" data-payment="cash" data-i18n="cashAtWindow">Efectivo en ventanilla</button>
-    </div>
-  </section>
+    <section id="ordersTab" class="admin-tab-panel active" data-admin-panel="orders">
+      <div class="admin-card wide">
+        <div class="section-title">
+          <h2>Pedidos recibidos</h2>
+          <span id="orderCount">0</span>
+        </div>
+        <p class="admin-help">Aquí se ve el pedido completo: cliente, teléfono, total, pago y estado. Cuando marques “Entregado / quitar”, desaparece para todos.</p>
+        <div id="ordersList" class="orders-list"></div>
+      </div>
+    </section>
+
+    <section id="kitchenTab" class="admin-tab-panel" data-admin-panel="kitchen" hidden>
+      <div class="admin-card wide kitchen-card">
+        <div class="section-title">
+          <h2>Cocina</h2>
+          <span id="kitchenVisibleCount">0</span>
+        </div>
+        <p class="admin-help">Vista limpia para cocina. Solo muestra ID, platos y subopciones. “Terminado en cocina” oculta la comanda solo aquí; el pedido sigue en el panel principal.</p>
+        <div id="kitchenList" class="kitchen-list"></div>
+      </div>
+    </section>
+
+    <section id="availabilityTab" class="admin-tab-panel" data-admin-panel="availability" hidden>
+      <div class="admin-card wide">
+        <div class="section-title">
+          <h2>Disponibilidad</h2>
+        </div>
+        <p class="admin-help">Apaga un producto cuando esté agotado. El menú público lo mostrará como agotado y no dejará pedirlo.</p>
+        <input id="availabilitySearch" class="search-input" type="search" placeholder="Buscar producto...">
+        <div id="availabilityList" class="availability-list"></div>
+      </div>
+    </section>
+  </main>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="supabase-config.js?v=18-mobile-fixed"></script>
-  <script src="supabase-client.js?v=18-mobile-fixed"></script>
+  <script src="supabase-client.js?v=19-availability"></script>
   <script src="backend-config.js?v=18-mobile-fixed"></script>
   <script src="menu-data.js?v=18-mobile-fixed"></script>
-  <script src="app.js?v=18-mobile-fixed"></script>
+  <script src="admin.js?v=19-availability"></script>
 </body>
 </html>
