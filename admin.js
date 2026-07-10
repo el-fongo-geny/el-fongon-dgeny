@@ -17,7 +17,7 @@ let soundUnlocked = false;
 let lastNewOrderSignature = "";
 
 const pendingAvailabilityWrites = new Map();
-const DAILY_MISSING_PHONE = "16507224407";
+const DAILY_MISSING_PHONE = "16507855425";
 
 function applyAdminTheme() {
   const theme = localStorage.getItem(STORAGE_ADMIN_THEME) || "dark";
