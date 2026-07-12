@@ -1828,3 +1828,96 @@ body.dark-mode .category-title span {
     font-size: 0.82rem;
   }
 }
+
+/* =========================================================
+   V16 — BORDES CULTURALES DOMINICANOS POR CATEGORÍA
+   Aplica un borde sutil rojo, blanco y azul a todas las tarjetas.
+   Cada categoría cambia ligeramente la dirección y el predominio
+   del degradado para conservar unidad visual sin verse repetitiva.
+   ========================================================= */
+
+.product-trigger {
+  --card-flag-angle: 135deg;
+  --card-flag-first: var(--flag-blue);
+  --card-flag-second: var(--flag-red);
+
+  border: 2px solid transparent !important;
+  background:
+    linear-gradient(var(--surface), var(--surface)) padding-box,
+    linear-gradient(
+      var(--card-flag-angle),
+      var(--card-flag-first) 0 29%,
+      rgba(255, 255, 255, 0.96) 29% 35%,
+      var(--card-flag-second) 35% 65%,
+      rgba(255, 255, 255, 0.96) 65% 71%,
+      var(--card-flag-first) 71% 100%
+    ) border-box !important;
+  box-shadow:
+    0 0 0 1px rgba(18, 59, 114, 0.05),
+    0 10px 26px rgba(31, 27, 22, 0.07);
+}
+
+/* Variación 1: azul dominante, lectura horizontal y sobria. */
+.menu-grid > .category-section:nth-child(4n + 1) .product-trigger {
+  --card-flag-angle: 90deg;
+  --card-flag-first: var(--flag-blue);
+  --card-flag-second: var(--flag-red);
+}
+
+/* Variación 2: rojo dominante, diagonal más cálida. */
+.menu-grid > .category-section:nth-child(4n + 2) .product-trigger {
+  --card-flag-angle: 135deg;
+  --card-flag-first: var(--flag-red);
+  --card-flag-second: var(--flag-blue);
+}
+
+/* Variación 3: azul y rojo en diagonal ascendente. */
+.menu-grid > .category-section:nth-child(4n + 3) .product-trigger {
+  --card-flag-angle: 45deg;
+  --card-flag-first: var(--flag-blue);
+  --card-flag-second: var(--flag-red);
+}
+
+/* Variación 4: rojo y azul en lectura vertical. */
+.menu-grid > .category-section:nth-child(4n + 4) .product-trigger {
+  --card-flag-angle: 180deg;
+  --card-flag-first: var(--flag-red);
+  --card-flag-second: var(--flag-blue);
+}
+
+.product-trigger:hover {
+  border-color: transparent !important;
+  box-shadow:
+    0 0 0 1px rgba(216, 58, 33, 0.08),
+    0 14px 34px rgba(18, 59, 114, 0.13);
+}
+
+.product-trigger:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--flag-blue) 34%, transparent);
+  outline-offset: 3px;
+}
+
+/* Mantiene el acabado correctamente en modo oscuro. */
+body.dark-mode .product-trigger {
+  border-color: transparent !important;
+  background:
+    linear-gradient(var(--surface), var(--surface)) padding-box,
+    linear-gradient(
+      var(--card-flag-angle),
+      var(--card-flag-first) 0 29%,
+      rgba(255, 255, 255, 0.88) 29% 35%,
+      var(--card-flag-second) 35% 65%,
+      rgba(255, 255, 255, 0.88) 65% 71%,
+      var(--card-flag-first) 71% 100%
+    ) border-box !important;
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.035),
+    0 12px 30px rgba(0, 0, 0, 0.38);
+}
+
+/* En móvil el borde se mantiene visible sin ocupar demasiado espacio. */
+@media (max-width: 900px) {
+  .product-trigger {
+    border-width: 2px !important;
+  }
+}
