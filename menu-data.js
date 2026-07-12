@@ -671,7 +671,7 @@ const MENU_ITEMS = [
     taxable: false,
     optionGroups: [{ id: "base", es: "Base", en: "Base", required: true, type: "single", options: [{ id: "leche", es: "Con leche", en: "With milk", price: 0 }, { id: "agua", es: "Con agua", en: "With water", price: 0 }] }]
   },
-  { id: "morir-sonando-chinola", category: "jugos", es: "Morir Soñando de Chinola y limon", en: "Passion Fruit Morir Soñando or limón", description: { es: "Bebida dominicana cremosa de chinola.", en: "Creamy Dominican passion fruit drink." }, price: 8, image: "assets/images/morir-sonando-chinola.png", taxable: false },
+  { id: "morir-sonando-chinola o limon", category: "jugos", es: "Morir Soñando de Chinola o limon", en: "Passion Fruit Morir Soñando or limón", description: { es: "Bebida dominicana cremosa de chinola.", en: "Creamy Dominican passion fruit drink." }, price: 8, image: "assets/images/morir-sonando-chinola.png", taxable: false },
   { id: "cafe-santo-domingo", category: "bebidas", es: "Café Santo Domingo", en: "Santo Domingo Coffee", description: { es: "Café dominicano.", en: "Dominican coffee." }, price: 5, image: "assets/images/cafe-santo-domingo.png", taxable: false },
   { id: "agua", category: "bebidas", es: "Agua", en: "Water", description: { es: "Agua embotellada.", en: "Bottled water." }, price: 2, image: "assets/images/agua.png", taxable: false },
   { id: "agua-de-coco", category: "bebidas", es: "Agua de Coco", en: "Coconut Water", description: { es: "Agua de coco.", en: "Coconut water." }, price: 4, image: "assets/images/agua-de-coco.png", taxable: false },
