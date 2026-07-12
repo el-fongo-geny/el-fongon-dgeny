@@ -1830,266 +1830,10 @@ body.dark-mode .category-title span {
 }
 
 /* =========================================================
-   V16 — BORDES CULTURALES DOMINICANOS POR CATEGORÍA
-   Aplica un borde sutil rojo, blanco y azul a todas las tarjetas.
-   Cada categoría cambia ligeramente la dirección y el predominio
-   del degradado para conservar unidad visual sin verse repetitiva.
-   ========================================================= */
-
-.product-trigger {
-  --card-flag-angle: 135deg;
-  --card-flag-first: var(--flag-blue);
-  --card-flag-second: var(--flag-red);
-
-  border: 2px solid transparent !important;
-  background:
-    linear-gradient(var(--surface), var(--surface)) padding-box,
-    linear-gradient(
-      var(--card-flag-angle),
-      var(--card-flag-first) 0 29%,
-      rgba(255, 255, 255, 0.96) 29% 35%,
-      var(--card-flag-second) 35% 65%,
-      rgba(255, 255, 255, 0.96) 65% 71%,
-      var(--card-flag-first) 71% 100%
-    ) border-box !important;
-  box-shadow:
-    0 0 0 1px rgba(18, 59, 114, 0.05),
-    0 10px 26px rgba(31, 27, 22, 0.07);
-}
-
-/* Variación 1: azul dominante, lectura horizontal y sobria. */
-.menu-grid > .category-section:nth-child(4n + 1) .product-trigger {
-  --card-flag-angle: 90deg;
-  --card-flag-first: var(--flag-blue);
-  --card-flag-second: var(--flag-red);
-}
-
-/* Variación 2: rojo dominante, diagonal más cálida. */
-.menu-grid > .category-section:nth-child(4n + 2) .product-trigger {
-  --card-flag-angle: 135deg;
-  --card-flag-first: var(--flag-red);
-  --card-flag-second: var(--flag-blue);
-}
-
-/* Variación 3: azul y rojo en diagonal ascendente. */
-.menu-grid > .category-section:nth-child(4n + 3) .product-trigger {
-  --card-flag-angle: 45deg;
-  --card-flag-first: var(--flag-blue);
-  --card-flag-second: var(--flag-red);
-}
-
-/* Variación 4: rojo y azul en lectura vertical. */
-.menu-grid > .category-section:nth-child(4n + 4) .product-trigger {
-  --card-flag-angle: 180deg;
-  --card-flag-first: var(--flag-red);
-  --card-flag-second: var(--flag-blue);
-}
-
-.product-trigger:hover {
-  border-color: transparent !important;
-  box-shadow:
-    0 0 0 1px rgba(216, 58, 33, 0.08),
-    0 14px 34px rgba(18, 59, 114, 0.13);
-}
-
-.product-trigger:focus-visible {
-  outline: 3px solid color-mix(in srgb, var(--flag-blue) 34%, transparent);
-  outline-offset: 3px;
-}
-
-/* Mantiene el acabado correctamente en modo oscuro. */
-body.dark-mode .product-trigger {
-  border-color: transparent !important;
-  background:
-    linear-gradient(var(--surface), var(--surface)) padding-box,
-    linear-gradient(
-      var(--card-flag-angle),
-      var(--card-flag-first) 0 29%,
-      rgba(255, 255, 255, 0.88) 29% 35%,
-      var(--card-flag-second) 35% 65%,
-      rgba(255, 255, 255, 0.88) 65% 71%,
-      var(--card-flag-first) 71% 100%
-    ) border-box !important;
-  box-shadow:
-    0 0 0 1px rgba(255, 255, 255, 0.035),
-    0 12px 30px rgba(0, 0, 0, 0.38);
-}
-
-/* En móvil el borde se mantiene visible sin ocupar demasiado espacio. */
-@media (max-width: 900px) {
-  .product-trigger {
-    border-width: 2px !important;
-  }
-}
-
-/* =========================================================
-   V17 — MARCO DOMINICANO NOTORIO Y ELEGANTE
-   Sustituye visualmente el borde V16 por un marco tricolor
-   más presente, con variaciones culturales por categoría.
-   ========================================================= */
-
-.product-trigger {
-  --dominican-primary: var(--flag-blue);
-  --dominican-secondary: var(--flag-red);
-  --dominican-angle: 118deg;
-  --dominican-shadow: rgba(18, 59, 114, 0.18);
-
-  position: relative;
-  isolation: isolate;
-  border: 5px solid transparent !important;
-  background:
-    linear-gradient(var(--surface), var(--surface)) padding-box,
-    linear-gradient(
-      var(--dominican-angle),
-      var(--dominican-primary) 0 30%,
-      #ffffff 30% 36%,
-      var(--dominican-secondary) 36% 64%,
-      #ffffff 64% 70%,
-      var(--dominican-primary) 70% 100%
-    ) border-box !important;
-  box-shadow:
-    0 0 0 1px rgba(255, 255, 255, 0.92),
-    0 12px 30px var(--dominican-shadow),
-    0 4px 10px rgba(31, 27, 22, 0.08) !important;
-  transition:
-    transform 180ms ease,
-    box-shadow 180ms ease,
-    filter 180ms ease !important;
-}
-
-/* Línea interior blanca: separa el tricolor del contenido y lo hace premium. */
-.product-trigger::before {
-  content: "";
-  position: absolute;
-  inset: 3px;
-  z-index: 4;
-  pointer-events: none;
-  border: 1px solid rgba(255, 255, 255, 0.88);
-  border-radius: calc(20px - 3px);
-  box-shadow: inset 0 0 0 1px rgba(18, 59, 114, 0.06);
-}
-
-/* Pequeño sello tricolor inspirado en la bandera, sin usar un icono literal. */
-.product-trigger::after {
-  content: "";
-  position: absolute;
-  left: 50%;
-  top: -1px;
-  z-index: 5;
-  width: 58px;
-  height: 9px;
-  pointer-events: none;
-  border: 2px solid rgba(255, 255, 255, 0.96);
-  border-radius: 0 0 9px 9px;
-  background:
-    linear-gradient(
-      90deg,
-      var(--dominican-primary) 0 42%,
-      #ffffff 42% 58%,
-      var(--dominican-secondary) 58% 100%
-    );
-  box-shadow: 0 4px 10px var(--dominican-shadow);
-  transform: translateX(-50%);
-}
-
-.product-trigger:hover {
-  transform: translateY(-4px) scale(1.008);
-  filter: saturate(1.08);
-  box-shadow:
-    0 0 0 1px rgba(255, 255, 255, 1),
-    0 18px 42px var(--dominican-shadow),
-    0 7px 16px rgba(31, 27, 22, 0.11) !important;
-}
-
-/* Categoría 1: azul institucional, sobrio y clásico. */
-.menu-grid > .category-section:nth-child(4n + 1) .product-trigger {
-  --dominican-primary: #123b72;
-  --dominican-secondary: #c82932;
-  --dominican-angle: 112deg;
-  --dominican-shadow: rgba(18, 59, 114, 0.21);
-}
-
-/* Categoría 2: rojo cálido, asociado al fogón y la cocina criolla. */
-.menu-grid > .category-section:nth-child(4n + 2) .product-trigger {
-  --dominican-primary: #c82932;
-  --dominican-secondary: #123b72;
-  --dominican-angle: 68deg;
-  --dominican-shadow: rgba(200, 41, 50, 0.19);
-}
-
-/* Categoría 3: diagonales cruzadas, guiño elegante a la cruz de la bandera. */
-.menu-grid > .category-section:nth-child(4n + 3) .product-trigger {
-  --dominican-primary: #173f78;
-  --dominican-secondary: #d3353d;
-  --dominican-angle: 142deg;
-  --dominican-shadow: rgba(23, 63, 120, 0.20);
-}
-
-/* Categoría 4: rojo profundo y azul marino, aspecto más ceremonial. */
-.menu-grid > .category-section:nth-child(4n + 4) .product-trigger {
-  --dominican-primary: #a91f2b;
-  --dominican-secondary: #0e356c;
-  --dominican-angle: 90deg;
-  --dominican-shadow: rgba(169, 31, 43, 0.18);
-}
-
-body.dark-mode .product-trigger {
-  background:
-    linear-gradient(var(--surface), var(--surface)) padding-box,
-    linear-gradient(
-      var(--dominican-angle),
-      var(--dominican-primary) 0 30%,
-      rgba(255, 255, 255, 0.96) 30% 36%,
-      var(--dominican-secondary) 36% 64%,
-      rgba(255, 255, 255, 0.96) 64% 70%,
-      var(--dominican-primary) 70% 100%
-    ) border-box !important;
-  box-shadow:
-    0 0 0 1px rgba(255, 255, 255, 0.24),
-    0 15px 36px rgba(0, 0, 0, 0.45),
-    0 5px 14px var(--dominican-shadow) !important;
-}
-
-body.dark-mode .product-trigger::before {
-  border-color: rgba(255, 255, 255, 0.46);
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.05);
-}
-
-@media (max-width: 900px) {
-  .product-trigger {
-    border-width: 4px !important;
-    box-shadow:
-      0 0 0 1px rgba(255, 255, 255, 0.88),
-      0 10px 24px var(--dominican-shadow),
-      0 3px 8px rgba(31, 27, 22, 0.07) !important;
-  }
-
-  .product-trigger::before {
-    inset: 2px;
-    border-radius: calc(22px - 3px);
-  }
-
-  .product-trigger::after {
-    width: 48px;
-    height: 8px;
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .product-trigger {
-    transition: none !important;
-  }
-
-  .product-trigger:hover {
-    transform: none;
-  }
-}
-
-/* =========================================================
-   V18 — CATEGORÍAS SIEMPRE UNA DEBAJO DE OTRA
-   Evita que en tablet horizontal el menú se divida en dos
-   columnas de categorías. Las tarjetas internas de cada
-   categoría conservan su propia cuadrícula.
+   V16 — CATEGORÍAS EN UNA SOLA COLUMNA
+   En vertical y en tablet horizontal, cada categoría aparece
+   debajo de la anterior. La cuadrícula interna de productos
+   sigue adaptándose al ancho disponible.
    ========================================================= */
 .menu-grid {
   grid-template-columns: minmax(0, 1fr) !important;
@@ -2098,4 +1842,174 @@ body.dark-mode .product-trigger::before {
 .category-section {
   width: 100%;
   min-width: 0;
+}
+
+/* =========================================================
+   V17 — TARJETAS DOMINICANAS FLUIDAS Y ELEGANTES
+   Marco continuo inspirado en la bandera dominicana.
+   Sin pestañas, cortes bruscos ni adornos sobresalientes.
+   ========================================================= */
+.product-trigger {
+  --card-flag-blue: #123b72;
+  --card-flag-red: #c92d36;
+  --card-flag-angle: 125deg;
+  --card-blue-glow: rgba(18, 59, 114, 0.10);
+  --card-red-glow: rgba(201, 45, 54, 0.09);
+
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  border: 3px solid transparent !important;
+  border-radius: 22px;
+  background:
+    linear-gradient(var(--surface), var(--surface)) padding-box,
+    linear-gradient(
+      var(--card-flag-angle),
+      var(--card-flag-blue) 0%,
+      #24558d 25%,
+      rgba(255, 255, 255, 0.98) 44%,
+      rgba(255, 255, 255, 0.98) 52%,
+      #d9424a 70%,
+      var(--card-flag-red) 88%,
+      var(--card-flag-blue) 100%
+    ) border-box !important;
+  box-shadow:
+    -7px 8px 22px var(--card-blue-glow),
+    7px 8px 22px var(--card-red-glow),
+    0 12px 30px rgba(31, 27, 22, 0.08) !important;
+  transition:
+    transform 180ms ease,
+    box-shadow 180ms ease,
+    filter 180ms ease;
+}
+
+/* Brillo interior que integra el marco con la tarjeta. */
+.product-trigger::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  pointer-events: none;
+  border-radius: inherit;
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.82),
+    inset 0 12px 20px rgba(255, 255, 255, 0.035);
+}
+
+/* Velo cromático muy ligero: da unidad sin teñir la comida. */
+.product-trigger::after {
+  content: "";
+  position: absolute;
+  inset: 3px;
+  z-index: 2;
+  pointer-events: none;
+  border-radius: calc(22px - 3px);
+  background:
+    linear-gradient(
+      135deg,
+      rgba(18, 59, 114, 0.025),
+      transparent 28%,
+      transparent 72%,
+      rgba(201, 45, 54, 0.025)
+    );
+}
+
+.product-trigger:hover {
+  transform: translateY(-3px);
+  filter: saturate(1.025);
+  box-shadow:
+    -9px 12px 28px var(--card-blue-glow),
+    9px 12px 28px var(--card-red-glow),
+    0 18px 38px rgba(31, 27, 22, 0.11) !important;
+}
+
+/* Variación 1: azul protagonista, institucional y sobria. */
+.menu-grid > .category-section:nth-child(4n + 1) .product-trigger {
+  --card-flag-blue: #113b73;
+  --card-flag-red: #c92d36;
+  --card-flag-angle: 122deg;
+  --card-blue-glow: rgba(17, 59, 115, 0.11);
+  --card-red-glow: rgba(201, 45, 54, 0.075);
+}
+
+/* Variación 2: rojo cálido, inspirado en el fogón criollo. */
+.menu-grid > .category-section:nth-child(4n + 2) .product-trigger {
+  --card-flag-blue: #174578;
+  --card-flag-red: #bd2631;
+  --card-flag-angle: 72deg;
+  --card-blue-glow: rgba(23, 69, 120, 0.075);
+  --card-red-glow: rgba(189, 38, 49, 0.105);
+}
+
+/* Variación 3: diagonal más dinámica y contemporánea. */
+.menu-grid > .category-section:nth-child(4n + 3) .product-trigger {
+  --card-flag-blue: #0f356b;
+  --card-flag-red: #d13a43;
+  --card-flag-angle: 148deg;
+  --card-blue-glow: rgba(15, 53, 107, 0.10);
+  --card-red-glow: rgba(209, 58, 67, 0.08);
+}
+
+/* Variación 4: tonos profundos, con carácter ceremonial. */
+.menu-grid > .category-section:nth-child(4n + 4) .product-trigger {
+  --card-flag-blue: #1f4a80;
+  --card-flag-red: #aa202c;
+  --card-flag-angle: 48deg;
+  --card-blue-glow: rgba(31, 74, 128, 0.09);
+  --card-red-glow: rgba(170, 32, 44, 0.09);
+}
+
+/* El contenido permanece por encima del velo decorativo. */
+.product-trigger > * {
+  position: relative;
+  z-index: 1;
+}
+
+body.dark-mode .product-trigger {
+  background:
+    linear-gradient(var(--surface), var(--surface)) padding-box,
+    linear-gradient(
+      var(--card-flag-angle),
+      var(--card-flag-blue) 0%,
+      #2b6098 25%,
+      rgba(255, 255, 255, 0.90) 44%,
+      rgba(255, 255, 255, 0.90) 52%,
+      #df4b53 70%,
+      var(--card-flag-red) 88%,
+      var(--card-flag-blue) 100%
+    ) border-box !important;
+  box-shadow:
+    -7px 10px 24px rgba(18, 59, 114, 0.16),
+    7px 10px 24px rgba(201, 45, 54, 0.13),
+    0 18px 38px rgba(0, 0, 0, 0.36) !important;
+}
+
+body.dark-mode .product-trigger::before {
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.20),
+    inset 0 12px 20px rgba(255, 255, 255, 0.025);
+}
+
+@media (max-width: 900px) {
+  .product-trigger {
+    border-width: 3px !important;
+    border-radius: 20px;
+    box-shadow:
+      -5px 7px 18px var(--card-blue-glow),
+      5px 7px 18px var(--card-red-glow),
+      0 10px 24px rgba(31, 27, 22, 0.075) !important;
+  }
+
+  .product-trigger::after {
+    inset: 3px;
+    border-radius: calc(20px - 3px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .product-trigger,
+  .product-trigger:hover {
+    transition: none !important;
+    transform: none !important;
+  }
 }
