@@ -1921,3 +1921,181 @@ body.dark-mode .product-trigger {
     border-width: 2px !important;
   }
 }
+
+/* =========================================================
+   V17 — MARCO DOMINICANO NOTORIO Y ELEGANTE
+   Sustituye visualmente el borde V16 por un marco tricolor
+   más presente, con variaciones culturales por categoría.
+   ========================================================= */
+
+.product-trigger {
+  --dominican-primary: var(--flag-blue);
+  --dominican-secondary: var(--flag-red);
+  --dominican-angle: 118deg;
+  --dominican-shadow: rgba(18, 59, 114, 0.18);
+
+  position: relative;
+  isolation: isolate;
+  border: 5px solid transparent !important;
+  background:
+    linear-gradient(var(--surface), var(--surface)) padding-box,
+    linear-gradient(
+      var(--dominican-angle),
+      var(--dominican-primary) 0 30%,
+      #ffffff 30% 36%,
+      var(--dominican-secondary) 36% 64%,
+      #ffffff 64% 70%,
+      var(--dominican-primary) 70% 100%
+    ) border-box !important;
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.92),
+    0 12px 30px var(--dominican-shadow),
+    0 4px 10px rgba(31, 27, 22, 0.08) !important;
+  transition:
+    transform 180ms ease,
+    box-shadow 180ms ease,
+    filter 180ms ease !important;
+}
+
+/* Línea interior blanca: separa el tricolor del contenido y lo hace premium. */
+.product-trigger::before {
+  content: "";
+  position: absolute;
+  inset: 3px;
+  z-index: 4;
+  pointer-events: none;
+  border: 1px solid rgba(255, 255, 255, 0.88);
+  border-radius: calc(20px - 3px);
+  box-shadow: inset 0 0 0 1px rgba(18, 59, 114, 0.06);
+}
+
+/* Pequeño sello tricolor inspirado en la bandera, sin usar un icono literal. */
+.product-trigger::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: -1px;
+  z-index: 5;
+  width: 58px;
+  height: 9px;
+  pointer-events: none;
+  border: 2px solid rgba(255, 255, 255, 0.96);
+  border-radius: 0 0 9px 9px;
+  background:
+    linear-gradient(
+      90deg,
+      var(--dominican-primary) 0 42%,
+      #ffffff 42% 58%,
+      var(--dominican-secondary) 58% 100%
+    );
+  box-shadow: 0 4px 10px var(--dominican-shadow);
+  transform: translateX(-50%);
+}
+
+.product-trigger:hover {
+  transform: translateY(-4px) scale(1.008);
+  filter: saturate(1.08);
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 1),
+    0 18px 42px var(--dominican-shadow),
+    0 7px 16px rgba(31, 27, 22, 0.11) !important;
+}
+
+/* Categoría 1: azul institucional, sobrio y clásico. */
+.menu-grid > .category-section:nth-child(4n + 1) .product-trigger {
+  --dominican-primary: #123b72;
+  --dominican-secondary: #c82932;
+  --dominican-angle: 112deg;
+  --dominican-shadow: rgba(18, 59, 114, 0.21);
+}
+
+/* Categoría 2: rojo cálido, asociado al fogón y la cocina criolla. */
+.menu-grid > .category-section:nth-child(4n + 2) .product-trigger {
+  --dominican-primary: #c82932;
+  --dominican-secondary: #123b72;
+  --dominican-angle: 68deg;
+  --dominican-shadow: rgba(200, 41, 50, 0.19);
+}
+
+/* Categoría 3: diagonales cruzadas, guiño elegante a la cruz de la bandera. */
+.menu-grid > .category-section:nth-child(4n + 3) .product-trigger {
+  --dominican-primary: #173f78;
+  --dominican-secondary: #d3353d;
+  --dominican-angle: 142deg;
+  --dominican-shadow: rgba(23, 63, 120, 0.20);
+}
+
+/* Categoría 4: rojo profundo y azul marino, aspecto más ceremonial. */
+.menu-grid > .category-section:nth-child(4n + 4) .product-trigger {
+  --dominican-primary: #a91f2b;
+  --dominican-secondary: #0e356c;
+  --dominican-angle: 90deg;
+  --dominican-shadow: rgba(169, 31, 43, 0.18);
+}
+
+body.dark-mode .product-trigger {
+  background:
+    linear-gradient(var(--surface), var(--surface)) padding-box,
+    linear-gradient(
+      var(--dominican-angle),
+      var(--dominican-primary) 0 30%,
+      rgba(255, 255, 255, 0.96) 30% 36%,
+      var(--dominican-secondary) 36% 64%,
+      rgba(255, 255, 255, 0.96) 64% 70%,
+      var(--dominican-primary) 70% 100%
+    ) border-box !important;
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.24),
+    0 15px 36px rgba(0, 0, 0, 0.45),
+    0 5px 14px var(--dominican-shadow) !important;
+}
+
+body.dark-mode .product-trigger::before {
+  border-color: rgba(255, 255, 255, 0.46);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.05);
+}
+
+@media (max-width: 900px) {
+  .product-trigger {
+    border-width: 4px !important;
+    box-shadow:
+      0 0 0 1px rgba(255, 255, 255, 0.88),
+      0 10px 24px var(--dominican-shadow),
+      0 3px 8px rgba(31, 27, 22, 0.07) !important;
+  }
+
+  .product-trigger::before {
+    inset: 2px;
+    border-radius: calc(22px - 3px);
+  }
+
+  .product-trigger::after {
+    width: 48px;
+    height: 8px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .product-trigger {
+    transition: none !important;
+  }
+
+  .product-trigger:hover {
+    transform: none;
+  }
+}
+
+/* =========================================================
+   V18 — CATEGORÍAS SIEMPRE UNA DEBAJO DE OTRA
+   Evita que en tablet horizontal el menú se divida en dos
+   columnas de categorías. Las tarjetas internas de cada
+   categoría conservan su propia cuadrícula.
+   ========================================================= */
+.menu-grid {
+  grid-template-columns: minmax(0, 1fr) !important;
+}
+
+.category-section {
+  width: 100%;
+  min-width: 0;
+}
