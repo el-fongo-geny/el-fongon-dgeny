@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#fbfaf7">
   <title>El Fogon D' Geny | Menu</title>
-  <link rel="stylesheet" href="style.css?v=20-ipad-performance">
+  <link rel="stylesheet" href="style.css?v=19-availability">
 
   <style>
     /* Carrito visual premium */
@@ -87,11 +87,6 @@
       .cart-fab { gap: 8px; }
       .cart-icon-wrap { width: 38px; height: 38px; flex-basis: 38px; }
       .cart-svg { width: 23px; height: 23px; }
-    }
-
-    /* En iPad/táctil evitamos una animación permanente que consume GPU al deslizar. */
-    @media (hover: none), (pointer: coarse), (prefers-reduced-motion: reduce) {
-      .cart-fab::before { animation: none; display: none; }
     }
   </style>
 </head>
