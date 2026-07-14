@@ -158,31 +158,23 @@ function toggleTheme() {
   applyTheme();
 }
 
-function renderCategories({ centerActive = false } = {}) {
+function renderCategories() {
   const tabs = $("#categoryTabs");
   tabs.innerHTML = CATEGORIES.map((category) => `
     <button class="${category.id === state.category ? "active" : ""}" data-category="${category.id}">
       ${category[state.lang] || category.es}
     </button>
   `).join("");
-
-  if (centerActive) {
-    const active = tabs.querySelector(`[data-category="${state.category}"]`);
-    active?.scrollIntoView({ behavior: "auto", inline: "center", block: "nearest" });
-  }
 }
 
-let renderedProductIndex = 0;
-
-function productCardHtml(item) {
+function productCardHtml(item, imageIndex) {
   const unavailable = !isProductAvailable(item);
-  const imageIndex = renderedProductIndex++;
   const priorityImage = imageIndex < 6;
   return `
     <article class="product-card ${unavailable ? "is-unavailable" : ""}">
       <button class="product-trigger" data-product-id="${item.id}" ${unavailable ? "disabled" : ""}>
         <div class="product-image">
-          ${item.image ? `<img src="${item.image}" alt="${itemName(item)}" width="640" height="556" loading="${priorityImage ? "eager" : "lazy"}" fetchpriority="${priorityImage ? "high" : "low"}" decoding="async" onerror="this.closest('.product-image').classList.add('missing-image'); this.remove();">` : ""}
+          ${item.image ? `<img src="${item.image}" alt="${itemName(item)}" loading="${priorityImage ? "eager" : "lazy"}" fetchpriority="${priorityImage ? "high" : "auto"}" decoding="async" width="640" height="557" onerror="this.closest('.product-image').classList.add('missing-image'); this.remove();">` : ""}
         </div>
         <div class="product-info">
           <div>
@@ -201,7 +193,7 @@ function productCardHtml(item) {
 
 function renderMenu() {
   const grid = $("#menuGrid");
-  renderedProductIndex = 0;
+  let imageIndex = 0;
   grid.innerHTML = CATEGORIES.map((category) => {
     const items = MENU_ITEMS.filter((item) => item.category === category.id);
     if (!items.length) return "";
@@ -212,7 +204,7 @@ function renderMenu() {
           <span>${items.length}</span>
         </div>
         <div class="category-products">
-          ${items.map(productCardHtml).join("")}
+          ${items.map((item) => productCardHtml(item, imageIndex++)).join("")}
         </div>
       </section>
     `;
@@ -233,7 +225,9 @@ function setupCategoryObserver() {
     const nextCategory = visible.target.dataset.categorySection;
     if (nextCategory && nextCategory !== state.category) {
       state.category = nextCategory;
-      renderCategories({ centerActive: false });
+      document.querySelectorAll("[data-category]").forEach((button) => {
+        button.classList.toggle("active", button.dataset.category === nextCategory);
+      });
     }
   }, { root: null, rootMargin: "-72px 0px -68% 0px", threshold: [0.12, 0.25, 0.5] });
   sections.forEach((section) => categoryObserver.observe(section));
@@ -244,7 +238,7 @@ function scrollToCategory(categoryId) {
   scrollRevealLockUntil = Date.now() + 900;
   document.body.classList.remove("is-scrolling-down");
   document.body.classList.add("is-scrolling-up");
-  renderCategories({ centerActive: true });
+  renderCategories();
   const section = document.getElementById(`cat-${categoryId}`);
   if (section) section.scrollIntoView({ behavior: "smooth", block: "start" });
 }
