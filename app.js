@@ -560,7 +560,13 @@ function initEvents() {
     if (productButton) openProduct(productButton.dataset.productId);
 
     if (event.target.closest(".modal-close") || event.target === $("#modalBackdrop")) closeProduct();
-    if (event.target.closest("#cartFab")) openCart();
+    if (event.target.closest("#cartFab")) {
+      if (document.body.classList.contains("cart-open")) {
+        closeCart();
+      } else {
+        openCart();
+      }
+    }
     if (event.target.closest("#closeCartBtn")) closeCart();
 
     const removeButton = event.target.closest("[data-remove-cart]");
@@ -626,6 +632,18 @@ function init() {
   renderCategories();
   renderMenu();
   renderCart();
+
+  let scrollTicking = false;
+  window.addEventListener("scroll", () => {
+    if (scrollTicking) return;
+    scrollTicking = true;
+    window.requestAnimationFrame(() => {
+      handlePageScroll();
+      scrollTicking = false;
+    });
+  }, { passive: true });
+
+  handlePageScroll();
 }
 
 init();
