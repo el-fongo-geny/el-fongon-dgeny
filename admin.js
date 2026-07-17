@@ -73,6 +73,7 @@ function orderFromBackend(row) {
     items: row.items || row.raw?.items || [],
     totals: row.totals || row.raw?.totals || {},
     paymentMethod: row.payment_method || row.raw?.paymentMethod || "",
+    orderType: row.order_type || row.raw?.orderType || (Array.isArray(row.items) && row.items[0]?.orderType) || "",
     status: row.status || row.raw?.status || "new",
     language: row.language || row.raw?.language || "es",
     acceptedAt: row.accepted_at || row.raw?.acceptedAt || null,
@@ -475,6 +476,12 @@ async function sendReadyNotification(orderId) {
 }
 
 
+function orderTypeLabel(type) {
+  if (type === "dine-in") return "Para aquí";
+  if (type === "takeout") return "Para llevar";
+  return "No indicado";
+}
+
 function paymentLabel(method) {
   if (method === "card") return "Tarjeta en ventanilla";
   if (method === "cash") return "Efectivo en ventanilla";
@@ -544,6 +551,7 @@ function renderOrders() {
         <span class="order-status ${statusClass(order)}">${statusLabel(order)}</span>
       </div>
       <p><strong>${escapeHtml(order.customer?.name || "Sin nombre")}</strong> · ${escapeHtml(order.customer?.phone || "Sin teléfono")}</p>
+      <p><strong>Tipo:</strong> ${escapeHtml(orderTypeLabel(order.orderType || ((order.items || [])[0] || {}).orderType))}</p>
       <p><strong>Pago:</strong> ${escapeHtml(paymentLabel(order.paymentMethod))}</p>
       <div class="order-items">
         ${(order.items || []).map((item) => itemDetailsHtml(item)).join("")}
