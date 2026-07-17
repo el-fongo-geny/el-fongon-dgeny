@@ -1929,3 +1929,21 @@ body.cart-open .category-tabs {
     justify-content: flex-end;
   }
 }
+
+
+/* ===== Cambios puntuales del pedido ===== */
+.payment-step-actions {
+  display: grid;
+  gap: 10px;
+}
+
+/* El carrito queda un poco más abajo para no taparse con la navegación. */
+.cart-fab {
+  top: max(82px, calc(env(safe-area-inset-top) + 64px)) !important;
+}
+
+@media (max-width: 900px) {
+  .cart-fab {
+    top: max(72px, calc(env(safe-area-inset-top) + 58px)) !important;
+  }
+}
