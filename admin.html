@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#111111">
   <title>Panel iPad | El Fogon D' Geny</title>
-  <link rel="stylesheet" href="style.css?v=19-availability">
+  <link rel="stylesheet" href="style.css?v=21-menu-update">
 </head>
 <body class="admin-body dark-mode">
   <main id="adminLogin" class="admin-login">
@@ -91,12 +91,17 @@
   </div>
 </section>
 
+  <script>
+    // Compatibilidad básica para Safari/iPad antiguos.
+    if (!Element.prototype.matches) Element.prototype.matches = Element.prototype.msMatchesSelector || Element.prototype.webkitMatchesSelector;
+    if (!Element.prototype.closest) Element.prototype.closest = function (selector) { var node = this; while (node && node.nodeType === 1) { if (node.matches(selector)) return node; node = node.parentElement || node.parentNode; } return null; };
+    if (!Array.from) Array.from = function (value) { return [].slice.call(value); };
+  </script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="supabase-config.js?v=18-mobile-fixed"></script>
   <script src="supabase-client.js?v=19-availability"></script>
   <script src="backend-config.js?v=18-mobile-fixed"></script>
-  <script src="menu-data.js?v=18-mobile-fixed"></script>
-  <script src="admin.js?v=20-suboptions"></script>
-  <script src="admin.js?v=28-daily-missing"></script>
+  <script src="menu-data.js?v=21-menu-update"></script>
+  <script src="admin.js?v=29-menu-update"></script>
 </body>
 </html>
