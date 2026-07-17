@@ -19,11 +19,15 @@ const UI_TEXT = {
     remove: "Eliminar",
     emptyCart: "Tu carrito está vacío.",
     chooseRequired: "Completa las opciones obligatorias.",
+    orderTypeTitle: "¿Es para aquí o para llevar?",
+    dineIn: "Para aquí",
+    takeout: "Para llevar",
     paymentTitle: "¿Cómo pagarás?",
     paymentSubtitle: "El pago se realiza en la ventanilla.",
     cardAtWindow: "Tarjeta en ventanilla",
     cashAtWindow: "Efectivo en ventanilla",
     orderSent: "Pedido enviado. Te avisaremos cuando esté listo.",
+    delayWarning: "Aviso: tenemos más de tres pedidos pendientes o en preparación. Tu orden puede tardar un poco más de lo habitual.",
     unavailable: "Agotado",
     darkMode: "Modo oscuro",
     lightMode: "Modo claro"
@@ -46,11 +50,15 @@ const UI_TEXT = {
     remove: "Remove",
     emptyCart: "Your cart is empty.",
     chooseRequired: "Complete the required options.",
+    orderTypeTitle: "Is this for here or to go?",
+    dineIn: "For here",
+    takeout: "To go",
     paymentTitle: "How will you pay?",
     paymentSubtitle: "Payment is made at the pickup window.",
     cardAtWindow: "Card at window",
     cashAtWindow: "Cash at window",
     orderSent: "Order sent. We will notify you when it is ready.",
+    delayWarning: "Notice: we have more than three orders pending or being prepared. Your order may take a little longer than usual.",
     unavailable: "Sold out",
     darkMode: "Dark mode",
     lightMode: "Light mode"
@@ -74,8 +82,6 @@ const PROTEINS = [
   { id: "puerco-guisado", es: "Puerco guisado", en: "Stewed pork", price: 0 },
   { id: "bistec", es: "Bistec", en: "Steak", price: 0 },
   { id: "chuleta-plancha", es: "Chuleta a la plancha", en: "Grilled pork chop", price: 0 },
-  { id: "bacalao", es: "Bacalao", en: "Codfish", price: 0 },
-  { id: "arenque", es: "Arenque", en: "Herring", price: 0 },
   { id: "pechuga-plancha", es: "Pechuga a la plancha", en: "Grilled chicken breast", price: 0 }
 ];
 
@@ -126,7 +132,7 @@ const MENU_ITEMS = [
     en: "Mofongo",
     description: { es: "Mofongo dominicano con proteína a elección.", en: "Dominican mofongo with your choice of protein." },
     price: 22,
-    image: "assets/images/mofongo.png",
+    image: "assets/images/pilon.png",
     taxable: true,
     optionGroups: [
       {
@@ -318,7 +324,7 @@ const MENU_ITEMS = [
     category: "platos-fuertes",
     es: "Fritura Combinada",
     en: "Mixed Fried Platter",
-    description: { es: "Combinación dominicana con acompañamiento.", en: "Dominican mixed platter with a side." },
+    description: { es: "Queso, longaniza y salami con acompañamiento.", en: "Cheese, Dominican sausage and salami with a side." },
     price: 24,
     image: "assets/images/fritura-combinada.png",
     taxable: true,
@@ -343,7 +349,7 @@ const MENU_ITEMS = [
     es: "Sancocho",
     en: "Sancocho",
     description: { es: "Sopa dominicana tradicional.", en: "Traditional Dominican stew." },
-    price: 20,
+    price: 21,
     image: "assets/images/sancocho.png",
     taxable: true,
     extras: [EXTRA_AVOCADO]
@@ -359,13 +365,13 @@ const MENU_ITEMS = [
     taxable: true
   },
   {
-    id: "sandwich-dominicano",
+    id: "sandwich-tres-golpes",
     category: "desayuno",
-    es: "Sándwich Dominicano",
-    en: "Dominican Sandwich",
-    description: { es: "Sándwich dominicano con acompañamiento.", en: "Dominican sandwich with a side." },
+    es: "Sandwis de 3 Golpes",
+    en: "Tres Golpes Sandwich",
+    description: { es: "Sandwis dominicano de tres golpes con acompañamiento.", en: "Dominican tres golpes sandwich with a side." },
     price: 18,
-    image: "assets/images/sandwich-dominicano.png",
+    image: "assets/images/sandwis-tres-golpes.png",
     taxable: true,
     optionGroups: [
       {
@@ -679,5 +685,12 @@ const MENU_ITEMS = [
   { id: "sprite", category: "bebidas", es: "Sprite", en: "Sprite", description: { es: "Refresco Sprite.", en: "Sprite soda." }, price: 4, image: "assets/images/sprite.png", taxable: true },
   { id: "malta-india", category: "bebidas", es: "Malta India", en: "Malta India", description: { es: "Malta India.", en: "Malta India." }, price: 5, image: "assets/images/malta-india.png", taxable: true },
   { id: "country-club-frambuesa", category: "bebidas", es: "Country Club Frambuesa", en: "Country Club Raspberry", description: { es: "Refresco dominicano.", en: "Dominican soda." }, price: 5, image: "assets/images/country-club-frambuesa.png", taxable: true },
-  { id: "country-club-naranja", category: "bebidas", es: "Country Club Naranja", en: "Country Club Orange", description: { es: "Refresco dominicano.", en: "Dominican soda." }, price: 5, image: "assets/images/country-club-naranja.png", taxable: true }
+  { id: "country-club-naranja", category: "bebidas", es: "Country Club Naranja", en: "Country Club Orange", description: { es: "Refresco dominicano.", en: "Dominican soda." }, price: 5, image: "assets/images/country-club-naranja.png", taxable: true },
+  { id: "cerveza-modelo", category: "bebidas", es: "Cerveza Modelo", en: "Modelo Beer", description: { es: "Cerveza Modelo fría.", en: "Cold Modelo beer." }, price: 5, image: "assets/images/cerveza-modelo.png", taxable: true },
+  { id: "cerveza-presidente", category: "bebidas", es: "Cerveza Presidente", en: "Presidente Beer", description: { es: "Cerveza Presidente fría.", en: "Cold Presidente beer." }, price: 5, image: "assets/images/cerveza-presidente.png", taxable: true }
 ];
+
+// Ajuste general solicitado: un dólar adicional a cada producto.
+MENU_ITEMS.forEach((item) => {
+  item.price = Number(item.price || 0) + 1;
+});
