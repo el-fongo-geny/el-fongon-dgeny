@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#fbfaf7">
   <title>El Fogon D' Geny | Menu</title>
-  <link rel="stylesheet" href="style.css?v=20-cart-fix">
+  <link rel="stylesheet" href="style.css?v=21-menu-update">
 
   <style>
     /* Carrito visual premium */
@@ -170,10 +170,21 @@
 
   <section id="paymentModal" class="payment-modal" aria-hidden="true">
     <div class="payment-card">
-      <h2 data-i18n="paymentTitle">¿Cómo pagarás?</h2>
-      <p data-i18n="paymentSubtitle">El pago se realiza en la ventanilla.</p>
-      <button class="primary-btn full" data-payment="card" data-i18n="cardAtWindow">Tarjeta en ventanilla</button>
-      <button class="secondary-btn full" data-payment="cash" data-i18n="cashAtWindow">Efectivo en ventanilla</button>
+      <div id="orderTypeStep">
+        <h2 data-i18n="orderTypeTitle">¿Es para aquí o para llevar?</h2>
+        <div class="payment-step-actions">
+          <button class="primary-btn full" type="button" data-order-type="dine-in" data-i18n="dineIn">Para aquí</button>
+          <button class="secondary-btn full" type="button" data-order-type="takeout" data-i18n="takeout">Para llevar</button>
+        </div>
+      </div>
+      <div id="paymentMethodStep" hidden>
+        <h2 data-i18n="paymentTitle">¿Cómo pagarás?</h2>
+        <p data-i18n="paymentSubtitle">El pago se realiza en la ventanilla.</p>
+        <div class="payment-step-actions">
+          <button class="primary-btn full" type="button" data-payment="card" data-i18n="cardAtWindow">Tarjeta en ventanilla</button>
+          <button class="secondary-btn full" type="button" data-payment="cash" data-i18n="cashAtWindow">Efectivo en ventanilla</button>
+        </div>
+      </div>
     </div>
   </section>
 
@@ -181,7 +192,7 @@
   <script src="supabase-config.js?v=18-mobile-fixed"></script>
   <script src="supabase-client.js?v=19-availability"></script>
   <script src="backend-config.js?v=18-mobile-fixed"></script>
-  <script src="menu-data.js?v=18-mobile-fixed"></script>
-  <script src="app.js?v=20-cart-fix"></script>
+  <script src="menu-data.js?v=21-menu-update"></script>
+  <script src="app.js?v=21-menu-update"></script>
 </body>
 </html>
