@@ -4,6 +4,7 @@ const state = {
   cart: [],
   currentProduct: null,
   pendingOrder: null,
+  orderType: "",
   theme: localStorage.getItem("fogon_theme") || "light",
   cartFabCompact: false
 };
@@ -489,12 +490,16 @@ function nextSimpleOrderId() {
 
 function openPayment(order) {
   state.pendingOrder = order;
+  state.orderType = "";
+  $("#orderTypeStep").hidden = false;
+  $("#paymentMethodStep").hidden = true;
   $("#paymentModal").setAttribute("aria-hidden", "false");
 }
 
 function closePayment() {
   $("#paymentModal").setAttribute("aria-hidden", "true");
   state.pendingOrder = null;
+  state.orderType = "";
 }
 
 async function postOrderToBackend(order) {
@@ -508,10 +513,29 @@ async function postOrderToBackend(order) {
   return response.json();
 }
 
+async function countActiveOrders() {
+  const db = window.FOGON_DB;
+  if (db && db.isReady && db.isReady()) {
+    try {
+      const orders = await db.fetchOrders();
+      return orders.filter((order) => order.status === "new" || order.status === "accepted" || !order.status).length;
+    } catch (error) {
+      console.warn("No se pudo comprobar la carga actual de pedidos:", error);
+    }
+  }
+
+  try {
+    const orders = JSON.parse(localStorage.getItem(STORAGE_ORDERS) || "[]");
+    return orders.filter((order) => order.status === "new" || order.status === "accepted" || !order.status).length;
+  } catch (_) {
+    return 0;
+  }
+}
+
 async function saveOrder(paymentMethod) {
   if (!state.pendingOrder) return;
 
-  let order = { ...state.pendingOrder, paymentMethod, status: "new" };
+  let order = { ...state.pendingOrder, paymentMethod, orderType: state.orderType, status: "new" };
   const db = window.FOGON_DB;
 
   if (db?.isReady()) {
@@ -537,11 +561,17 @@ async function saveOrder(paymentMethod) {
   orders.unshift(order);
   localStorage.setItem(STORAGE_ORDERS, JSON.stringify(orders));
 
+  const activeOrderCount = await countActiveOrders();
+
   state.cart = [];
+  $("#customerName").value = "";
+  $("#customerPhone").value = "";
   renderCart();
   closeCart();
   closePayment();
-  alert(text("orderSent"));
+  alert(activeOrderCount > 3 ? `${text("orderSent")}
+
+${text("delayWarning")}` : text("orderSent"));
 }
 
 function initEvents() {
@@ -575,8 +605,15 @@ function initEvents() {
       renderCart();
     }
 
+    const orderTypeButton = event.target.closest("[data-order-type]");
+    if (orderTypeButton && state.pendingOrder) {
+      state.orderType = orderTypeButton.dataset.orderType;
+      $("#orderTypeStep").hidden = true;
+      $("#paymentMethodStep").hidden = false;
+    }
+
     const paymentButton = event.target.closest("[data-payment]");
-    if (paymentButton && state.pendingOrder) saveOrder(paymentButton.dataset.payment);
+    if (paymentButton && state.pendingOrder && state.orderType) saveOrder(paymentButton.dataset.payment);
   });
 
   document.addEventListener("submit", (event) => {
