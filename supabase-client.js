@@ -8,8 +8,8 @@
   const cfg = window.FOGON_SUPABASE || {};
   const placeholders = new Set([
     "",
-    "PEGA_AQUI_TU_SUPABASE_API_URL",
-    "PEGA_AQUI_TU_SUPABASE_ANON_PUBLIC_KEY"
+    "jjfxjfkomcjgmhjzhwmc",
+    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpqZnhqZmtvbWNqZ21oanpod21jIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM1NDI4MzYsImV4cCI6MjA5OTExODgzNn0.IDw7xJrgxvvi1_u-hI8lybsw5sMNSQN1lNUreCLUvb0"
   ]);
 
   function isReady() {
@@ -64,6 +64,7 @@
         total: moneyNumber(row.total ?? row.totals?.total ?? row.raw?.totals?.total)
       },
       paymentMethod: row.payment_method || row.raw?.paymentMethod || "",
+      orderType: row.order_type || row.raw?.orderType || (Array.isArray(row.items) && row.items[0]?.orderType) || "",
       status,
       language: row.language || row.raw?.language || "es",
       acceptedAt: row.accepted_at || (status === "accepted" ? updatedAt : null),
@@ -91,6 +92,9 @@
     if (!client) throw new Error("Supabase no está configurado.");
     const publicId = await nextPublicId();
     const totals = order.totals || {};
+    const items = (order.items || []).map((item, index) => index === 0
+      ? { ...item, orderType: order.orderType || "" }
+      : item);
     const payload = {
       public_id: publicId,
       customer_name: String(order.customer?.name || "").trim(),
@@ -101,7 +105,7 @@
       subtotal: moneyNumber(totals.subtotal),
       tax: moneyNumber(totals.tax),
       total: moneyNumber(totals.total),
-      items: order.items || []
+      items
     };
 
     const { data, error } = await client
