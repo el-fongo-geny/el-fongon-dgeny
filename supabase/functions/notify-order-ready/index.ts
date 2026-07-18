@@ -94,7 +94,13 @@ function readyMessage(order: Record<string, unknown>): string {
 }
 
 async function readJson(request: Request): Promise<Record<string, unknown>> {
-  const body = await request.json().catch(() => null);
+  const raw = await request.text();
+  let body: unknown = null;
+  try {
+    body = raw ? JSON.parse(raw) : null;
+  } catch (_) {
+    body = null;
+  }
   if (!body || typeof body !== "object" || Array.isArray(body)) {
     throw new Error("invalid_json");
   }
@@ -312,6 +318,11 @@ Deno.serve(async (request: Request) => {
   try {
     if (request.method === "GET" && (route === "/" || route === "/health")) {
       return json({ ok: true, service: "sms-gateway", smsGateway: true, orderReady: true });
+    }
+    if (request.method === "POST" && route === "/") {
+      const preview = await readJson(request.clone());
+      if (preview.action === "order-ready") return await handleOrderReady(request);
+      return json({ ok: false, error: "unknown_action", action: preview.action || null }, 400);
     }
     if (request.method === "POST" && route === "/api/order-ready") return await handleOrderReady(request);
     if (request.method === "POST" && route === "/api/sms-gateway/heartbeat") return await handleHeartbeat(request);
