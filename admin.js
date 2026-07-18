@@ -400,26 +400,29 @@ async function sendReadyNotification(orderId) {
 
   const cfg = window.FOGON_SUPABASE || {};
   const supabaseUrl = String(cfg.url || "").replace(/\/$/, "");
-  const anonKey = String(cfg.anonKey || "");
 
   if (!supabaseUrl) {
     alert("Falta la URL de Supabase en supabase-config.js.");
     return;
   }
 
-  const endpoint = `${supabaseUrl}/functions/v1/sms-gateway/api/order-ready`;
+  /*
+    Llamamos a la raiz de la funcion y usamos text/plain para que el navegador
+    haga una peticion simple, sin preflight OPTIONS. La funcion sigue protegida
+    por ADMIN_PIN y Verify JWT debe estar desactivado.
+  */
+  const endpoint = `${supabaseUrl}/functions/v1/sms-gateway`;
 
   try {
     const response = await fetch(endpoint, {
       method: "POST",
+      mode: "cors",
+      cache: "no-store",
       headers: {
-        "Content-Type": "application/json",
-        ...(anonKey ? {
-          apikey: anonKey,
-          Authorization: `Bearer ${anonKey}`
-        } : {})
+        "Content-Type": "text/plain;charset=UTF-8"
       },
       body: JSON.stringify({
+        action: "order-ready",
         orderId: order.databaseId || order.id,
         publicId: Number(order.id) || null,
         adminPin: "5425"
