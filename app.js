@@ -536,11 +536,15 @@ async function saveOrder(paymentMethod) {
   if (!state.pendingOrder) return;
 
   let order = { ...state.pendingOrder, paymentMethod, orderType: state.orderType, status: "new" };
+  order.items = (order.items || []).map((item, index) => index === 0
+    ? { ...item, orderType: state.orderType }
+    : item);
   const db = window.FOGON_DB;
 
   if (db?.isReady()) {
     try {
       order = await db.createOrder(order);
+      order.orderType = state.orderType;
     } catch (error) {
       console.error(error);
       alert(state.lang === "en"
@@ -548,13 +552,22 @@ async function saveOrder(paymentMethod) {
         : "No se pudo enviar el pedido. Inténtalo otra vez.");
       return;
     }
-  } else {
+  } else if (BACKEND_URL) {
     try {
       const result = await postOrderToBackend(order);
       if (result?.orderId) order.backendOrderId = result.orderId;
     } catch (error) {
-      console.warn("No se pudo enviar el pedido al backend todavía:", error);
+      console.error("No se pudo enviar el pedido al backend:", error);
+      alert(state.lang === "en"
+        ? "The order could not be sent. Please try again."
+        : "No se pudo enviar el pedido. Inténtalo otra vez.");
+      return;
     }
+  } else {
+    alert(state.lang === "en"
+      ? "The ordering service is temporarily unavailable. Please try again."
+      : "El servicio de pedidos no está disponible ahora mismo. Inténtalo otra vez.");
+    return;
   }
 
   const orders = JSON.parse(localStorage.getItem(STORAGE_ORDERS) || "[]");
