@@ -400,18 +400,19 @@ async function sendReadyNotification(orderId) {
 
   const cfg = window.FOGON_SUPABASE || {};
   const supabaseUrl = String(cfg.url || "").replace(/\/$/, "");
+  const anonKey = String(cfg.anonKey || "").trim();
 
-  if (!supabaseUrl) {
-    alert("Falta la URL de Supabase en supabase-config.js.");
+  if (!supabaseUrl || !anonKey) {
+    alert("Faltan la URL o la anon key de Supabase en supabase-config.js.");
     return;
   }
 
   /*
-    Llamamos a la raiz de la funcion y usamos text/plain para que el navegador
-    haga una peticion simple, sin preflight OPTIONS. La funcion sigue protegida
-    por ADMIN_PIN y Verify JWT debe estar desactivado.
+    rapid-action es la funcion que marca el pedido listo y crea la fila en
+    sms_queue. sms-gateway queda reservado para la APK Android: heartbeat,
+    claim y result.
   */
-  const endpoint = `${supabaseUrl}/functions/v1/sms-gateway`;
+  const endpoint = `${supabaseUrl}/functions/v1/rapid-action`;
 
   try {
     const response = await fetch(endpoint, {
@@ -419,13 +420,14 @@ async function sendReadyNotification(orderId) {
       mode: "cors",
       cache: "no-store",
       headers: {
-        "Content-Type": "text/plain;charset=UTF-8"
+        "Content-Type": "application/json",
+        "apikey": anonKey,
+        "Authorization": `Bearer ${anonKey}`
       },
       body: JSON.stringify({
-        action: "order-ready",
         orderId: order.databaseId || order.id,
         publicId: Number(order.id) || null,
-        adminPin: "5425"
+        adminPin: ADMIN_PIN
       })
     });
 
@@ -443,7 +445,7 @@ async function sendReadyNotification(orderId) {
         result?.error,
         result?.detail
       ].filter(Boolean).join(" · ");
-      throw new Error(reason || "sms-gateway no confirmó la operación.");
+      throw new Error(reason || "rapid-action no confirmo la operacion.");
     }
 
     const updatedOrders = getOrders().map((candidate) => (
@@ -461,21 +463,21 @@ async function sendReadyNotification(orderId) {
 
     if (result?.sms?.queued) {
       alert(result.sms.alreadyQueued
-        ? "Pedido listo. El SMS ya estaba en la cola y no se duplicó."
-        : "Pedido listo. SMS añadido a la cola; el Android lo enviará automáticamente.");
+        ? "Pedido listo. El SMS ya estaba en la cola y no se duplico."
+        : "Pedido listo. SMS anadido a la cola; el Android lo enviara automaticamente.");
       return;
     }
 
     const reasons = {
-      invalid_phone: "el teléfono del cliente no es válido",
-      empty_message: "el mensaje quedó vacío",
+      invalid_phone: "el telefono del cliente no es valido",
+      empty_message: "el mensaje quedo vacio",
       queue_insert_failed: result?.sms?.detail || "no se pudo insertar en sms_queue"
     };
     const reason = reasons[result?.sms?.reason] || result?.sms?.reason || "causa desconocida";
-    alert(`Pedido marcado como listo, pero el SMS no entró en la cola: ${reason}.`);
+    alert(`Pedido marcado como listo, pero el SMS no entro en la cola: ${reason}.`);
   } catch (error) {
-    console.error("Error al llamar sms-gateway:", error);
-    alert(`No se pudo contactar sms-gateway para enviar el SMS. ${error?.message || error}`);
+    console.error("Error al llamar rapid-action:", error);
+    alert(`No se pudo ejecutar rapid-action para enviar el SMS. ${error?.message || error}`);
   }
 }
 
