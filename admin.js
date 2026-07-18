@@ -366,19 +366,31 @@ function escapeHtml(value) {
     .replace(/'/g, "&#039;");
 }
 
-function normalizePhoneForWhatsApp(phone) {
-  const digits = String(phone || "").replace(/\D/g, "");
-  if (!digits) return "";
-  if (digits.length === 10) return `1${digits}`;
-  return digits;
-}
+async function edgeFunctionErrorDetails(error) {
+  const parts = [];
+  if (error && error.message) parts.push(error.message);
 
-function readyMessage(order) {
-  const name = order.customer?.name || "";
-  if (order.language === "en") {
-    return `Hi${name ? ` ${name}` : ""}, your order ${order.id} from El Fogon D' Geny is ready. Please pick it up at the truck window. Thank you.`;
+  const response = error && error.context;
+  if (response) {
+    if (response.status) parts.push(`HTTP ${response.status}`);
+    try {
+      const readable = typeof response.clone === "function" ? response.clone() : response;
+      const payload = await readable.json();
+      if (payload?.error) parts.push(payload.error);
+      if (payload?.detail) parts.push(payload.detail);
+      if (!payload?.error && !payload?.detail) parts.push(JSON.stringify(payload));
+    } catch (_) {
+      try {
+        const readable = typeof response.clone === "function" ? response.clone() : response;
+        const body = await readable.text();
+        if (body) parts.push(body);
+      } catch (_) {
+        // La respuesta no tenia un cuerpo legible.
+      }
+    }
   }
-  return `Hola${name ? ` ${name}` : ""}, tu pedido ${order.id} de El Fogon D' Geny está listo. Pasa por la ventanilla del camión. Gracias.`;
+
+  return Array.from(new Set(parts.filter(Boolean))).join(" · ") || "Error desconocido";
 }
 
 async function sendReadyNotification(orderId) {
@@ -399,6 +411,9 @@ async function sendReadyNotification(orderId) {
       });
 
       if (error) throw error;
+      if (!data?.ok) {
+        throw new Error([data?.error, data?.detail].filter(Boolean).join(" · ") || "La funcion no confirmo la operacion.");
+      }
 
       const updatedOrders = getOrders().map((candidate) => (
         String(candidate.id) === String(orderId)
@@ -406,32 +421,32 @@ async function sendReadyNotification(orderId) {
               ...candidate,
               status: "ready",
               readyAt: new Date().toISOString(),
-              whatsappSent: Boolean(data?.whatsapp?.sent || candidate.whatsappSent),
-              cloverSynced: Boolean(data?.clover?.synced || candidate.cloverSynced),
-              cloverOrderId: data?.clover?.orderId || candidate.cloverOrderId || null
+              smsQueued: Boolean(data?.sms?.queued || candidate.smsQueued)
             }
           : candidate
       ));
       saveOrders(updatedOrders);
       await syncOrdersFromBackend();
 
-      const cloverText = data?.clover?.skipped
-        ? "Clover omitido"
-        : data?.clover?.synced
-          ? "Clover sincronizado"
-          : "Clover no sincronizado";
+      if (data?.sms?.queued) {
+        alert(data.sms.alreadyQueued
+          ? "Pedido listo. El SMS ya estaba en la cola y no se duplico."
+          : "Pedido listo. SMS añadido a la cola; el Android lo enviara automaticamente.");
+        return;
+      }
 
-      const whatsappText = data?.whatsapp?.skipped
-        ? "WhatsApp omitido"
-        : data?.whatsapp?.sent
-          ? "WhatsApp enviado"
-          : "WhatsApp no enviado";
-
-      alert(`Pedido listo. ${cloverText}. ${whatsappText}.`);
+      const reasons = {
+        invalid_phone: "el telefono del cliente no es valido",
+        empty_message: "el mensaje quedo vacio",
+        queue_insert_failed: data?.sms?.detail || "no se pudo insertar en sms_queue"
+      };
+      const reason = reasons[data?.sms?.reason] || data?.sms?.reason || "causa desconocida";
+      alert(`Pedido marcado como listo, pero el SMS no entro en la cola: ${reason}.`);
       return;
     } catch (error) {
       console.error(error);
-      alert("No se pudo ejecutar notify-order-ready. Revisa Edge Functions, Secrets y Logs en Supabase.");
+      const detail = await edgeFunctionErrorDetails(error);
+      alert(`No se pudo ejecutar notify-order-ready. ${detail}`);
       return;
     }
   }
@@ -443,38 +458,34 @@ async function sendReadyNotification(orderId) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(order)
       });
-      if (!response.ok) throw new Error(`Backend error ${response.status}`);
-      const result = await response.json();
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(result?.error || `Backend error ${response.status}`);
+
       const updatedOrders = getOrders().map((candidate) => (
-        candidate.id === orderId
+        String(candidate.id) === String(orderId)
           ? {
               ...candidate,
               status: "ready",
               readyAt: new Date().toISOString(),
-              whatsappSent: Boolean(result.whatsappSent),
-              cloverOrderId: result.cloverOrderId || candidate.cloverOrderId || null
+              smsQueued: Boolean(result?.smsQueued || candidate.smsQueued)
             }
           : candidate
       ));
       saveOrders(updatedOrders);
-      alert("Cliente notificado y Clover sincronizado si las credenciales están configuradas.");
+      await syncOrdersFromBackend();
+      alert(result?.smsQueued
+        ? "Pedido listo. SMS añadido a la cola."
+        : "Pedido listo, pero el SMS no entro en la cola.");
       return;
     } catch (error) {
       console.error(error);
-      alert("No se pudo contactar el backend. Revisa la URL en backend-config.js o el servidor.");
+      alert(`No se pudo contactar el backend: ${error?.message || error}`);
       return;
     }
   }
 
-  const phone = normalizePhoneForWhatsApp(order.customer?.phone);
-  if (!phone) {
-    alert("Este pedido no tiene teléfono válido para WhatsApp.");
-    return;
-  }
-  markReady(orderId);
-  window.open(`https://wa.me/${phone}?text=${encodeURIComponent(readyMessage(order))}`, "_blank");
+  alert("No existe conexion con Supabase Edge Functions ni con un backend publico.");
 }
-
 
 function orderTypeLabel(type) {
   if (type === "dine-in") return "Para aquí";
@@ -562,7 +573,7 @@ function renderOrders() {
       </div>
       ${isNew ? `<button class="primary-btn full accept-order" data-accept-order="${escapeHtml(order.id)}" type="button">Aceptar pedido y parar sonido</button>` : `<p class="accepted-note">${isReady ? "Pedido listo" : "Pedido aceptado"}${order.acceptedAt ? ` · ${new Date(order.acceptedAt).toLocaleTimeString()}` : ""}</p>`}
       <div class="order-actions-row">
-        ${!isNew ? `<button class="secondary-btn" data-ready-order="${escapeHtml(order.id)}" type="button">Pedido listo / WhatsApp</button>` : ""}
+        ${!isNew ? `<button class="secondary-btn" data-ready-order="${escapeHtml(order.id)}" type="button">Pedido listo / Enviar SMS</button>` : ""}
         <button class="secondary-btn danger-btn" data-deliver-order="${escapeHtml(order.id)}" type="button">Entregado / quitar para todos</button>
       </div>
     </article>`;
