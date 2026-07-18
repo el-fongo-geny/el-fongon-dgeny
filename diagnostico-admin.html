@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Diagnóstico Admin | El Fogón</title>
+  <style>
+    body{font-family:Arial,sans-serif;margin:0;padding:18px;background:#f4f1eb;color:#171717}
+    h1{font-size:25px;margin:0 0 8px}.box{background:#fff;border:1px solid #ccc;border-radius:10px;padding:14px;margin:12px 0}
+    .row{padding:9px 0;border-bottom:1px solid #ddd}.row:last-child{border-bottom:0}
+    .ok{color:#167a3b;font-weight:bold}.bad{color:#b00020;font-weight:bold}.wait{color:#7a5b00;font-weight:bold}
+    pre{white-space:pre-wrap;word-break:break-word;background:#111;color:#eee;padding:12px;border-radius:8px;font-size:12px}
+    button{width:100%;min-height:48px;border:0;border-radius:8px;background:#d83a21;color:#fff;font-weight:bold;font-size:16px;margin-top:10px}
+  </style>
+  <script>
+    var capturedErrors=[];
+    window.onerror=function(message,source,line,column,error){
+      capturedErrors.push(String(message)+" | "+String(source)+":"+String(line)+":"+String(column));
+      updateErrors();
+      return false;
+    };
+    function el(id){return document.getElementById(id);}
+    function setStatus(id,ok,text){var n=el(id);if(!n)return;n.className=ok===true?'ok':(ok===false?'bad':'wait');n.innerHTML=text;}
+    function updateErrors(){if(el('errors'))el('errors').textContent=capturedErrors.length?capturedErrors.join('\n'):'Ningún error JavaScript capturado.';}
+    function scriptResult(id,name,loaded){setStatus(id,loaded,loaded?name+' cargó el archivo.':name+' NO pudo cargar el archivo.');}
+  </script>
+</head>
+<body>
+  <h1>Diagnóstico del admin</h1>
+  <p>Abre esta página en el mismo dispositivo donde no aparecen los pedidos.</p>
+
+  <div class="box">
+    <div class="row">1. CDN Supabase: <span id="cdn" class="wait">comprobando…</span></div>
+    <div class="row">2. Configuración: <span id="config" class="wait">comprobando…</span></div>
+    <div class="row">3. Cliente FOGON_DB: <span id="client" class="wait">comprobando…</span></div>
+    <div class="row">4. Conexión preparada: <span id="ready" class="wait">comprobando…</span></div>
+    <div class="row">5. Lectura con el cliente del admin: <span id="read" class="wait">pendiente…</span></div>
+    <div class="row">6. Pedido de diagnóstico n.º 6: <span id="order6" class="wait">pendiente…</span></div>
+  </div>
+
+  <button type="button" onclick="runChecks()">Repetir comprobación</button>
+
+  <div class="box"><strong>Errores JavaScript</strong><pre id="errors">Ningún error JavaScript capturado.</pre></div>
+  <div class="box"><strong>Resultado de pedidos</strong><pre id="output">Esperando…</pre></div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"
+    onload="scriptResult('cdn','Supabase JS v2',true)"
+    onerror="scriptResult('cdn','Supabase JS v2',false)"></script>
+  <script src="supabase-config.js?v=diagnostico-admin-1"
+    onload="scriptResult('config','supabase-config.js',true)"
+    onerror="scriptResult('config','supabase-config.js',false)"></script>
+  <script src="supabase-client.js?v=diagnostico-admin-1"
+    onload="scriptResult('client','supabase-client.js',Boolean(window.FOGON_DB))"
+    onerror="scriptResult('client','supabase-client.js',false)"></script>
+
+  <script>
+    function runChecks(){
+      updateErrors();
+      setStatus('cdn',Boolean(window.supabase),window.supabase?'Supabase JS está disponible.':'window.supabase no existe.');
+      setStatus('config',Boolean(window.FOGON_SUPABASE && window.FOGON_SUPABASE.url && window.FOGON_SUPABASE.anonKey),window.FOGON_SUPABASE?'FOGON_SUPABASE existe.':'FOGON_SUPABASE no existe.');
+      setStatus('client',Boolean(window.FOGON_DB),window.FOGON_DB?'FOGON_DB existe.':'FOGON_DB no existe; supabase-client.js no ejecutó correctamente.');
+
+      var ready=false;
+      try{ready=Boolean(window.FOGON_DB && window.FOGON_DB.isReady && window.FOGON_DB.isReady());}
+      catch(e){capturedErrors.push('isReady: '+String(e));updateErrors();}
+      setStatus('ready',ready,ready?'FOGON_DB está preparado.':'FOGON_DB NO está preparado.');
+
+      if(!ready){
+        setStatus('read',false,'No se puede probar porque FOGON_DB no está preparado.');
+        setStatus('order6',false,'No comprobado.');
+        return;
+      }
+
+      try{
+        var result=window.FOGON_DB.fetchOrders();
+        if(!result || typeof result.then!=='function'){
+          setStatus('read',false,'fetchOrders no devolvió una promesa.');
+          return;
+        }
+        result.then(function(orders){
+          orders=orders||[];
+          setStatus('read',true,'Lectura correcta: '+orders.length+' pedido(s).');
+          var found=false;
+          var i;
+          for(i=0;i<orders.length;i++){
+            if(String(orders[i].id)==='6'){found=true;break;}
+          }
+          setStatus('order6',found,found?'El pedido n.º 6 aparece en el cliente del admin.':'El pedido n.º 6 NO aparece.');
+          el('output').textContent=JSON.stringify(orders,null,2);
+        },function(error){
+          setStatus('read',false,'Error: '+String(error && (error.message||error)));
+          capturedErrors.push('fetchOrders: '+String(error && (error.message||error)));updateErrors();
+        });
+      }catch(e){
+        setStatus('read',false,'Excepción: '+String(e));
+        capturedErrors.push('fetchOrders excepción: '+String(e));updateErrors();
+      }
+    }
+
+    setTimeout(runChecks,2500);
+  </script>
+</body>
+</html>
