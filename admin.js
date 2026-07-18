@@ -398,93 +398,82 @@ async function sendReadyNotification(orderId) {
   const order = orders.find((candidate) => String(candidate.id) === String(orderId));
   if (!order) return;
 
-  const db = window.FOGON_DB;
+  const cfg = window.FOGON_SUPABASE || {};
+  const supabaseUrl = String(cfg.url || "").replace(/\/$/, "");
+  const anonKey = String(cfg.anonKey || "");
 
-  if (db?.isReady() && db.client?.functions?.invoke) {
-    try {
-      const { data, error } = await db.client.functions.invoke("notify-order-ready", {
-        body: {
-          orderId: order.databaseId || order.id,
-          publicId: Number(order.id) || null,
-          adminPin: "5425"
-        }
-      });
-
-      if (error) throw error;
-      if (!data?.ok) {
-        throw new Error([data?.error, data?.detail].filter(Boolean).join(" · ") || "La funcion no confirmo la operacion.");
-      }
-
-      const updatedOrders = getOrders().map((candidate) => (
-        String(candidate.id) === String(orderId)
-          ? {
-              ...candidate,
-              status: "ready",
-              readyAt: new Date().toISOString(),
-              smsQueued: Boolean(data?.sms?.queued || candidate.smsQueued)
-            }
-          : candidate
-      ));
-      saveOrders(updatedOrders);
-      await syncOrdersFromBackend();
-
-      if (data?.sms?.queued) {
-        alert(data.sms.alreadyQueued
-          ? "Pedido listo. El SMS ya estaba en la cola y no se duplico."
-          : "Pedido listo. SMS añadido a la cola; el Android lo enviara automaticamente.");
-        return;
-      }
-
-      const reasons = {
-        invalid_phone: "el telefono del cliente no es valido",
-        empty_message: "el mensaje quedo vacio",
-        queue_insert_failed: data?.sms?.detail || "no se pudo insertar en sms_queue"
-      };
-      const reason = reasons[data?.sms?.reason] || data?.sms?.reason || "causa desconocida";
-      alert(`Pedido marcado como listo, pero el SMS no entro en la cola: ${reason}.`);
-      return;
-    } catch (error) {
-      console.error(error);
-      const detail = await edgeFunctionErrorDetails(error);
-      alert(`No se pudo ejecutar notify-order-ready. ${detail}`);
-      return;
-    }
+  if (!supabaseUrl) {
+    alert("Falta la URL de Supabase en supabase-config.js.");
+    return;
   }
 
-  if (BACKEND_URL) {
-    try {
-      const response = await fetch(`${BACKEND_URL}/api/orders/${encodeURIComponent(order.id)}/ready`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(order)
-      });
-      const result = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(result?.error || `Backend error ${response.status}`);
+  const endpoint = `${supabaseUrl}/functions/v1/sms-gateway/api/order-ready`;
 
-      const updatedOrders = getOrders().map((candidate) => (
-        String(candidate.id) === String(orderId)
-          ? {
-              ...candidate,
-              status: "ready",
-              readyAt: new Date().toISOString(),
-              smsQueued: Boolean(result?.smsQueued || candidate.smsQueued)
-            }
-          : candidate
-      ));
-      saveOrders(updatedOrders);
-      await syncOrdersFromBackend();
-      alert(result?.smsQueued
-        ? "Pedido listo. SMS añadido a la cola."
-        : "Pedido listo, pero el SMS no entro en la cola.");
-      return;
-    } catch (error) {
-      console.error(error);
-      alert(`No se pudo contactar el backend: ${error?.message || error}`);
+  try {
+    const response = await fetch(endpoint, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...(anonKey ? {
+          apikey: anonKey,
+          Authorization: `Bearer ${anonKey}`
+        } : {})
+      },
+      body: JSON.stringify({
+        orderId: order.databaseId || order.id,
+        publicId: Number(order.id) || null,
+        adminPin: "5425"
+      })
+    });
+
+    const rawText = await response.text();
+    let result = {};
+    try {
+      result = rawText ? JSON.parse(rawText) : {};
+    } catch (_) {
+      result = { detail: rawText };
+    }
+
+    if (!response.ok || !result?.ok) {
+      const reason = [
+        `HTTP ${response.status}`,
+        result?.error,
+        result?.detail
+      ].filter(Boolean).join(" · ");
+      throw new Error(reason || "sms-gateway no confirmó la operación.");
+    }
+
+    const updatedOrders = getOrders().map((candidate) => (
+      String(candidate.id) === String(orderId)
+        ? {
+            ...candidate,
+            status: "ready",
+            readyAt: new Date().toISOString(),
+            smsQueued: Boolean(result?.sms?.queued || candidate.smsQueued)
+          }
+        : candidate
+    ));
+    saveOrders(updatedOrders);
+    await syncOrdersFromBackend();
+
+    if (result?.sms?.queued) {
+      alert(result.sms.alreadyQueued
+        ? "Pedido listo. El SMS ya estaba en la cola y no se duplicó."
+        : "Pedido listo. SMS añadido a la cola; el Android lo enviará automáticamente.");
       return;
     }
-  }
 
-  alert("No existe conexion con Supabase Edge Functions ni con un backend publico.");
+    const reasons = {
+      invalid_phone: "el teléfono del cliente no es válido",
+      empty_message: "el mensaje quedó vacío",
+      queue_insert_failed: result?.sms?.detail || "no se pudo insertar en sms_queue"
+    };
+    const reason = reasons[result?.sms?.reason] || result?.sms?.reason || "causa desconocida";
+    alert(`Pedido marcado como listo, pero el SMS no entró en la cola: ${reason}.`);
+  } catch (error) {
+    console.error("Error al llamar sms-gateway:", error);
+    alert(`No se pudo contactar sms-gateway para enviar el SMS. ${error?.message || error}`);
+  }
 }
 
 function orderTypeLabel(type) {
