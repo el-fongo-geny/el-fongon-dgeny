@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://el-fongo-geny.github.io/el-fongon-dgeny/sitemap.xml
