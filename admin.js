@@ -9,6 +9,72 @@ const STORAGE_KITCHEN_HIDDEN = "fogon_kitchen_hidden";
 const STORAGE_ADMIN_THEME = "fogon_admin_theme";
 const ADMIN_PIN = "5425";
 const BACKEND_URL = (window.FOGON_BACKEND_URL || "").replace(/\/$/, "");
+const ORDER_MODE_MANUAL_KEY = "system:orders-manual";
+const ORDER_MODE_OPEN_KEY = "system:orders-open";
+
+const INVENTORY_ITEMS = [
+  "Pollo guisar", "Pollo pica pollo", "Alitas", "Bistec", "Chuleta", "Orejita",
+  "Patica", "Trompa", "Tilapia", "Chillo", "Camarones", "Res", "Cerdo",
+  "Chicharron", "Pechuga de Pollo", "Salami", "Bacon", "Longaniza", "Pinguilin",
+  "Rabito", "Platano verde", "Platano maduro", "Pepino", "Tomate", "Lechuga",
+  "Repollo", "Papa", "Papas fritas", "Queso mexicano", "Queso dominicano",
+  "Queso rayado", "Arroz", "Habichuela", "Gandules con coco", "Guandules",
+  "Yuca", "Ketchup", "Mayonesa", "Yautia", "Envase para llevar con division",
+  "Envase para llevar sin division", "Jamon", "Huevo", "Tocino", "Cebolla",
+  "Pimientos", "Chabola", "Tamarindo", "Guanabana", "Aguacate", "Bacalao",
+  "Limon", "Zapatero", "Lechoza", "Envase para Habichuela",
+  "Envase de mayo-kepchut", "Vaso de jugo", "Envase de niño", "Envase de set",
+  "Leche condensada", "Leche evaporada", "Plato de plastico para comer",
+  "Cucharas desechables", "Envase redondo", "Hielo", "Envase de sancocho",
+  "Envase para salsa pequeño", "Envase para salsa mediano", "Cafe dominicano",
+  "Guante", "Servilleta", "Sorvete", "Vaso para cafe", "Sal", "Azucar",
+  "Vinagre", "Sopita", "Aceite", "Aceite de oliva"
+].map((name, index) => ({
+  id: `inventory:${index + 1}:${name.toLowerCase()
+    .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "")}`,
+  es: name,
+  en: name
+}));
+
+function getOrderMode() {
+  const availability = getAvailability();
+  const manual = availability[ORDER_MODE_MANUAL_KEY] === true;
+  const open = availability[ORDER_MODE_OPEN_KEY] === true;
+  return manual ? (open ? "open" : "closed") : "auto";
+}
+
+function renderOrderModeButton() {
+  const button = $("#orderModeBtn");
+  if (!button) return;
+  const mode = getOrderMode();
+  const labels = {
+    auto: "Pedidos: AUTOMATICO (11:00-20:30)",
+    open: "Pedidos: ABIERTO",
+    closed: "Pedidos: CERRADO"
+  };
+  button.textContent = labels[mode];
+  button.dataset.mode = mode;
+  button.classList.toggle("is-open", mode === "open");
+  button.classList.toggle("is-closed", mode === "closed");
+}
+
+async function setOrderMode(mode) {
+  if (mode === "auto") {
+    await setAvailability(ORDER_MODE_MANUAL_KEY, false);
+    await setAvailability(ORDER_MODE_OPEN_KEY, false);
+  } else {
+    await setAvailability(ORDER_MODE_OPEN_KEY, mode === "open");
+    await setAvailability(ORDER_MODE_MANUAL_KEY, true);
+  }
+  renderOrderModeButton();
+}
+
+async function cycleOrderMode() {
+  const mode = getOrderMode();
+  const next = mode === "auto" ? "open" : mode === "open" ? "closed" : "auto";
+  await setOrderMode(next);
+}
 
 let availabilityQuery = "";
 let alarmTimer = null;
@@ -116,6 +182,7 @@ async function syncAvailabilityFromBackend() {
       const availability = await db.fetchAvailability();
       localStorage.setItem(STORAGE_AVAILABILITY, JSON.stringify(availability));
       renderAvailability();
+      renderOrderModeButton();
     } catch (error) {
       console.warn("No se pudo sincronizar disponibilidad desde Supabase:", error);
     }
@@ -602,21 +669,44 @@ function renderKitchen() {
 function renderAvailability() {
   const availability = getAvailability();
   const query = availabilityQuery.trim().toLowerCase();
-  const items = MENU_ITEMS.filter((item) => {
-    const haystack = `${item.es} ${item.en}`.toLowerCase();
+  const menuItems = MENU_ITEMS.map((item) => ({
+    id: item.id,
+    es: item.es,
+    en: item.en,
+    group: "Productos del menu"
+  }));
+  const inventoryItems = INVENTORY_ITEMS.map((item) => ({
+    ...item,
+    group: "Inventario interno"
+  }));
+  const items = [...menuItems, ...inventoryItems].filter((item) => {
+    const haystack = `${item.es} ${item.en} ${item.group}`.toLowerCase();
     return haystack.includes(query);
   });
   const availabilityList = $("#availabilityList");
   if (!availabilityList) return;
-  availabilityList.innerHTML = items.map((item) => {
-    const available = availability[item.id] !== false;
+
+  const groups = ["Productos del menu", "Inventario interno"];
+  availabilityList.innerHTML = groups.map((group) => {
+    const groupItems = items.filter((item) => item.group === group);
+    if (!groupItems.length) return "";
     return `
-      <label class="availability-row">
-        <span>${escapeHtml(item.es)}<small>${escapeHtml(item.en)}</small></span>
-        <input type="checkbox" data-availability="${escapeHtml(item.id)}" ${available ? "checked" : ""}>
-      </label>
+      <section class="availability-group">
+        <h3>${escapeHtml(group)}</h3>
+        ${groupItems.map((item) => {
+          const available = availability[item.id] !== false;
+          return `
+            <label class="availability-row">
+              <span>${escapeHtml(item.es)}${item.en !== item.es ? `<small>${escapeHtml(item.en)}</small>` : ""}</span>
+              <input type="checkbox" data-availability="${escapeHtml(item.id)}" ${available ? "checked" : ""}>
+            </label>
+          `;
+        }).join("")}
+      </section>
     `;
   }).join("");
+
+  renderOrderModeButton();
 }
 
 function renderAll() {
@@ -719,6 +809,9 @@ function init() {
   const banner = $("#soundBanner");
   if (banner) banner.hidden = true;
 
+  const orderModeBtn = $("#orderModeBtn");
+  if (orderModeBtn) orderModeBtn.addEventListener("click", cycleOrderMode);
+
   const adminThemeBtn = $("#adminThemeToggleBtn");
   if (adminThemeBtn) adminThemeBtn.addEventListener("click", toggleAdminTheme);
 
@@ -782,7 +875,7 @@ function init() {
 
   window.addEventListener("storage", (event) => {
     if (event.key === STORAGE_ORDERS || event.key === STORAGE_KITCHEN_HIDDEN || event.key === null) renderAll();
-    if (event.key === STORAGE_AVAILABILITY || event.key === null) renderAvailability();
+    if (event.key === STORAGE_AVAILABILITY || event.key === null) { renderAvailability(); renderOrderModeButton(); }
   });
 
   if (window.FOGON_DB?.isReady()) {
