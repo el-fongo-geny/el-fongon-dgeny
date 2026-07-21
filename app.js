@@ -15,6 +15,61 @@ let scrollRevealLockUntil = 0;
 const STORAGE_ORDERS = "fogon_orders";
 const STORAGE_ORDER_COUNTER = "fogon_order_counter";
 const BACKEND_URL = (window.FOGON_BACKEND_URL || "").replace(/\/$/, "");
+const ORDER_MODE_MANUAL_KEY = "system:orders-manual";
+const ORDER_MODE_OPEN_KEY = "system:orders-open";
+const CALIFORNIA_TIME_ZONE = "America/Los_Angeles";
+const ORDER_OPEN_MINUTES = 11 * 60;
+const ORDER_CLOSE_MINUTES = 20 * 60 + 30;
+
+function uniqueCartLineId(productId) {
+  if (window.crypto?.randomUUID) return `${productId}-${window.crypto.randomUUID()}`;
+  return `${productId}-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+}
+
+function californiaMinutesNow(date = new Date()) {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: CALIFORNIA_TIME_ZONE,
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23"
+  }).formatToParts(date);
+  const hour = Number(parts.find((part) => part.type === "hour")?.value || 0);
+  const minute = Number(parts.find((part) => part.type === "minute")?.value || 0);
+  return hour * 60 + minute;
+}
+
+function currentOrderingState() {
+  const availability = getAvailability();
+  const manual = availability[ORDER_MODE_MANUAL_KEY] === true;
+  const forcedOpen = availability[ORDER_MODE_OPEN_KEY] === true;
+  const automaticOpen = californiaMinutesNow() >= ORDER_OPEN_MINUTES &&
+    californiaMinutesNow() < ORDER_CLOSE_MINUTES;
+  return {
+    mode: manual ? (forcedOpen ? "open" : "closed") : "auto",
+    open: manual ? forcedOpen : automaticOpen
+  };
+}
+
+function orderingClosedMessage() {
+  return state.lang === "en"
+    ? "Online ordering is currently closed. Regular ordering hours are 11:00 AM to 8:30 PM, California time."
+    : "Los pedidos en linea estan cerrados ahora mismo. El horario habitual es de 11:00 a. m. a 8:30 p. m., hora de California.";
+}
+
+function updateOrderingUi() {
+  const status = currentOrderingState();
+  const submit = document.querySelector('#checkoutForm button[type="submit"]');
+  if (submit) {
+    submit.disabled = !status.open;
+    submit.setAttribute("aria-disabled", String(!status.open));
+    submit.title = status.open ? "" : orderingClosedMessage();
+  }
+  const notice = document.getElementById("orderingStatusNotice");
+  if (notice) {
+    notice.hidden = status.open;
+    notice.textContent = orderingClosedMessage();
+  }
+}
 
 const $ = (selector) => document.querySelector(selector);
 const $$ = (selector) => Array.from(document.querySelectorAll(selector));
@@ -116,6 +171,7 @@ function refreshAvailabilityIfChanged(force = false) {
   if (!force && nextSnapshot === lastAvailabilitySnapshot) return;
   lastAvailabilitySnapshot = nextSnapshot;
   renderMenu();
+  updateOrderingUi();
 }
 
 function setLanguage(lang) {
@@ -368,7 +424,7 @@ function buildCartItem(form) {
   });
 
   return {
-    id: `${item.id}-${Date.now()}`,
+    id: uniqueCartLineId(item.id),
     productId: item.id,
     name: itemName(item),
     basePrice: Number(item.price),
@@ -416,7 +472,7 @@ function renderCart() {
         </div>
         <div>
           <strong>${money(item.lineTotal * item.quantity)}</strong>
-          <button class="text-btn" data-remove-cart="${item.id}" type="button">${text("remove")}</button>
+          <button class="text-btn cart-remove-btn" data-remove-cart="${item.id}" type="button" aria-label="${text("remove")} ${item.name}">${text("remove")}</button>
         </div>
       </div>
     `).join("");
@@ -534,6 +590,12 @@ async function countActiveOrders() {
 
 async function saveOrder(paymentMethod) {
   if (!state.pendingOrder) return;
+  if (!currentOrderingState().open) {
+    closePayment();
+    alert(orderingClosedMessage());
+    updateOrderingUi();
+    return;
+  }
 
   let order = { ...state.pendingOrder, paymentMethod, orderType: state.orderType, status: "new" };
   order.items = (order.items || []).map((item, index) => index === 0
@@ -614,8 +676,12 @@ function initEvents() {
 
     const removeButton = event.target.closest("[data-remove-cart]");
     if (removeButton) {
-      state.cart = state.cart.filter((item) => item.id !== removeButton.dataset.removeCart);
+      event.preventDefault();
+      event.stopPropagation();
+      const lineId = String(removeButton.dataset.removeCart || "");
+      state.cart = state.cart.filter((item) => String(item.id) !== lineId);
       renderCart();
+      return;
     }
 
     const orderTypeButton = event.target.closest("[data-order-type]");
@@ -641,6 +707,11 @@ function initEvents() {
 
     if (event.target.id === "checkoutForm") {
       event.preventDefault();
+      if (!currentOrderingState().open) {
+        alert(orderingClosedMessage());
+        updateOrderingUi();
+        return;
+      }
       if (!event.target.checkValidity()) {
         event.target.reportValidity();
         return;
@@ -682,6 +753,8 @@ function init() {
   renderCategories();
   renderMenu();
   renderCart();
+  updateOrderingUi();
+  setInterval(updateOrderingUi, 30000);
 
   let scrollTicking = false;
   window.addEventListener("scroll", () => {
