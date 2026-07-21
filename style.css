@@ -1947,3 +1947,101 @@ body.cart-open .category-tabs {
     top: max(72px, calc(env(safe-area-inset-top) + 58px)) !important;
   }
 }
+
+
+/* ===== v22: carrito, horario e inventario ===== */
+.cart-item > div:last-child {
+  min-width: 96px;
+  text-align: right;
+}
+
+.cart-remove-btn {
+  min-width: 92px;
+  min-height: 42px;
+  margin-left: auto;
+  border: 1px solid color-mix(in srgb, var(--accent) 55%, var(--line));
+  border-radius: 12px;
+  padding: 8px 12px;
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+  touch-action: manipulation;
+}
+
+.cart-remove-btn:active {
+  transform: scale(0.97);
+}
+
+.ordering-status-notice {
+  margin: 8px 0 12px;
+  border: 1px solid #e6a23c;
+  border-radius: 12px;
+  padding: 10px 12px;
+  background: rgba(230, 162, 60, 0.13);
+  color: var(--ink);
+  font-weight: 800;
+  line-height: 1.35;
+}
+
+.checkout-form button[type="submit"]:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.order-mode-btn {
+  min-height: 46px;
+  border: 1px solid #d5a83b;
+  border-radius: 999px;
+  padding: 0 15px;
+  background: #5a4819;
+  color: #fff;
+  font-weight: 900;
+}
+
+.order-mode-btn.is-open {
+  border-color: #38b36b;
+  background: #166638;
+}
+
+.order-mode-btn.is-closed {
+  border-color: #ec6759;
+  background: #8c241b;
+}
+
+.availability-group {
+  margin: 14px 0 24px;
+  border: 1px solid rgba(255,255,255,.12);
+  border-radius: 14px;
+  padding: 12px 14px;
+}
+
+.availability-group h3 {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  margin: -12px -14px 4px;
+  border-radius: 14px 14px 0 0;
+  padding: 12px 14px;
+  background: #252525;
+}
+
+body.light-mode .availability-group {
+  border-color: #ded4c8;
+}
+
+body.light-mode .availability-group h3 {
+  background: #f4ede5;
+  color: #1f1b16;
+}
+
+@media (max-width: 560px) {
+  .cart-item {
+    grid-template-columns: minmax(0, 1fr) 104px;
+  }
+
+  .cart-remove-btn {
+    width: 100%;
+  }
+
+  .order-mode-btn {
+    width: 100%;
+  }
+}
