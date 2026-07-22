@@ -15,7 +15,7 @@
     .tabs button{background:#333}.tabs button.active{background:#d83a21}.panel{display:none}.panel.active{display:block}
     .order{background:#252525;border:1px solid #555;border-left:6px solid #d83a21;border-radius:10px;padding:14px;margin:12px 0}.order.accepted{border-left-color:#e9a72f}.order.ready{border-left-color:#2c9f57}
     .item{border-top:1px solid #444;padding-top:9px;margin-top:9px}.status{font-weight:bold}.error{background:#6d1818;padding:10px;border-radius:8px}.ok{background:#174f2b;padding:10px;border-radius:8px}
-    .availability{display:block;padding:12px 0;border-bottom:1px solid #444}.availability input{width:auto;margin-right:10px}
+    .availability{display:block;padding:12px 0;border-bottom:1px solid #444}.availability input{width:auto;margin-right:10px}.availability-group{margin:14px 0;padding:10px;border:1px solid #444;border-radius:10px}.availability-group h3{margin:0 0 8px}.mode-open{background:#166638!important}.mode-closed{background:#8c241b!important}.mode-auto{background:#5a4819!important}
     @media(max-width:600px){.left,.right{float:none}.right{margin-top:8px}.wrap{padding:10px}button{min-height:46px}}
   </style>
 </head>
@@ -35,7 +35,7 @@
     <div id="admin" style="display:none">
       <div class="card row">
         <div class="left"><h1>Pedidos</h1><p class="muted">Versión compatible con iPad antiguo</p></div>
-        <div class="right"><button id="refreshBtn" class="secondary">Actualizar</button></div><div class="clear"></div>
+        <div class="right"><button id="orderModeBtn" class="secondary">Pedidos: AUTOMATICO</button><button id="refreshBtn" class="secondary">Actualizar</button></div><div class="clear"></div>
         <p id="connectionMessage" class="muted">Conectando…</p>
       </div>
       <div class="tabs card">
@@ -48,6 +48,6 @@
       <div id="availabilityPanel" class="panel"><div class="card"><h2>Disponibilidad</h2><p class="muted">Activa o desactiva productos completos.</p><div id="availabilityList"></div></div></div>
     </div>
   </div>
-  <script src="admin-legacy.js?v=1"></script>
+  <script src="admin-legacy.js?v=2"></script>
 </body>
 </html>
