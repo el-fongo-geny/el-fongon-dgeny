@@ -129,6 +129,61 @@ function getSupabaseFunctionConfig() {
 }
 
 
+function buildEdgeFunctionHeaders(anonKey) {
+  const headers = {
+    "Content-Type": "application/json",
+    "apikey": anonKey
+  };
+
+  /*
+    Las claves legacy anon son JWT y pueden enviarse como Bearer.
+    Las claves nuevas sb_publishable_ no son JWT y NO deben enviarse
+    dentro de Authorization.
+  */
+  const looksLikeJwt =
+    anonKey.startsWith("eyJ") &&
+    anonKey.split(".").length === 3;
+
+  if (looksLikeJwt) {
+    headers.Authorization = `Bearer ${anonKey}`;
+  }
+
+  return headers;
+}
+
+function adminLoginErrorMessage(error) {
+  const status = Number(error?.status || 0);
+  const payload = error?.payload || {};
+  const code = String(payload?.error || "").trim();
+  const detail = String(payload?.detail || error?.message || error || "").trim();
+
+  if (status === 401 && code === "invalid_admin_pin") {
+    return "PIN incorrecto. Confirma que coincide exactamente con el Secret ADMIN_PIN.";
+  }
+
+  if (code === "missing_admin_pin_secret") {
+    return "Falta el Secret ADMIN_PIN dentro de Supabase.";
+  }
+
+  if (status === 404) {
+    return "La función admin-auth no existe o todavía no está desplegada.";
+  }
+
+  if (/invalid jwt/i.test(detail)) {
+    return "Supabase está bloqueando la función por JWT. Desactiva Verify JWT en admin-auth.";
+  }
+
+  if (/missing authorization header/i.test(detail)) {
+    return "Verify JWT sigue activado en admin-auth. Debe estar desactivado.";
+  }
+
+  if (/failed to fetch|networkerror|load failed/i.test(detail)) {
+    return "El navegador no pudo conectar con admin-auth. Revisa la URL de Supabase, el despliegue y CORS.";
+  }
+
+  return detail || "No se pudo validar el acceso.";
+}
+
 async function callAdminAuth(adminPin) {
   const { supabaseUrl, anonKey } = getSupabaseFunctionConfig();
 
@@ -136,11 +191,7 @@ async function callAdminAuth(adminPin) {
     method: "POST",
     mode: "cors",
     cache: "no-store",
-    headers: {
-      "Content-Type": "application/json",
-      "apikey": anonKey,
-      "Authorization": `Bearer ${anonKey}`
-    },
+    headers: buildEdgeFunctionHeaders(anonKey),
     body: JSON.stringify({
       adminPin: String(adminPin || "").trim()
     })
@@ -177,7 +228,7 @@ async function callAdminCatalog(action, adminPin, extraBody = {}) {
     method: "POST",
     mode: "cors",
     cache: "no-store",
-    headers: { "Content-Type": "application/json", "apikey": anonKey, "Authorization": `Bearer ${anonKey}` },
+    headers: buildEdgeFunctionHeaders(anonKey),
     body: JSON.stringify({ action, adminPin, ...extraBody })
   });
   const rawText = await response.text();
@@ -875,10 +926,7 @@ function initLogin() {
       console.error("Acceso rechazado:", loginError);
       if (error) {
         error.hidden = false;
-        error.textContent =
-          loginError?.status === 401
-            ? "PIN incorrecto."
-            : `No se pudo conectar con admin-auth. ${loginError?.message || loginError}`;
+        error.textContent = adminLoginErrorMessage(loginError);
       }
       input.focus();
       input.select();
@@ -890,7 +938,6 @@ function initLogin() {
   }
 
   form.addEventListener("submit", tryLogin);
-  if (loginButton) loginButton.addEventListener("click", tryLogin);
   input.focus();
 }
 
