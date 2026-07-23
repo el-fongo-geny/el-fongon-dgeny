@@ -27,7 +27,7 @@
       </label>
       <button id="loginButton" class="primary-btn full" type="button">Entrar</button>
       <p id="pinError" class="error-text" hidden>PIN incorrecto.</p>
-      <p id="adminBuildLabel" class="admin-build-label">Acceso V48</p>
+      <p id="adminBuildLabel" class="admin-build-label">Acceso V49</p>
     </form>
   </main>
 
@@ -115,6 +115,34 @@
   <script src="supabase-config.js?v=18-mobile-fixed"></script>
   <script src="supabase-client.js?v=30-order-fix"></script>
   <script src="backend-config.js?v=18-mobile-fixed"></script>
-  <script src="admin.js?v=48-no-menu-data"></script>
+  <script>
+  // Si GitHub Pages entrega HTML o un archivo incorrecto en lugar de admin.js,
+  // el panel mostrará el problema en pantalla en vez de dejar el botón muerto.
+  window.FOGON_ADMIN_EXPECTED_BUILD = "49-admin-js-restored";
+
+  window.reportAdminScriptLoadFailure = function () {
+    var errorBox = document.getElementById("pinError");
+    var loginButton = document.getElementById("loginButton");
+
+    if (errorBox) {
+      errorBox.hidden = false;
+      errorBox.textContent =
+        "No se cargó admin.js correctamente. Reemplaza el archivo admin.js de la raíz del repositorio y recarga sin caché.";
+    }
+
+    if (loginButton) {
+      loginButton.disabled = true;
+      loginButton.textContent = "Falta admin.js";
+    }
+  };
+  </script>
+  <script src="admin.js?v=49-admin-js-restored" onerror="window.reportAdminScriptLoadFailure()"></script>
+  <script>
+  window.setTimeout(function () {
+    if (window.FOGON_ADMIN_BUILD !== window.FOGON_ADMIN_EXPECTED_BUILD) {
+      window.reportAdminScriptLoadFailure();
+    }
+  }, 1200);
+  </script>
 </body>
 </html>
