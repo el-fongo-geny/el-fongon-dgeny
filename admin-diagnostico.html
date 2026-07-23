@@ -1,0 +1,1503 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="robots" content="noindex,nofollow,noarchive">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#111111">
+  <title>Diagnóstico completo del administrador</title>
+
+  <style>
+    :root {
+      color-scheme: light;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      --bg: #f4f4f1;
+      --surface: #ffffff;
+      --ink: #171716;
+      --muted: #686964;
+      --line: #ddddda;
+      --accent: #c73520;
+      --ok: #18764a;
+      --warn: #9a5c0b;
+      --bad: #b42318;
+      --code: #151515;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100svh;
+      background: var(--bg);
+      color: var(--ink);
+    }
+
+    main {
+      width: min(980px, calc(100% - 28px));
+      margin: 24px auto 50px;
+    }
+
+    .header,
+    .card {
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      background: var(--surface);
+    }
+
+    .header {
+      padding: 22px;
+      margin-bottom: 14px;
+    }
+
+    h1, h2, h3, p { margin-top: 0; }
+
+    h1 {
+      margin-bottom: 8px;
+      font-size: clamp(1.8rem, 5vw, 2.8rem);
+      letter-spacing: -0.04em;
+    }
+
+    .subtitle {
+      max-width: 760px;
+      margin-bottom: 0;
+      color: var(--muted);
+      line-height: 1.5;
+    }
+
+    .card {
+      padding: 18px;
+      margin-bottom: 14px;
+    }
+
+    .form-grid {
+      display: grid;
+      grid-template-columns: minmax(220px, 1fr) auto;
+      gap: 10px;
+      align-items: end;
+    }
+
+    label {
+      display: grid;
+      gap: 7px;
+      font-weight: 750;
+    }
+
+    input,
+    button {
+      min-height: 46px;
+      border-radius: 10px;
+      font: inherit;
+    }
+
+    input {
+      width: 100%;
+      border: 1px solid #bfc0bb;
+      padding: 0 12px;
+      background: #fff;
+      color: var(--ink);
+    }
+
+    button {
+      border: 0;
+      padding: 0 16px;
+      background: var(--accent);
+      color: #fff;
+      font-weight: 800;
+      cursor: pointer;
+    }
+
+    button.secondary {
+      border: 1px solid var(--line);
+      background: #fff;
+      color: var(--ink);
+    }
+
+    button:disabled {
+      opacity: .55;
+      cursor: wait;
+    }
+
+    .actions {
+      display: flex;
+      gap: 9px;
+      flex-wrap: wrap;
+      margin-top: 12px;
+    }
+
+    .notice {
+      margin: 12px 0 0;
+      color: var(--muted);
+      font-size: .84rem;
+      line-height: 1.45;
+    }
+
+    .progress {
+      display: grid;
+      gap: 8px;
+    }
+
+    .step {
+      display: grid;
+      grid-template-columns: 28px minmax(0, 1fr) auto;
+      gap: 10px;
+      align-items: center;
+      min-height: 48px;
+      border: 1px solid var(--line);
+      border-radius: 11px;
+      padding: 8px 11px;
+      background: #fafaf8;
+    }
+
+    .step-number {
+      display: grid;
+      place-items: center;
+      width: 28px;
+      height: 28px;
+      border-radius: 8px;
+      background: #ecece8;
+      font-size: .76rem;
+      font-weight: 900;
+    }
+
+    .step strong {
+      display: block;
+      margin-bottom: 2px;
+    }
+
+    .step small {
+      color: var(--muted);
+    }
+
+    .badge {
+      border-radius: 999px;
+      padding: 5px 9px;
+      background: #ecece8;
+      color: var(--muted);
+      font-size: .72rem;
+      font-weight: 850;
+      white-space: nowrap;
+    }
+
+    .step[data-state="ok"] .badge {
+      background: #e8f5ee;
+      color: var(--ok);
+    }
+
+    .step[data-state="warn"] .badge {
+      background: #fff4df;
+      color: var(--warn);
+    }
+
+    .step[data-state="error"] .badge {
+      background: #fff0ef;
+      color: var(--bad);
+    }
+
+    .summary {
+      border-left: 5px solid var(--line);
+      border-radius: 10px;
+      padding: 14px;
+      background: #fafaf8;
+      line-height: 1.5;
+    }
+
+    .summary.ok { border-left-color: var(--ok); }
+    .summary.warn { border-left-color: var(--warn); }
+    .summary.error { border-left-color: var(--bad); }
+
+    pre {
+      max-height: 520px;
+      overflow: auto;
+      margin: 0;
+      border-radius: 12px;
+      padding: 15px;
+      background: var(--code);
+      color: #e9f2ea;
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+      font: 12px/1.55 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    }
+
+    details {
+      border: 1px solid var(--line);
+      border-radius: 11px;
+      margin-top: 10px;
+      background: #fafaf8;
+    }
+
+    summary {
+      cursor: pointer;
+      padding: 11px 13px;
+      font-weight: 800;
+    }
+
+    details > div {
+      border-top: 1px solid var(--line);
+      padding: 12px;
+    }
+
+    iframe {
+      width: 100%;
+      min-height: 620px;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      background: #fff;
+    }
+
+    .hidden-frame {
+      position: fixed;
+      left: -10000px;
+      top: 0;
+      width: 1200px;
+      height: 900px;
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    .good { color: var(--ok); }
+    .bad { color: var(--bad); }
+    .warning { color: var(--warn); }
+
+    @media (max-width: 680px) {
+      .form-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .step {
+        grid-template-columns: 28px minmax(0, 1fr);
+      }
+
+      .badge {
+        grid-column: 2;
+        justify-self: start;
+      }
+    }
+  </style>
+</head>
+
+<body>
+<main>
+  <section class="header">
+    <h1>Diagnóstico completo del administrador</h1>
+    <p class="subtitle">
+      Esta página prueba los archivos que GitHub está sirviendo realmente.
+      No modifica pedidos, productos ni configuraciones. El PIN solo se usa
+      durante la prueba y se borra inmediatamente del campo.
+    </p>
+  </section>
+
+  <section class="card">
+    <div class="form-grid">
+      <label>
+        <span>PIN utilizado en admin-auth</span>
+        <input
+          id="diagnosticPin"
+          type="password"
+          inputmode="numeric"
+          autocomplete="off"
+          placeholder="Introduce el mismo PIN que dio HTTP 200"
+        >
+      </label>
+
+      <button id="runDiagnosticButton" type="button">
+        Ejecutar diagnóstico
+      </button>
+    </div>
+
+    <div class="actions">
+      <button id="copyReportButton" class="secondary" type="button" disabled>
+        Copiar informe
+      </button>
+
+      <button id="showFrameButton" class="secondary" type="button" disabled>
+        Mostrar panel probado
+      </button>
+
+      <a href="admin.html" style="align-self:center;color:#5e2ca5;font-weight:750">
+        Abrir administrador normal
+      </a>
+    </div>
+
+    <p class="notice">
+      No envíes el PIN en la captura ni en el informe. El informe generado
+      excluye el PIN y la clave completa de Supabase.
+    </p>
+  </section>
+
+  <section class="card">
+    <h2>Pruebas</h2>
+    <div id="progressList" class="progress"></div>
+  </section>
+
+  <section class="card">
+    <h2>Conclusión automática</h2>
+    <div id="diagnosticSummary" class="summary">
+      Ejecuta el diagnóstico para determinar el punto exacto del fallo.
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>Informe técnico</h2>
+    <pre id="reportOutput">Esperando diagnóstico…</pre>
+  </section>
+
+  <section id="frameSection" class="card" hidden>
+    <h2>Panel real instrumentado</h2>
+    <p class="notice">
+      Esta es una copia temporal de tu admin actual con registro de errores
+      activado. No se almacenan cambios.
+    </p>
+    <iframe id="visibleDiagnosticFrame" title="Panel instrumentado"></iframe>
+  </section>
+
+  <iframe
+    id="diagnosticFrame"
+    class="hidden-frame"
+    title="Diagnóstico oculto del administrador"
+  ></iframe>
+</main>
+
+<script src="supabase-config.js?diagnostic=1"></script>
+
+<script>
+(() => {
+  "use strict";
+
+  const $ = (selector) => document.querySelector(selector);
+
+  const steps = [
+    ["page", "Descargar admin.html", "Confirma qué HTML está publicado"],
+    ["scripts", "Identificar scripts cargados", "Detecta versiones y rutas reales"],
+    ["adminjs", "Analizar admin.js", "Busca errores y versiones incorrectas"],
+    ["config", "Comprobar Supabase", "Verifica que la configuración esté disponible"],
+    ["auth", "Probar admin-auth", "Confirma el PIN desde esta misma página"],
+    ["boot", "Cargar panel instrumentado", "Registra errores desde el inicio"],
+    ["listeners", "Comprobar eventos del login", "Verifica que el botón esté conectado"],
+    ["click", "Simular el clic real", "Observa lo que hace el formulario"],
+    ["directauth", "Probar autenticación interna", "Ejecuta callAdminAuth directamente"],
+    ["show", "Probar apertura directa", "Separa login, DOM y CSS"],
+  ];
+
+  const state = {
+    report: [],
+    results: {},
+    sourceHtml: "",
+    sourceJs: "",
+    adminScriptUrl: "",
+    instrumentedHtml: "",
+    pin: "",
+    iframeLogs: null,
+  };
+
+  function now() {
+    return new Date().toISOString();
+  }
+
+  function log(section, message, data = undefined) {
+    const item = {
+      time: now(),
+      section,
+      message,
+      data: sanitize(data),
+    };
+
+    state.report.push(item);
+    renderReport();
+  }
+
+  function sanitize(value) {
+    if (value == null) return value;
+
+    if (typeof value === "string") {
+      return value
+        .replace(/sb_publishable_[A-Za-z0-9_-]+/g, "sb_publishable_[OCULTA]")
+        .replace(/eyJ[A-Za-z0-9._-]{20,}/g, "JWT_[OCULTA]");
+    }
+
+    if (Array.isArray(value)) {
+      return value.map(sanitize);
+    }
+
+    if (typeof value === "object") {
+      const copy = {};
+
+      Object.entries(value).forEach(([key, child]) => {
+        if (/pin|apikey|anonkey|authorization/i.test(key)) {
+          copy[key] = "[OCULTO]";
+        } else {
+          copy[key] = sanitize(child);
+        }
+      });
+
+      return copy;
+    }
+
+    return value;
+  }
+
+  function renderReport() {
+    $("#reportOutput").textContent = JSON.stringify(
+      {
+        generatedAt: now(),
+        page: location.href,
+        userAgent: navigator.userAgent,
+        results: sanitize(state.results),
+        events: state.report,
+      },
+      null,
+      2
+    );
+  }
+
+  function setStep(id, status, detail) {
+    const step = document.querySelector(`[data-step-id="${id}"]`);
+    if (!step) return;
+
+    step.dataset.state = status;
+    step.querySelector(".badge").textContent =
+      status === "ok" ? "CORRECTO" :
+      status === "warn" ? "ATENCIÓN" :
+      status === "error" ? "ERROR" :
+      "PROBANDO";
+
+    if (detail) {
+      step.querySelector("small").textContent = detail;
+    }
+  }
+
+  function renderSteps() {
+    $("#progressList").innerHTML = steps.map((step, index) => `
+      <article class="step" data-step-id="${step[0]}" data-state="pending">
+        <span class="step-number">${index + 1}</span>
+        <span>
+          <strong>${escapeHtml(step[1])}</strong>
+          <small>${escapeHtml(step[2])}</small>
+        </span>
+        <span class="badge">PENDIENTE</span>
+      </article>
+    `).join("");
+  }
+
+  function escapeHtml(value) {
+    return String(value ?? "")
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#039;");
+  }
+
+  function absoluteUrl(path) {
+    return new URL(path, location.href).href;
+  }
+
+  function withCacheBust(url) {
+    const next = new URL(url, location.href);
+    next.searchParams.set("_diagnostic", String(Date.now()));
+    return next.href;
+  }
+
+  async function fetchText(url) {
+    const response = await fetch(withCacheBust(url), {
+      method: "GET",
+      cache: "no-store",
+      credentials: "same-origin",
+    });
+
+    const text = await response.text();
+
+    return {
+      ok: response.ok,
+      status: response.status,
+      url: response.url,
+      text,
+      contentType: response.headers.get("content-type") || "",
+    };
+  }
+
+  function buildHeaders(key) {
+    const headers = {
+      "Content-Type": "application/json",
+      apikey: key,
+    };
+
+    const isLegacyJwt =
+      key.startsWith("eyJ") &&
+      key.split(".").length === 3;
+
+    if (isLegacyJwt) {
+      headers.Authorization = `Bearer ${key}`;
+    }
+
+    return headers;
+  }
+
+  function findAdminScript(documentObject) {
+    const scripts = Array.from(documentObject.querySelectorAll("script[src]"));
+
+    return scripts.find((script) =>
+      /(^|\/)admin\.js([?#]|$)/i.test(script.getAttribute("src") || "")
+    );
+  }
+
+  function testJavaScriptSyntax(code) {
+    try {
+      new Function(code);
+      return { ok: true };
+    } catch (error) {
+      return {
+        ok: false,
+        name: error.name,
+        message: error.message,
+        stack: error.stack,
+      };
+    }
+  }
+
+  function extractBuild(code) {
+    const matches = [
+      code.match(/FOGON_ADMIN_BUILD\s*=\s*["']([^"']+)["']/),
+      code.match(/admin\.js\?v=([A-Za-z0-9._-]+)/),
+    ].filter(Boolean);
+
+    return matches[0]?.[1] || "no-identificada";
+  }
+
+  function instrumentHtml(sourceHtml) {
+    const parser = new DOMParser();
+    const documentObject = parser.parseFromString(sourceHtml, "text/html");
+
+    const base = documentObject.createElement("base");
+    base.href = new URL("./", location.href).href;
+    documentObject.head.prepend(base);
+
+    const instrument = documentObject.createElement("script");
+    instrument.textContent = `
+      window.__ADMIN_DIAGNOSTIC__ = {
+        startedAt: new Date().toISOString(),
+        errors: [],
+        rejections: [],
+        console: [],
+        fetches: [],
+        listeners: [],
+        stages: []
+      };
+
+      (function () {
+        const diag = window.__ADMIN_DIAGNOSTIC__;
+
+        function safe(value) {
+          try {
+            if (value instanceof Error) {
+              return {
+                name: value.name,
+                message: value.message,
+                stack: value.stack
+              };
+            }
+
+            if (typeof value === "string") return value;
+            return JSON.parse(JSON.stringify(value));
+          } catch (_) {
+            return String(value);
+          }
+        }
+
+        ["log", "warn", "error"].forEach((method) => {
+          const original = console[method].bind(console);
+
+          console[method] = (...args) => {
+            diag.console.push({
+              method,
+              time: new Date().toISOString(),
+              args: args.map(safe)
+            });
+
+            original(...args);
+          };
+        });
+
+        window.addEventListener("error", (event) => {
+          diag.errors.push({
+            time: new Date().toISOString(),
+            message: event.message,
+            filename: event.filename,
+            lineno: event.lineno,
+            colno: event.colno,
+            error: safe(event.error)
+          });
+        });
+
+        window.addEventListener("unhandledrejection", (event) => {
+          diag.rejections.push({
+            time: new Date().toISOString(),
+            reason: safe(event.reason)
+          });
+        });
+
+        const originalAddEventListener =
+          EventTarget.prototype.addEventListener;
+
+        EventTarget.prototype.addEventListener =
+          function (type, listener, options) {
+            const id = this && this.id ? this.id : "";
+            const tag =
+              this && this.tagName
+                ? this.tagName.toLowerCase()
+                : this === window
+                  ? "window"
+                  : this === document
+                    ? "document"
+                    : "";
+
+            if (
+              id === "loginButton" ||
+              id === "pinForm" ||
+              id === "pinInput"
+            ) {
+              diag.listeners.push({
+                time: new Date().toISOString(),
+                id,
+                tag,
+                type,
+                listenerType: typeof listener
+              });
+            }
+
+            return originalAddEventListener.call(
+              this,
+              type,
+              listener,
+              options
+            );
+          };
+
+        const originalFetch = window.fetch.bind(window);
+
+        window.fetch = async (...args) => {
+          const startedAt = Date.now();
+          const requestUrl =
+            typeof args[0] === "string"
+              ? args[0]
+              : args[0] && args[0].url
+                ? args[0].url
+                : String(args[0]);
+
+          const record = {
+            time: new Date().toISOString(),
+            url: requestUrl,
+            method:
+              (args[1] && args[1].method) ||
+              (args[0] && args[0].method) ||
+              "GET",
+            status: null,
+            ok: null,
+            durationMs: null,
+            response: ""
+          };
+
+          diag.fetches.push(record);
+
+          try {
+            const response = await originalFetch(...args);
+            record.status = response.status;
+            record.ok = response.ok;
+            record.durationMs = Date.now() - startedAt;
+
+            try {
+              const text = await response.clone().text();
+              record.response = text.slice(0, 500);
+            } catch (_) {}
+
+            return response;
+          } catch (error) {
+            record.durationMs = Date.now() - startedAt;
+            record.error = safe(error);
+            throw error;
+          }
+        };
+
+        diag.stages.push({
+          time: new Date().toISOString(),
+          stage: "instrumentation-installed"
+        });
+      })();
+    `;
+
+    documentObject.head.prepend(instrument);
+
+    Array.from(documentObject.querySelectorAll("script[src]")).forEach((script) => {
+      const src = script.getAttribute("src");
+
+      if (!src) return;
+
+      const url = new URL(src, location.href);
+
+      if (url.origin === location.origin) {
+        url.searchParams.set("_diagnostic", String(Date.now()));
+        script.setAttribute("src", url.href);
+      }
+    });
+
+    return "<!doctype html>\n" + documentObject.documentElement.outerHTML;
+  }
+
+  function frameSnapshot(frame) {
+    const win = frame.contentWindow;
+    const doc = frame.contentDocument;
+
+    if (!win || !doc) {
+      return {
+        accessible: false,
+        error: "No se pudo acceder al iframe.",
+      };
+    }
+
+    const login = doc.querySelector("#adminLogin");
+    const panel = doc.querySelector("#adminPanel");
+    const form = doc.querySelector("#pinForm");
+    const input = doc.querySelector("#pinInput");
+    const button = doc.querySelector("#loginButton");
+    const error = doc.querySelector("#pinError");
+    const buildLabel = doc.querySelector("#adminBuildLabel");
+
+    const panelStyle = panel ? win.getComputedStyle(panel) : null;
+    const loginStyle = login ? win.getComputedStyle(login) : null;
+
+    return {
+      accessible: true,
+      href: win.location.href,
+      readyState: doc.readyState,
+      buildGlobal: win.FOGON_ADMIN_BUILD || null,
+      buildLabel: buildLabel?.textContent?.trim() || null,
+      functions: {
+        initLogin: typeof win.initLogin,
+        callAdminAuth: typeof win.callAdminAuth,
+        showAdminPanel: typeof win.showAdminPanel,
+        validateAdminPin: typeof win.validateAdminPin,
+      },
+      elements: {
+        form: Boolean(form),
+        input: Boolean(input),
+        button: Boolean(button),
+        login: Boolean(login),
+        panel: Boolean(panel),
+      },
+      button: button ? {
+        type: button.type,
+        text: button.textContent.trim(),
+        disabled: button.disabled,
+      } : null,
+      error: error ? {
+        hidden: error.hidden,
+        text: error.textContent.trim(),
+      } : null,
+      login: login ? {
+        hidden: login.hidden,
+        inlineDisplay: login.style.display,
+        computedDisplay: loginStyle.display,
+        visibility: loginStyle.visibility,
+        opacity: loginStyle.opacity,
+        rect: login.getBoundingClientRect().toJSON
+          ? login.getBoundingClientRect().toJSON()
+          : {
+              width: login.getBoundingClientRect().width,
+              height: login.getBoundingClientRect().height,
+            },
+      } : null,
+      panel: panel ? {
+        hidden: panel.hidden,
+        inlineDisplay: panel.style.display,
+        computedDisplay: panelStyle.display,
+        visibility: panelStyle.visibility,
+        opacity: panelStyle.opacity,
+        rect: panel.getBoundingClientRect().toJSON
+          ? panel.getBoundingClientRect().toJSON()
+          : {
+              width: panel.getBoundingClientRect().width,
+              height: panel.getBoundingClientRect().height,
+            },
+      } : null,
+      diagnostic: sanitize(win.__ADMIN_DIAGNOSTIC__ || null),
+    };
+  }
+
+  async function wait(milliseconds) {
+    return new Promise((resolve) => setTimeout(resolve, milliseconds));
+  }
+
+  async function loadFrame(source) {
+    const frame = $("#diagnosticFrame");
+
+    return new Promise((resolve, reject) => {
+      const timeout = setTimeout(() => {
+        reject(new Error("El iframe tardó demasiado en cargar."));
+      }, 20000);
+
+      frame.onload = () => {
+        clearTimeout(timeout);
+        resolve(frame);
+      };
+
+      frame.srcdoc = source;
+    });
+  }
+
+  async function runDiagnostic() {
+    const runButton = $("#runDiagnosticButton");
+    const copyButton = $("#copyReportButton");
+    const showFrameButton = $("#showFrameButton");
+    const pinInput = $("#diagnosticPin");
+
+    const pin = String(pinInput.value || "").trim();
+    pinInput.value = "";
+
+    state.pin = pin;
+    state.report = [];
+    state.results = {};
+    state.iframeLogs = null;
+
+    renderReport();
+
+    steps.forEach((step) => setStep(step[0], "pending"));
+    $("#diagnosticSummary").className = "summary";
+    $("#diagnosticSummary").textContent = "Ejecutando pruebas…";
+
+    runButton.disabled = true;
+    copyButton.disabled = true;
+    showFrameButton.disabled = true;
+
+    try {
+      if (!pin) {
+        throw new Error("Introduce el PIN antes de ejecutar el diagnóstico.");
+      }
+
+      // 1. admin.html
+      setStep("page", "running", "Descargando archivo publicado…");
+
+      const htmlResult = await fetchText("admin.html");
+      state.sourceHtml = htmlResult.text;
+      state.results.adminHtml = {
+        status: htmlResult.status,
+        ok: htmlResult.ok,
+        url: htmlResult.url,
+        length: htmlResult.text.length,
+        contentType: htmlResult.contentType,
+      };
+
+      log("admin.html", "Archivo descargado", state.results.adminHtml);
+
+      if (!htmlResult.ok) {
+        setStep("page", "error", `GitHub respondió HTTP ${htmlResult.status}`);
+        throw new Error(`admin.html respondió HTTP ${htmlResult.status}.`);
+      }
+
+      setStep("page", "ok", `${htmlResult.text.length} caracteres recibidos`);
+
+      const parser = new DOMParser();
+      const adminDocument = parser.parseFromString(
+        htmlResult.text,
+        "text/html"
+      );
+
+      // 2. Scripts
+      setStep("scripts", "running", "Leyendo rutas de scripts…");
+
+      const scriptSources = Array.from(
+        adminDocument.querySelectorAll("script[src]")
+      ).map((script) => script.getAttribute("src"));
+
+      const adminScript = findAdminScript(adminDocument);
+
+      state.results.scripts = {
+        sources: scriptSources,
+        adminScriptFound: Boolean(adminScript),
+        adminScriptSrc: adminScript?.getAttribute("src") || null,
+        loginButtonType:
+          adminDocument.querySelector("#loginButton")?.getAttribute("type") ||
+          null,
+        formOnSubmit:
+          adminDocument.querySelector("#pinForm")?.getAttribute("onsubmit") ||
+          null,
+        buildLabel:
+          adminDocument.querySelector("#adminBuildLabel")?.textContent?.trim() ||
+          null,
+      };
+
+      log("scripts", "Scripts encontrados", state.results.scripts);
+
+      if (!adminScript) {
+        setStep("scripts", "error", "admin.html no carga admin.js");
+        throw new Error("admin.html no contiene una referencia a admin.js.");
+      }
+
+      state.adminScriptUrl = absoluteUrl(
+        adminScript.getAttribute("src")
+      );
+
+      setStep(
+        "scripts",
+        "ok",
+        `admin.js: ${adminScript.getAttribute("src")}`
+      );
+
+      // 3. Analizar admin.js
+      setStep("adminjs", "running", "Descargando y analizando JavaScript…");
+
+      const jsResult = await fetchText(state.adminScriptUrl);
+      state.sourceJs = jsResult.text;
+
+      const syntax = testJavaScriptSyntax(jsResult.text);
+      const patterns = {
+        build: extractBuild(jsResult.text),
+        hasAdminAuth: /function\s+callAdminAuth\s*\(/.test(jsResult.text),
+        hasInitLogin: /function\s+initLogin\s*\(/.test(jsResult.text),
+        hasShowAdminPanel: /function\s+showAdminPanel\s*\(/.test(jsResult.text),
+        hasLoginClickListener:
+          /loginButton\.addEventListener\(\s*["']click["']/.test(jsResult.text),
+        hasFormSubmitListener:
+          /form\.addEventListener\(\s*["']submit["']/.test(jsResult.text),
+        hasPublicPin:
+          /const\s+ADMIN_PIN\s*=/.test(jsResult.text) ||
+          /5425/.test(jsResult.text),
+        knownV47StorageBug:
+          /function\s+safeLocalGet[\s\S]{0,300}window\.safeLocalGet\s*\(/.test(jsResult.text),
+        badInitOrder:
+          /function\s+init\s*\(\)\s*\{\s*applyAdminTheme\(\);\s*initLogin\(\)/.test(jsResult.text),
+      };
+
+      state.results.adminJs = {
+        status: jsResult.status,
+        ok: jsResult.ok,
+        url: jsResult.url,
+        length: jsResult.text.length,
+        syntax,
+        patterns,
+        firstLines: jsResult.text.split("\n").slice(0, 20),
+      };
+
+      log("admin.js", "Análisis de admin.js", state.results.adminJs);
+
+      if (!jsResult.ok) {
+        setStep("adminjs", "error", `admin.js respondió HTTP ${jsResult.status}`);
+        throw new Error(`admin.js respondió HTTP ${jsResult.status}.`);
+      }
+
+      if (!syntax.ok) {
+        setStep("adminjs", "error", `Error de sintaxis: ${syntax.message}`);
+      } else if (patterns.knownV47StorageBug) {
+        setStep(
+          "adminjs",
+          "warn",
+          "Detectado fallo V47: safeLocalGet llama a window.safeLocalGet"
+        );
+      } else if (patterns.hasPublicPin) {
+        setStep("adminjs", "warn", "El código todavía contiene el PIN antiguo");
+      } else {
+        setStep("adminjs", "ok", `Versión detectada: ${patterns.build}`);
+      }
+
+      // 4. Config
+      setStep("config", "running", "Leyendo window.FOGON_SUPABASE…");
+
+      const cfg = window.FOGON_SUPABASE || {};
+      const supabaseUrl = String(cfg.url || "").replace(/\/$/, "");
+      const anonKey = String(cfg.anonKey || "").trim();
+
+      state.results.supabaseConfig = {
+        exists: Boolean(window.FOGON_SUPABASE),
+        urlPresent: Boolean(supabaseUrl),
+        keyPresent: Boolean(anonKey),
+        keyType:
+          anonKey.startsWith("sb_publishable_")
+            ? "publishable"
+            : anonKey.startsWith("eyJ")
+              ? "legacy-jwt"
+              : anonKey
+                ? "unknown"
+                : "missing",
+        keyLength: anonKey.length,
+      };
+
+      log("supabase-config", "Configuración detectada", state.results.supabaseConfig);
+
+      if (!supabaseUrl || !anonKey) {
+        setStep("config", "error", "Falta URL o anonKey");
+        throw new Error("supabase-config.js no cargó URL y anonKey.");
+      }
+
+      setStep(
+        "config",
+        "ok",
+        `Configuración disponible; clave ${state.results.supabaseConfig.keyType}`
+      );
+
+      // 5. Auth desde diagnóstico
+      setStep("auth", "running", "Llamando a admin-auth…");
+
+      const authResponse = await fetch(
+        `${supabaseUrl}/functions/v1/admin-auth`,
+        {
+          method: "POST",
+          mode: "cors",
+          cache: "no-store",
+          headers: buildHeaders(anonKey),
+          body: JSON.stringify({ adminPin: pin }),
+        }
+      );
+
+      const authText = await authResponse.text();
+      let authPayload = {};
+
+      try {
+        authPayload = authText ? JSON.parse(authText) : {};
+      } catch (_) {
+        authPayload = { raw: authText };
+      }
+
+      state.results.externalAuth = {
+        status: authResponse.status,
+        ok: authResponse.ok,
+        payload: authPayload,
+      };
+
+      log("admin-auth", "Respuesta externa", state.results.externalAuth);
+
+      if (!authResponse.ok || !authPayload?.ok) {
+        setStep(
+          "auth",
+          "error",
+          `HTTP ${authResponse.status}: ${authPayload?.error || "respuesta inválida"}`
+        );
+        throw new Error(
+          `admin-auth falló: HTTP ${authResponse.status} ${authText}`
+        );
+      }
+
+      setStep("auth", "ok", "HTTP 200 y authenticated=true");
+
+      // 6. Cargar iframe instrumentado
+      setStep("boot", "running", "Preparando panel instrumentado…");
+
+      state.instrumentedHtml = instrumentHtml(state.sourceHtml);
+      const frame = await loadFrame(state.instrumentedHtml);
+
+      await wait(1600);
+
+      const initialSnapshot = frameSnapshot(frame);
+      state.results.frameInitial = initialSnapshot;
+      log("iframe", "Estado inicial", initialSnapshot);
+
+      const initialErrors = [
+        ...(initialSnapshot.diagnostic?.errors || []),
+        ...(initialSnapshot.diagnostic?.rejections || []),
+      ];
+
+      if (initialErrors.length) {
+        setStep(
+          "boot",
+          "error",
+          `${initialErrors.length} error(es) durante la carga`
+        );
+      } else {
+        setStep(
+          "boot",
+          "ok",
+          `Panel cargado; build=${initialSnapshot.buildGlobal || "sin marca"}`
+        );
+      }
+
+      // 7. Listeners
+      setStep("listeners", "running", "Buscando eventos registrados…");
+
+      const listeners =
+        initialSnapshot.diagnostic?.listeners || [];
+
+      const hasClick = listeners.some(
+        (listener) =>
+          listener.id === "loginButton" &&
+          listener.type === "click"
+      );
+
+      const hasSubmit = listeners.some(
+        (listener) =>
+          listener.id === "pinForm" &&
+          listener.type === "submit"
+      );
+
+      state.results.listeners = {
+        listeners,
+        hasClick,
+        hasSubmit,
+      };
+
+      log("listeners", "Eventos registrados", state.results.listeners);
+
+      if (!hasClick && !hasSubmit) {
+        setStep(
+          "listeners",
+          "error",
+          "No se registró ningún evento en el formulario"
+        );
+      } else if (!hasClick) {
+        setStep(
+          "listeners",
+          "warn",
+          "Solo existe submit; el clic puede provocar recarga"
+        );
+      } else {
+        setStep(
+          "listeners",
+          "ok",
+          `click=${hasClick}, submit=${hasSubmit}`
+        );
+      }
+
+      // 8. Simular clic
+      setStep("click", "running", "Introduciendo PIN y pulsando Entrar…");
+
+      const frameDoc = frame.contentDocument;
+      const frameWin = frame.contentWindow;
+      const frameInput = frameDoc.querySelector("#pinInput");
+      const frameButton = frameDoc.querySelector("#loginButton");
+
+      const beforeClick = frameSnapshot(frame);
+      const beforeHref = frameWin.location.href;
+
+      if (!frameInput || !frameButton) {
+        setStep("click", "error", "Faltan input o botón");
+        throw new Error("El iframe no contiene #pinInput o #loginButton.");
+      }
+
+      frameInput.value = pin;
+      frameInput.dispatchEvent(
+        new Event("input", { bubbles: true })
+      );
+
+      frameButton.click();
+
+      await wait(2400);
+
+      const afterClick = frameSnapshot(frame);
+
+      state.results.clickTest = {
+        beforeHref,
+        afterHref: frameWin.location.href,
+        navigated: beforeHref !== frameWin.location.href,
+        before: beforeClick,
+        after: afterClick,
+      };
+
+      log("click", "Resultado del clic", state.results.clickTest);
+
+      const clickAuthFetch =
+        afterClick.diagnostic?.fetches?.find((request) =>
+          /\/functions\/v1\/admin-auth(?:$|\?)/.test(request.url)
+        );
+
+      const panelVisibleAfterClick =
+        afterClick.panel &&
+        !afterClick.panel.hidden &&
+        afterClick.panel.computedDisplay !== "none" &&
+        Number(afterClick.panel.rect?.width || 0) > 0;
+
+      if (panelVisibleAfterClick) {
+        setStep("click", "ok", "El clic abrió el panel dentro del diagnóstico");
+      } else if (state.results.clickTest.navigated) {
+        setStep("click", "error", "El formulario recargó o navegó la página");
+      } else if (!clickAuthFetch) {
+        setStep("click", "error", "El clic no produjo una llamada a admin-auth");
+      } else if (clickAuthFetch.status === 200) {
+        setStep(
+          "click",
+          "error",
+          "admin-auth devolvió 200, pero showAdminPanel no dejó el panel visible"
+        );
+      } else {
+        setStep(
+          "click",
+          "error",
+          `La llamada interna respondió HTTP ${clickAuthFetch.status}`
+        );
+      }
+
+      // 9. Auth interna
+      setStep("directauth", "running", "Ejecutando callAdminAuth(pin)…");
+
+      let directAuthResult;
+
+      if (typeof frameWin.callAdminAuth !== "function") {
+        directAuthResult = {
+          available: false,
+          error: "callAdminAuth no existe en window",
+        };
+      } else {
+        try {
+          const result = await frameWin.callAdminAuth(pin);
+
+          directAuthResult = {
+            available: true,
+            ok: true,
+            result: sanitize(result),
+          };
+        } catch (error) {
+          directAuthResult = {
+            available: true,
+            ok: false,
+            error: {
+              name: error.name,
+              message: error.message,
+              status: error.status,
+              payload: sanitize(error.payload),
+            },
+          };
+        }
+      }
+
+      state.results.directAuth = directAuthResult;
+      log("direct-auth", "Autenticación interna", directAuthResult);
+
+      if (directAuthResult.ok) {
+        setStep("directauth", "ok", "callAdminAuth funciona dentro del panel");
+      } else {
+        setStep(
+          "directauth",
+          "error",
+          directAuthResult.error?.message || directAuthResult.error
+        );
+      }
+
+      // 10. Apertura directa
+      setStep("show", "running", "Ejecutando showAdminPanel() directamente…");
+
+      let directShow = {
+        available:
+          typeof frameWin.showAdminPanel === "function",
+      };
+
+      if (directShow.available) {
+        try {
+          frameWin.showAdminPanel();
+          await wait(500);
+          directShow.snapshot = frameSnapshot(frame);
+
+          directShow.panelVisible =
+            directShow.snapshot.panel &&
+            !directShow.snapshot.panel.hidden &&
+            directShow.snapshot.panel.computedDisplay !== "none" &&
+            Number(directShow.snapshot.panel.rect?.width || 0) > 0;
+        } catch (error) {
+          directShow.error = {
+            name: error.name,
+            message: error.message,
+            stack: error.stack,
+          };
+        }
+      }
+
+      state.results.directShow = directShow;
+      log("direct-show", "Apertura directa", directShow);
+
+      if (directShow.panelVisible) {
+        setStep("show", "ok", "showAdminPanel abre correctamente el DOM");
+      } else if (!directShow.available) {
+        setStep("show", "error", "showAdminPanel no existe");
+      } else {
+        setStep(
+          "show",
+          "error",
+          directShow.error?.message || "El panel continúa oculto"
+        );
+      }
+
+      buildConclusion();
+      copyButton.disabled = false;
+      showFrameButton.disabled = false;
+    } catch (error) {
+      log("fatal", error.message, {
+        name: error.name,
+        stack: error.stack,
+      });
+
+      buildConclusion(error);
+      copyButton.disabled = false;
+    } finally {
+      state.pin = "";
+      runButton.disabled = false;
+    }
+  }
+
+  function buildConclusion(fatalError = null) {
+    const summary = $("#diagnosticSummary");
+    const r = state.results;
+
+    let type = "warn";
+    let title = "Diagnóstico incompleto";
+    let explanation =
+      fatalError?.message ||
+      "Revisa el informe técnico para identificar la prueba que falló.";
+
+    const patterns = r.adminJs?.patterns || {};
+    const click = r.clickTest || {};
+    const after = click.after || {};
+    const directAuth = r.directAuth;
+    const directShow = r.directShow;
+    const listeners = r.listeners || {};
+
+    const internalAuthFetch =
+      after.diagnostic?.fetches?.find((request) =>
+        /\/functions\/v1\/admin-auth(?:$|\?)/.test(request.url)
+      );
+
+    const panelVisibleAfterClick =
+      after.panel &&
+      !after.panel.hidden &&
+      after.panel.computedDisplay !== "none" &&
+      Number(after.panel.rect?.width || 0) > 0;
+
+    if (r.adminHtml && !r.adminHtml.ok) {
+      type = "error";
+      title = "GitHub no está sirviendo admin.html";
+      explanation =
+        `La descarga respondió HTTP ${r.adminHtml.status}. Revisa el nombre y la publicación de GitHub Pages.`;
+    } else if (r.adminJs && !r.adminJs.ok) {
+      type = "error";
+      title = "GitHub no está sirviendo admin.js";
+      explanation =
+        `admin.html apunta a ${r.scripts?.adminScriptSrc}, pero la descarga respondió HTTP ${r.adminJs.status}.`;
+    } else if (r.adminJs?.syntax && !r.adminJs.syntax.ok) {
+      type = "error";
+      title = "admin.js tiene un error de sintaxis";
+      explanation =
+        `${r.adminJs.syntax.name}: ${r.adminJs.syntax.message}. JavaScript se detiene antes de conectar el botón.`;
+    } else if (patterns.knownV47StorageBug) {
+      type = "error";
+      title = "Está publicada la V47 defectuosa";
+      explanation =
+        "El archivo contiene `window.safeLocalGet(key)` dentro de `safeLocalGet()`. Esa función no existe. Debe ser `window.localStorage.getItem(key)`. Esta coincidencia confirma que el archivo publicado no es la corrección adecuada.";
+    } else if (r.scripts?.buildLabel === "Acceso V47" &&
+               patterns.build !== "47-login-first") {
+      type = "error";
+      title = "admin.html y admin.js pertenecen a versiones diferentes";
+      explanation =
+        `El HTML muestra “Acceso V47”, pero el JavaScript detectado es “${patterns.build}”. GitHub o el navegador está mezclando archivos por caché.`;
+    } else if (!listeners.hasClick && !listeners.hasSubmit) {
+      type = "error";
+      title = "initLogin nunca llegó a ejecutarse";
+      explanation =
+        "No se registró ningún evento en #loginButton ni #pinForm. Los errores capturados durante la carga indican qué script detuvo la inicialización.";
+    } else if (click.navigated) {
+      type = "error";
+      title = "El formulario está recargando la página";
+      explanation =
+        "El evento del login no está cancelando el submit, o el botón publicado continúa siendo type=submit sin un listener operativo.";
+    } else if (!internalAuthFetch) {
+      type = "error";
+      title = "El clic no llama a admin-auth";
+      explanation =
+        "El botón existe, pero su evento no ejecuta la autenticación. El problema está en initLogin, en el listener o en un error previo.";
+    } else if (
+      internalAuthFetch.status === 200 &&
+      directAuth?.ok &&
+      directShow?.panelVisible &&
+      !panelVisibleAfterClick
+    ) {
+      type = "error";
+      title = "La autenticación funciona, pero el flujo del clic no llama a showAdminPanel";
+      explanation =
+        "callAdminAuth funciona y showAdminPanel abre el panel cuando se ejecutan por separado. El fallo exacto está entre ambas llamadas dentro de tryLogin.";
+    } else if (
+      internalAuthFetch.status === 200 &&
+      directShow?.panelVisible &&
+      !panelVisibleAfterClick
+    ) {
+      type = "error";
+      title = "El PIN se valida, pero tryLogin se interrumpe después";
+      explanation =
+        "La red devuelve HTTP 200 y showAdminPanel funciona directamente. Revisa los errores o promesas rechazadas capturadas justo después de la autenticación.";
+    } else if (
+      internalAuthFetch.status === 200 &&
+      directShow &&
+      !directShow.panelVisible
+    ) {
+      type = "error";
+      title = "El problema está en el DOM o en el CSS del panel";
+      explanation =
+        "La autenticación responde correctamente, pero incluso showAdminPanel ejecutado directamente no hace visible #adminPanel.";
+    } else if (panelVisibleAfterClick) {
+      type = "ok";
+      title = "El panel funciona dentro del diagnóstico";
+      explanation =
+        "La versión cargada en el iframe abre correctamente. Si admin.html normal sigue fallando, la causa es caché del navegador, una extensión o una versión distinta cargada fuera del diagnóstico.";
+    } else if (fatalError) {
+      type = "error";
+      title = "El diagnóstico encontró un fallo previo";
+      explanation = fatalError.message;
+    }
+
+    summary.className = `summary ${type}`;
+    summary.innerHTML = `
+      <strong>${escapeHtml(title)}</strong><br>
+      ${escapeHtml(explanation)}
+    `;
+
+    state.results.conclusion = {
+      type,
+      title,
+      explanation,
+    };
+
+    log("conclusion", title, { explanation });
+  }
+
+  async function copyReport() {
+    const text = $("#reportOutput").textContent;
+
+    try {
+      await navigator.clipboard.writeText(text);
+      $("#copyReportButton").textContent = "Informe copiado";
+      setTimeout(() => {
+        $("#copyReportButton").textContent = "Copiar informe";
+      }, 1800);
+    } catch (_) {
+      const area = document.createElement("textarea");
+      area.value = text;
+      document.body.appendChild(area);
+      area.select();
+      document.execCommand("copy");
+      area.remove();
+    }
+  }
+
+  function showTestedFrame() {
+    const visibleFrame = $("#visibleDiagnosticFrame");
+    const section = $("#frameSection");
+
+    if (!state.instrumentedHtml) return;
+
+    visibleFrame.srcdoc = state.instrumentedHtml;
+    section.hidden = false;
+    section.scrollIntoView({ behavior: "smooth" });
+  }
+
+  renderSteps();
+  renderReport();
+
+  $("#runDiagnosticButton").addEventListener(
+    "click",
+    runDiagnostic
+  );
+
+  $("#copyReportButton").addEventListener(
+    "click",
+    copyReport
+  );
+
+  $("#showFrameButton").addEventListener(
+    "click",
+    showTestedFrame
+  );
+})();
+</script>
+</body>
+</html>
