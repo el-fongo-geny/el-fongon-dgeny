@@ -7,14 +7,9 @@ const STORAGE_ORDERS = "fogon_orders";
 const STORAGE_AVAILABILITY = "fogon_availability";
 const STORAGE_KITCHEN_HIDDEN = "fogon_kitchen_hidden";
 const STORAGE_ADMIN_THEME = "fogon_admin_theme";
-const BACKEND_URL = (window.FOGON_BACKEND_URL || "").replace(/\/$/, "");
-
-/*
-  El PIN no aparece en el código público y no se guarda en el navegador.
-  Supabase lo valida y permanece únicamente en memoria mientras la página
-  continúa abierta.
-*/
+/* El PIN no está escrito en el código público. */
 let adminPinInMemory = "";
+const BACKEND_URL = (window.FOGON_BACKEND_URL || "").replace(/\/$/, "");
 const ORDER_MODE_MANUAL_KEY = "system:orders-manual";
 const ORDER_MODE_OPEN_KEY = "system:orders-open";
 
@@ -129,82 +124,40 @@ function getSupabaseFunctionConfig() {
   const cfg = window.FOGON_SUPABASE || {};
   const supabaseUrl = String(cfg.url || "").replace(/\/$/, "");
   const anonKey = String(cfg.anonKey || "").trim();
-
-  if (!supabaseUrl || !anonKey) {
-    throw new Error(
-      "Faltan la URL o la anon key de Supabase en supabase-config.js."
-    );
-  }
-
+  if (!supabaseUrl || !anonKey) throw new Error("Faltan la URL o la anon key de Supabase en supabase-config.js.");
   return { supabaseUrl, anonKey };
 }
 
 async function callAdminCatalog(action, adminPin, extraBody = {}) {
   const { supabaseUrl, anonKey } = getSupabaseFunctionConfig();
-  const endpoint = `${supabaseUrl}/functions/v1/admin-catalog`;
-
-  const response = await fetch(endpoint, {
+  const response = await fetch(`${supabaseUrl}/functions/v1/admin-catalog`, {
     method: "POST",
     mode: "cors",
     cache: "no-store",
-    headers: {
-      "Content-Type": "application/json",
-      "apikey": anonKey,
-      "Authorization": `Bearer ${anonKey}`
-    },
-    body: JSON.stringify({
-      action,
-      adminPin,
-      ...extraBody
-    })
+    headers: { "Content-Type": "application/json", "apikey": anonKey, "Authorization": `Bearer ${anonKey}` },
+    body: JSON.stringify({ action, adminPin, ...extraBody })
   });
-
   const rawText = await response.text();
   let result = {};
-
-  try {
-    result = rawText ? JSON.parse(rawText) : {};
-  } catch (_) {
-    result = { detail: rawText };
-  }
-
+  try { result = rawText ? JSON.parse(rawText) : {}; } catch (_) { result = { detail: rawText }; }
   if (!response.ok || !result?.ok) {
-    const reason = [
-      `HTTP ${response.status}`,
-      result?.error,
-      result?.detail
-    ].filter(Boolean).join(" · ");
-
-    const requestError = new Error(
-      reason || "La función admin-catalog rechazó la solicitud."
-    );
-
-    requestError.status = response.status;
-    requestError.payload = result;
-    throw requestError;
+    const message = [`HTTP ${response.status}`, result?.error, result?.detail].filter(Boolean).join(" · ");
+    const error = new Error(message || "Supabase rechazó la solicitud.");
+    error.status = response.status;
+    throw error;
   }
-
   return result;
 }
 
 async function validateAdminPin(pin) {
   const cleanPin = String(pin || "").trim();
-
-  if (!cleanPin) {
-    throw new Error("Escribe el PIN.");
-  }
-
+  if (!cleanPin) throw new Error("Escribe el PIN.");
   await callAdminCatalog("list_catalog", cleanPin);
   return cleanPin;
 }
 
 function getAdminPinOrThrow() {
-  if (!adminPinInMemory) {
-    throw new Error(
-      "La sesión de administrador terminó. Recarga la página e introduce el PIN nuevamente."
-    );
-  }
-
+  if (!adminPinInMemory) throw new Error("La sesión terminó. Recarga e introduce el PIN nuevamente.");
   return adminPinInMemory;
 }
 
@@ -824,813 +777,9 @@ function switchTab(tabName) {
 }
 
 
-
-const catalogState = {
-  catalog: {
-    categories: [],
-    products: [],
-    optionGroups: [],
-    options: [],
-    extras: [],
-    productExtras: [],
-    removables: [],
-    productRemovables: [],
-    inventory: []
-  },
-  query: "",
-  categoryId: "all",
-  selectedProductId: null,
-  creating: false,
-  dirty: false,
-  busy: false
-};
-
-function catalogCategoryName(categoryId) {
-  const category = catalogState.catalog.categories.find(
-    (candidate) => candidate.id === categoryId
-  );
-
-  return category?.name_es || categoryId || "Sin categoría";
-}
-
-function catalogSetBusy(busy) {
-  catalogState.busy = Boolean(busy);
-
-  const loading = $("#catalogLoading");
-  if (loading) loading.hidden = !catalogState.busy;
-
-  [
-    "#refreshCatalogBtn",
-    "#newProductBtn",
-    "#saveProductBtn",
-    "#deleteProductBtn",
-    "#saveCategoryBtn"
-  ].forEach((selector) => {
-    const button = $(selector);
-    if (button) button.disabled = catalogState.busy;
-  });
-}
-
-function catalogSetDirty(dirty) {
-  catalogState.dirty = Boolean(dirty);
-
-  const status = $("#catalogSaveStatus");
-  if (!status) return;
-
-  status.dataset.state = catalogState.dirty ? "dirty" : "saved";
-  status.textContent = catalogState.dirty ? "Cambios sin guardar" : "Todo guardado";
-}
-
-function showCatalogMessage(message, type = "success") {
-  const box = $("#catalogMessage");
-  if (!box) return;
-
-  box.hidden = !message;
-  box.textContent = message || "";
-  box.dataset.type = type;
-
-  clearTimeout(showCatalogMessage.timer);
-
-  if (message) {
-    showCatalogMessage.timer = setTimeout(() => {
-      box.hidden = true;
-    }, 4200);
-  }
-}
-
-function catalogFilteredProducts() {
-  const query = catalogState.query.trim().toLowerCase();
-
-  return catalogState.catalog.products.filter((product) => {
-    const categoryMatches =
-      catalogState.categoryId === "all" ||
-      product.category_id === catalogState.categoryId;
-
-    const text = [
-      product.name_es,
-      product.name_en,
-      product.description_es,
-      product.description_en,
-      catalogCategoryName(product.category_id)
-    ].filter(Boolean).join(" ").toLowerCase();
-
-    return categoryMatches && (!query || text.includes(query));
-  });
-}
-
-function renderCatalogCategoryFilters() {
-  const container = $("#catalogCategoryFilters");
-  if (!container) return;
-
-  const allCount = catalogState.catalog.products.length;
-
-  const buttons = [
-    {
-      id: "all",
-      label: "Todos los productos",
-      count: allCount,
-      active: true
-    },
-    ...catalogState.catalog.categories.map((category) => ({
-      id: category.id,
-      label: category.name_es,
-      count: catalogState.catalog.products.filter(
-        (product) => product.category_id === category.id
-      ).length,
-      active: category.active
-    }))
-  ];
-
-  container.innerHTML = buttons.map((category) => `
-    <button
-      class="catalog-category-filter ${catalogState.categoryId === category.id ? "active" : ""}"
-      type="button"
-      data-catalog-category="${escapeHtml(category.id)}"
-    >
-      <span>
-        ${escapeHtml(category.label)}
-        ${category.active === false ? `<small>Inactiva</small>` : ""}
-      </span>
-      <strong>${category.count}</strong>
-    </button>
-  `).join("");
-}
-
-function renderCatalogProductList() {
-  const container = $("#catalogProductList");
-  const count = $("#catalogProductCount");
-  if (!container) return;
-
-  const products = catalogFilteredProducts();
-
-  if (count) count.textContent = String(products.length);
-
-  if (!products.length) {
-    container.innerHTML = `
-      <div class="catalog-list-empty">
-        <strong>No encontramos productos</strong>
-        <p>Prueba otra búsqueda o selecciona una categoría diferente.</p>
-      </div>
-    `;
-    return;
-  }
-
-  container.innerHTML = products.map((product) => {
-    const selected = product.id === catalogState.selectedProductId;
-    const unavailableClass = !product.active ? "is-inactive" : "";
-    const hiddenClass = !product.visible ? "is-hidden-product" : "";
-
-    return `
-      <article
-        class="catalog-product-card ${selected ? "selected" : ""} ${unavailableClass} ${hiddenClass}"
-        data-catalog-product-card="${escapeHtml(product.id)}"
-      >
-        <button
-          class="catalog-product-main"
-          type="button"
-          data-edit-catalog-product="${escapeHtml(product.id)}"
-        >
-          <span class="catalog-product-thumb">
-            ${product.image_url
-              ? `<img src="${escapeHtml(product.image_url)}" alt="" loading="lazy">`
-              : `<span aria-hidden="true">🍽</span>`
-            }
-          </span>
-
-          <span class="catalog-product-copy">
-            <strong>${escapeHtml(product.name_es)}</strong>
-            <small>${escapeHtml(catalogCategoryName(product.category_id))}</small>
-            <span class="catalog-product-meta">
-              <b>${money(product.base_price)}</b>
-              ${!product.visible ? `<em>No visible</em>` : ""}
-              ${!product.active ? `<em>Inactivo</em>` : ""}
-            </span>
-          </span>
-        </button>
-
-        <button
-          class="catalog-visibility-btn"
-          type="button"
-          data-toggle-catalog-visibility="${escapeHtml(product.id)}"
-          aria-label="${product.visible ? "Ocultar" : "Mostrar"} ${escapeHtml(product.name_es)}"
-          title="${product.visible ? "Ocultar del menú" : "Mostrar en el menú"}"
-        >
-          ${product.visible ? "Visible" : "Oculto"}
-        </button>
-      </article>
-    `;
-  }).join("");
-}
-
-function renderProductCategorySelect(selectedCategoryId = "") {
-  const select = $("#productCategory");
-  if (!select) return;
-
-  select.innerHTML = catalogState.catalog.categories.map((category) => `
-    <option value="${escapeHtml(category.id)}" ${category.id === selectedCategoryId ? "selected" : ""}>
-      ${escapeHtml(category.name_es)}${category.active === false ? " — inactiva" : ""}
-    </option>
-  `).join("");
-}
-
-function updateProductImagePreview() {
-  const input = $("#productImageUrl");
-  const image = $("#productImagePreview");
-  const placeholder = $("#productImagePlaceholder");
-
-  if (!input || !image || !placeholder) return;
-
-  const url = String(input.value || "").trim();
-
-  if (!url) {
-    image.hidden = true;
-    image.removeAttribute("src");
-    placeholder.hidden = false;
-    return;
-  }
-
-  image.onload = () => {
-    image.hidden = false;
-    placeholder.hidden = true;
-  };
-
-  image.onerror = () => {
-    image.hidden = true;
-    placeholder.hidden = false;
-  };
-
-  image.src = url;
-}
-
-function productOptionStats(productId) {
-  const groups = catalogState.catalog.optionGroups.filter(
-    (group) => group.product_id === productId
-  );
-
-  const groupIds = new Set(groups.map((group) => group.id));
-
-  const options = catalogState.catalog.options.filter(
-    (option) => groupIds.has(option.option_group_id)
-  );
-
-  const extraLinks = catalogState.catalog.productExtras.filter(
-    (link) => link.product_id === productId
-  );
-
-  const removableLinks = catalogState.catalog.productRemovables.filter(
-    (link) => link.product_id === productId
-  );
-
-  return {
-    groups: groups.length,
-    options: options.length,
-    extras: extraLinks.length,
-    removables: removableLinks.length
-  };
-}
-
-function renderProductOptionsSummary(productId) {
-  const container = $("#productOptionsSummary");
-  if (!container) return;
-
-  if (!productId) {
-    container.innerHTML = `
-      <span><strong>0</strong> grupos</span>
-      <span><strong>0</strong> opciones</span>
-      <span><strong>0</strong> extras</span>
-      <span><strong>0</strong> removibles</span>
-    `;
-    return;
-  }
-
-  const stats = productOptionStats(productId);
-
-  container.innerHTML = `
-    <span><strong>${stats.groups}</strong> grupos</span>
-    <span><strong>${stats.options}</strong> opciones</span>
-    <span><strong>${stats.extras}</strong> extras</span>
-    <span><strong>${stats.removables}</strong> removibles</span>
-  `;
-}
-
-function showProductEditor(product = null, creating = false) {
-  const empty = $("#catalogEditorEmpty");
-  const form = $("#productEditorForm");
-  if (!form) return;
-
-  catalogState.creating = Boolean(creating);
-  catalogState.selectedProductId = product?.id || null;
-
-  if (empty) empty.hidden = true;
-  form.hidden = false;
-
-  $("#productOriginalId").value = product?.id || "";
-  $("#productNameEs").value = product?.name_es || "";
-  $("#productNameEn").value = product?.name_en || "";
-  $("#productPrice").value = Number(product?.base_price || 0).toFixed(2);
-  $("#productDescriptionEs").value = product?.description_es || "";
-  $("#productDescriptionEn").value = product?.description_en || "";
-  $("#productImageUrl").value = product?.image_url || "";
-  $("#productVisible").checked = product ? product.visible !== false : true;
-  $("#productActive").checked = product ? product.active !== false : true;
-  $("#productTaxable").checked = product ? product.taxable !== false : true;
-  $("#productFeatured").checked = Boolean(product?.featured);
-  $("#productSortOrder").value = Number(product?.sort_order || 0);
-
-  const defaultCategory =
-    product?.category_id ||
-    catalogState.categoryId !== "all" && catalogState.categoryId ||
-    catalogState.catalog.categories.find((category) => category.active)?.id ||
-    catalogState.catalog.categories[0]?.id ||
-    "";
-
-  renderProductCategorySelect(defaultCategory);
-
-  $("#productEditorEyebrow").textContent = creating ? "Nuevo producto" : "Editar producto";
-  $("#productEditorTitle").textContent = product?.name_es || "Nuevo producto";
-
-  const badge = $("#productIdBadge");
-  if (badge) {
-    badge.textContent = product?.id || "El ID se creará automáticamente";
-  }
-
-  const deleteButton = $("#deleteProductBtn");
-  if (deleteButton) deleteButton.hidden = creating || !product?.id;
-
-  renderProductOptionsSummary(product?.id || "");
-  updateProductImagePreview();
-  catalogSetDirty(false);
-  renderCatalogProductList();
-}
-
-function hideProductEditor() {
-  const empty = $("#catalogEditorEmpty");
-  const form = $("#productEditorForm");
-
-  catalogState.selectedProductId = null;
-  catalogState.creating = false;
-
-  if (empty) empty.hidden = false;
-  if (form) form.hidden = true;
-
-  catalogSetDirty(false);
-  renderCatalogProductList();
-}
-
-function getProductEditorPayload() {
-  const nameEs = String($("#productNameEs")?.value || "").trim();
-  const categoryId = String($("#productCategory")?.value || "").trim();
-  const price = Number($("#productPrice")?.value || 0);
-
-  if (!nameEs) {
-    throw new Error("Escribe el nombre del producto en español.");
-  }
-
-  if (!categoryId) {
-    throw new Error("Selecciona una categoría.");
-  }
-
-  if (!Number.isFinite(price) || price < 0) {
-    throw new Error("Escribe un precio válido.");
-  }
-
-  const payload = {
-    categoryId,
-    nameEs,
-    nameEn: String($("#productNameEn")?.value || "").trim() || nameEs,
-    descriptionEs: String($("#productDescriptionEs")?.value || "").trim(),
-    descriptionEn: String($("#productDescriptionEn")?.value || "").trim(),
-    basePrice: price,
-    imageUrl: String($("#productImageUrl")?.value || "").trim(),
-    visible: Boolean($("#productVisible")?.checked),
-    active: Boolean($("#productActive")?.checked),
-    taxable: Boolean($("#productTaxable")?.checked),
-    featured: Boolean($("#productFeatured")?.checked),
-    sortOrder: Number($("#productSortOrder")?.value || 0)
-  };
-
-  const originalId = String($("#productOriginalId")?.value || "").trim();
-  if (originalId) payload.id = originalId;
-
-  return payload;
-}
-
-async function loadCatalog(options = {}) {
-  const keepSelection = options.keepSelection !== false;
-  const previousSelection = keepSelection ? catalogState.selectedProductId : null;
-
-  catalogSetBusy(true);
-
-  try {
-    const result = await callAdminCatalog(
-      "list_catalog",
-      getAdminPinOrThrow()
-    );
-
-    catalogState.catalog = {
-      categories: result.catalog?.categories || [],
-      products: result.catalog?.products || [],
-      optionGroups: result.catalog?.optionGroups || [],
-      options: result.catalog?.options || [],
-      extras: result.catalog?.extras || [],
-      productExtras: result.catalog?.productExtras || [],
-      removables: result.catalog?.removables || [],
-      productRemovables: result.catalog?.productRemovables || [],
-      inventory: result.catalog?.inventory || []
-    };
-
-    renderCatalogCategoryFilters();
-    renderCatalogProductList();
-
-    if (previousSelection) {
-      const selected = catalogState.catalog.products.find(
-        (product) => product.id === previousSelection
-      );
-
-      if (selected) showProductEditor(selected, false);
-      else hideProductEditor();
-    }
-
-    return catalogState.catalog;
-  } catch (error) {
-    console.error("No se pudo cargar el catálogo:", error);
-    showCatalogMessage(
-      `No se pudo cargar el menú. ${error?.message || error}`,
-      "error"
-    );
-    throw error;
-  } finally {
-    catalogSetBusy(false);
-  }
-}
-
-async function openMenuManager() {
-  const panel = $("#adminPanel");
-  const manager = $("#menuManager");
-
-  if (!manager) return;
-
-  if (panel) panel.hidden = true;
-  manager.hidden = false;
-  document.body.classList.add("menu-manager-open");
-  window.scrollTo(0, 0);
-
-  try {
-    await loadCatalog({ keepSelection: false });
-  } catch (_) {
-    // El mensaje ya se muestra en la interfaz.
-  }
-}
-
-function closeMenuManager() {
-  if (
-    catalogState.dirty &&
-    !confirm("Hay cambios sin guardar. ¿Quieres salir y descartarlos?")
-  ) {
-    return;
-  }
-
-  const panel = $("#adminPanel");
-  const manager = $("#menuManager");
-
-  if (manager) manager.hidden = true;
-  if (panel) panel.hidden = false;
-
-  document.body.classList.remove("menu-manager-open");
-  hideProductEditor();
-  window.scrollTo(0, 0);
-}
-
-async function saveCurrentProduct(event) {
-  if (event) event.preventDefault();
-
-  catalogSetBusy(true);
-
-  try {
-    const product = getProductEditorPayload();
-    const action = catalogState.creating ? "create_product" : "update_product";
-
-    const result = await callAdminCatalog(
-      action,
-      getAdminPinOrThrow(),
-      { product }
-    );
-
-    catalogState.selectedProductId = result.product?.id || product.id || null;
-    catalogState.creating = false;
-    catalogSetDirty(false);
-
-    await loadCatalog({ keepSelection: true });
-    showCatalogMessage("Producto guardado correctamente.", "success");
-  } catch (error) {
-    console.error("No se pudo guardar el producto:", error);
-    showCatalogMessage(
-      `No se pudo guardar. ${error?.message || error}`,
-      "error"
-    );
-  } finally {
-    catalogSetBusy(false);
-  }
-}
-
-async function deleteCurrentProduct() {
-  const productId = String($("#productOriginalId")?.value || "").trim();
-  if (!productId) return;
-
-  const product = catalogState.catalog.products.find(
-    (candidate) => candidate.id === productId
-  );
-
-  if (
-    !confirm(
-      `¿Eliminar definitivamente "${product?.name_es || productId}"?\n\nSi solo quieres retirarlo temporalmente, usa el interruptor "Visible en el menú".`
-    )
-  ) {
-    return;
-  }
-
-  catalogSetBusy(true);
-
-  try {
-    await callAdminCatalog(
-      "delete_product",
-      getAdminPinOrThrow(),
-      { productId }
-    );
-
-    hideProductEditor();
-    await loadCatalog({ keepSelection: false });
-    showCatalogMessage("Producto eliminado.", "success");
-  } catch (error) {
-    console.error("No se pudo eliminar el producto:", error);
-    showCatalogMessage(
-      `No se pudo eliminar. ${error?.message || error}`,
-      "error"
-    );
-  } finally {
-    catalogSetBusy(false);
-  }
-}
-
-async function toggleCatalogProductVisibility(productId) {
-  const product = catalogState.catalog.products.find(
-    (candidate) => candidate.id === productId
-  );
-
-  if (!product) return;
-
-  catalogSetBusy(true);
-
-  try {
-    await callAdminCatalog(
-      "set_product_visibility",
-      getAdminPinOrThrow(),
-      {
-        productId,
-        visible: !product.visible
-      }
-    );
-
-    await loadCatalog({ keepSelection: true });
-    showCatalogMessage(
-      product.visible
-        ? "Producto ocultado del catálogo."
-        : "Producto visible nuevamente.",
-      "success"
-    );
-  } catch (error) {
-    console.error("No se pudo cambiar la visibilidad:", error);
-    showCatalogMessage(
-      `No se pudo cambiar la visibilidad. ${error?.message || error}`,
-      "error"
-    );
-  } finally {
-    catalogSetBusy(false);
-  }
-}
-
-function openCategoryEditor() {
-  const modal = $("#categoryEditorModal");
-  const select = $("#categoryEditorSelect");
-  if (!modal || !select) return;
-
-  select.innerHTML = catalogState.catalog.categories.map((category) => `
-    <option value="${escapeHtml(category.id)}">${escapeHtml(category.name_es)}</option>
-  `).join("");
-
-  modal.hidden = false;
-  document.body.classList.add("catalog-modal-open");
-  fillCategoryEditor(select.value);
-}
-
-function closeCategoryEditor() {
-  const modal = $("#categoryEditorModal");
-  if (modal) modal.hidden = true;
-  document.body.classList.remove("catalog-modal-open");
-}
-
-function fillCategoryEditor(categoryId) {
-  const category = catalogState.catalog.categories.find(
-    (candidate) => candidate.id === categoryId
-  );
-
-  if (!category) return;
-
-  $("#categoryNameEs").value = category.name_es || "";
-  $("#categoryNameEn").value = category.name_en || "";
-  $("#categorySortOrder").value = Number(category.sort_order || 0);
-  $("#categoryActive").checked = category.active !== false;
-}
-
-async function saveCurrentCategory() {
-  const categoryId = String($("#categoryEditorSelect")?.value || "").trim();
-  if (!categoryId) return;
-
-  catalogSetBusy(true);
-
-  try {
-    await callAdminCatalog(
-      "update_category",
-      getAdminPinOrThrow(),
-      {
-        category: {
-          id: categoryId,
-          nameEs: String($("#categoryNameEs")?.value || "").trim(),
-          nameEn: String($("#categoryNameEn")?.value || "").trim(),
-          sortOrder: Number($("#categorySortOrder")?.value || 0),
-          active: Boolean($("#categoryActive")?.checked)
-        }
-      }
-    );
-
-    await loadCatalog({ keepSelection: true });
-    closeCategoryEditor();
-    showCatalogMessage("Categoría guardada correctamente.", "success");
-  } catch (error) {
-    console.error("No se pudo guardar la categoría:", error);
-    showCatalogMessage(
-      `No se pudo guardar la categoría. ${error?.message || error}`,
-      "error"
-    );
-  } finally {
-    catalogSetBusy(false);
-  }
-}
-
-function initCatalogManager() {
-  const openButton = $("#openMenuManagerBtn");
-  const closeButton = $("#closeMenuManagerBtn");
-  const refreshButton = $("#refreshCatalogBtn");
-  const newButtons = [$("#newProductBtn"), $("#emptyNewProductBtn")].filter(Boolean);
-  const search = $("#catalogSearch");
-  const form = $("#productEditorForm");
-  const imageInput = $("#productImageUrl");
-  const cancelButton = $("#cancelProductChangesBtn");
-  const deleteButton = $("#deleteProductBtn");
-  const manageCategoriesButton = $("#manageCategoriesBtn");
-  const categorySelect = $("#categoryEditorSelect");
-  const saveCategoryButton = $("#saveCategoryBtn");
-
-  if (openButton) openButton.addEventListener("click", openMenuManager);
-  if (closeButton) closeButton.addEventListener("click", closeMenuManager);
-
-  if (refreshButton) {
-    refreshButton.addEventListener("click", () => {
-      if (
-        catalogState.dirty &&
-        !confirm("Hay cambios sin guardar. ¿Quieres actualizar y descartarlos?")
-      ) {
-        return;
-      }
-
-      loadCatalog({ keepSelection: true }).catch(() => {});
-    });
-  }
-
-  newButtons.forEach((button) => {
-    button.addEventListener("click", () => {
-      if (
-        catalogState.dirty &&
-        !confirm("Hay cambios sin guardar. ¿Quieres descartarlos?")
-      ) {
-        return;
-      }
-
-      showProductEditor(null, true);
-    });
-  });
-
-  if (search) {
-    search.addEventListener("input", (event) => {
-      catalogState.query = event.target.value;
-      renderCatalogProductList();
-    });
-  }
-
-  if (form) {
-    form.addEventListener("submit", saveCurrentProduct);
-
-    form.addEventListener("input", () => {
-      catalogSetDirty(true);
-
-      const name = String($("#productNameEs")?.value || "").trim();
-      $("#productEditorTitle").textContent = name || "Nuevo producto";
-    });
-
-    form.addEventListener("change", () => catalogSetDirty(true));
-  }
-
-  if (imageInput) {
-    imageInput.addEventListener("input", updateProductImagePreview);
-  }
-
-  if (cancelButton) {
-    cancelButton.addEventListener("click", () => {
-      if (
-        catalogState.dirty &&
-        !confirm("¿Descartar los cambios de este producto?")
-      ) {
-        return;
-      }
-
-      if (catalogState.creating) {
-        hideProductEditor();
-        return;
-      }
-
-      const product = catalogState.catalog.products.find(
-        (candidate) => candidate.id === catalogState.selectedProductId
-      );
-
-      if (product) showProductEditor(product, false);
-    });
-  }
-
-  if (deleteButton) deleteButton.addEventListener("click", deleteCurrentProduct);
-  if (manageCategoriesButton) manageCategoriesButton.addEventListener("click", openCategoryEditor);
-
-  if (categorySelect) {
-    categorySelect.addEventListener("change", (event) => {
-      fillCategoryEditor(event.target.value);
-    });
-  }
-
-  if (saveCategoryButton) {
-    saveCategoryButton.addEventListener("click", saveCurrentCategory);
-  }
-
-  document.addEventListener("click", (event) => {
-    const categoryButton = event.target.closest("[data-catalog-category]");
-    if (categoryButton) {
-      catalogState.categoryId = categoryButton.dataset.catalogCategory || "all";
-      renderCatalogCategoryFilters();
-      renderCatalogProductList();
-      return;
-    }
-
-    const productButton = event.target.closest("[data-edit-catalog-product]");
-    if (productButton) {
-      if (
-        catalogState.dirty &&
-        !confirm("Hay cambios sin guardar. ¿Quieres descartarlos?")
-      ) {
-        return;
-      }
-
-      const productId = productButton.dataset.editCatalogProduct;
-      const product = catalogState.catalog.products.find(
-        (candidate) => candidate.id === productId
-      );
-
-      if (product) showProductEditor(product, false);
-      return;
-    }
-
-    const visibilityButton = event.target.closest("[data-toggle-catalog-visibility]");
-    if (visibilityButton) {
-      toggleCatalogProductVisibility(
-        visibilityButton.dataset.toggleCatalogVisibility
-      );
-      return;
-    }
-
-    if (event.target.closest("[data-close-category-modal]")) {
-      closeCategoryEditor();
-    }
-  });
-
-  window.addEventListener("beforeunload", (event) => {
-    if (!catalogState.dirty) return;
-    event.preventDefault();
-    event.returnValue = "";
-  });
-}
-
-
 function showAdminPanel() {
   const login = $("#adminLogin");
   const panel = $("#adminPanel");
-  const manager = $("#menuManager");
   if (login) {
     login.hidden = true;
     login.style.display = "none";
@@ -1639,8 +788,6 @@ function showAdminPanel() {
     panel.hidden = false;
     panel.style.display = "";
   }
-  if (manager) manager.hidden = true;
-  document.body.classList.remove("menu-manager-open");
   unlockSound();
   setTimeout(() => {
     unlockSound();
@@ -1656,82 +803,45 @@ function initLogin() {
   const input = $("#pinInput");
   const loginButton = $("#loginButton");
   const error = $("#pinError");
-
   clearAdminSession();
-
-  if (!form || !input) {
-    console.error("Falta el formulario de acceso del administrador.");
-    return;
-  }
+  if (!form || !input) return;
 
   async function tryLogin(event) {
     if (event) event.preventDefault();
     unlockSound();
-
     const value = String(input.value || "").trim();
-
-    if (error) {
-      error.hidden = true;
-      error.textContent = "";
-    }
-
-    if (loginButton) {
-      loginButton.disabled = true;
-      loginButton.textContent = "Comprobando...";
-    }
-
+    if (error) { error.hidden = true; error.textContent = ""; }
     input.disabled = true;
-
+    if (loginButton) { loginButton.disabled = true; loginButton.textContent = "Comprobando…"; }
     try {
-      const validatedPin = await validateAdminPin(value);
-      adminPinInMemory = validatedPin;
+      adminPinInMemory = await validateAdminPin(value);
       input.value = "";
-
       showAdminPanel();
       beep();
       return true;
     } catch (loginError) {
-      console.error("Acceso administrativo rechazado:", loginError);
-
+      console.error("Acceso rechazado:", loginError);
       if (error) {
         error.hidden = false;
-        error.textContent =
-          loginError?.status === 401
-            ? "PIN incorrecto."
-            : `No se pudo validar el PIN. ${loginError?.message || loginError}`;
+        error.textContent = loginError?.status === 401 ? "PIN incorrecto." : `No se pudo validar el PIN. ${loginError?.message || loginError}`;
       }
-
       input.focus();
       input.select();
       return false;
     } finally {
       input.disabled = false;
-
-      if (loginButton) {
-        loginButton.disabled = false;
-        loginButton.textContent = "Entrar";
-      }
+      if (loginButton) { loginButton.disabled = false; loginButton.textContent = "Entrar"; }
     }
   }
 
   form.addEventListener("submit", tryLogin);
-
-  if (loginButton) {
-    loginButton.addEventListener("click", tryLogin);
-  }
-
-  input.addEventListener("keydown", (event) => {
-    if (event.key === "Enter") tryLogin(event);
-  });
-
+  if (loginButton) loginButton.addEventListener("click", tryLogin);
   input.focus();
 }
 
 function init() {
   applyAdminTheme();
   initLogin();
-  initCatalogManager();
-
   window.addEventListener("pagehide", clearAdminSession);
 
   document.addEventListener("pointerdown", unlockSound);
