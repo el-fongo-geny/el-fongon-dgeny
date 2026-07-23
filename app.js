@@ -98,6 +98,62 @@ function availabilityValue(key, legacyKey = null) {
   return true;
 }
 
+
+const INVENTORY_DEPENDENCY_BY_OPTION_ID = {
+  "pollo-guisado": "inventory:1:pollo-guisar",
+  "pollo": "inventory:1:pollo-guisar",
+  "pollo-frito": "inventory:2:pollo-pica-pollo",
+  "res-guisada": "inventory:12:res",
+  "res": "inventory:12:res",
+  "carne": "inventory:12:res",
+  "bistec": "inventory:4:bistec",
+  "puerco-guisado": "inventory:13:cerdo",
+  "cerdo": "inventory:13:cerdo",
+  "chuleta-plancha": "inventory:5:chuleta",
+  "pechuga-plancha": "inventory:15:pechuga-de-pollo",
+  "camaron": "inventory:11:camarones",
+  "camarones": "inventory:11:camarones",
+  "chicharron": "inventory:14:chicharron",
+  "tilapia": "inventory:9:tilapia",
+  "chillo": "inventory:10:chillo",
+  "papas-fritas": "inventory:28:papas-fritas",
+  "platanos-maduros": "inventory:22:platano-maduro",
+  "platanos-fritos": "inventory:22:platano-maduro",
+  "tostones": "inventory:21:platano-verde",
+  "salami": "inventory:16:salami",
+  "bacon": "inventory:17:bacon",
+  "tocino": "inventory:44:tocino",
+  "longaniza": "inventory:18:longaniza",
+  "jamon": "inventory:42:jamon",
+  "huevo": "inventory:43:huevo",
+  "aguacate-extra": "inventory:50:aguacate",
+  "queso": "inventory:30:queso-dominicano",
+  "jamon-queso": "inventory:42:jamon"
+};
+
+function inventoryDependencyAvailable(optionId) {
+  const key = INVENTORY_DEPENDENCY_BY_OPTION_ID[String(optionId || "")];
+  return !key || availabilityValue(key);
+}
+
+function showAddedToCartNotice() {
+  let notice = document.getElementById("addedToCartNotice");
+  if (!notice) {
+    notice = document.createElement("div");
+    notice.id = "addedToCartNotice";
+    notice.className = "added-to-cart-notice";
+    notice.setAttribute("role", "status");
+    notice.setAttribute("aria-live", "polite");
+    document.body.appendChild(notice);
+  }
+  notice.textContent = text("addedToCart");
+  notice.classList.add("is-visible");
+  clearTimeout(showAddedToCartNotice.timer);
+  showAddedToCartNotice.timer = setTimeout(() => {
+    notice.classList.remove("is-visible");
+  }, 1500);
+}
+
 function productAvailabilityKey(itemOrId) {
   const id = typeof itemOrId === "string" ? itemOrId : itemOrId?.id;
   return `product:${id}`;
@@ -127,11 +183,13 @@ function isProductAvailable(item) {
 }
 
 function isOptionAvailable(group, option) {
-  return availabilityValue(optionAvailabilityKey(group, option));
+  return availabilityValue(optionAvailabilityKey(group, option)) &&
+    inventoryDependencyAvailable(option?.id);
 }
 
 function isExtraAvailable(extra) {
-  return availabilityValue(extraAvailabilityKey(extra));
+  return availabilityValue(extraAvailabilityKey(extra)) &&
+    inventoryDependencyAvailable(extra?.id);
 }
 
 function isRemovableAvailable(remove) {
@@ -404,6 +462,8 @@ function buildCartItem(form) {
       selections.push({
         group: group[state.lang] || group.es,
         name: option[state.lang] || option.es,
+        groupEs: group.es,
+        nameEs: option.es,
         price: Number(option.price || 0)
       });
     });
@@ -414,19 +474,30 @@ function buildCartItem(form) {
     const extra = (item.extras || []).find((candidate) => candidate.id === input.value);
     if (!extra) return;
     lineTotal += Number(extra.price || 0);
-    extras.push({ name: extra[state.lang] || extra.es, price: Number(extra.price || 0) });
+    extras.push({
+      name: extra[state.lang] || extra.es,
+      nameEs: extra.es,
+      price: Number(extra.price || 0)
+    });
   });
 
   const removables = [];
   Array.from(form.querySelectorAll(`[name="removables"]:checked`)).forEach((input) => {
     const remove = (item.removables || []).find((candidate) => candidate.id === input.value);
-    if (remove) removables.push(remove[state.lang] || remove.es);
+    if (remove) {
+      removables.push({
+        name: remove[state.lang] || remove.es,
+        nameEs: remove.es
+      });
+    }
   });
 
   return {
     id: uniqueCartLineId(item.id),
     productId: item.id,
     name: itemName(item),
+    nameEs: item.es,
+    nameEn: item.en,
     basePrice: Number(item.price),
     taxable: item.taxable !== false,
     taxRate: TAX_RATE_SAN_JOSE_CA,
@@ -443,7 +514,7 @@ function addToCart(cartItem) {
   state.cart.push(cartItem);
   renderCart();
   closeProduct();
-  openCart();
+  showAddedToCartNotice();
 }
 
 function getTotals() {
@@ -467,7 +538,7 @@ function renderCart() {
           <strong>${item.quantity}x ${item.name}</strong>
           ${item.selections.map((selection) => `<p>${selection.group}: ${selection.name}</p>`).join("")}
           ${item.extras.map((extra) => `<p>Extra: ${extra.name} +${money(extra.price)}</p>`).join("")}
-          ${item.removables.map((remove) => `<p>${remove}</p>`).join("")}
+          ${item.removables.map((remove) => `<p>${typeof remove === "string" ? remove : remove.name}</p>`).join("")}
           ${item.notes ? `<p>${item.notes}</p>` : ""}
         </div>
         <div>
