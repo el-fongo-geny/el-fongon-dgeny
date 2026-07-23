@@ -128,6 +128,49 @@ function getSupabaseFunctionConfig() {
   return { supabaseUrl, anonKey };
 }
 
+
+async function callAdminAuth(adminPin) {
+  const { supabaseUrl, anonKey } = getSupabaseFunctionConfig();
+
+  const response = await fetch(`${supabaseUrl}/functions/v1/admin-auth`, {
+    method: "POST",
+    mode: "cors",
+    cache: "no-store",
+    headers: {
+      "Content-Type": "application/json",
+      "apikey": anonKey,
+      "Authorization": `Bearer ${anonKey}`
+    },
+    body: JSON.stringify({
+      adminPin: String(adminPin || "").trim()
+    })
+  });
+
+  const rawText = await response.text();
+  let result = {};
+
+  try {
+    result = rawText ? JSON.parse(rawText) : {};
+  } catch (_) {
+    result = { detail: rawText };
+  }
+
+  if (!response.ok || !result?.ok) {
+    const message = [
+      `HTTP ${response.status}`,
+      result?.error,
+      result?.detail
+    ].filter(Boolean).join(" · ");
+
+    const error = new Error(message || "No se pudo validar el acceso.");
+    error.status = response.status;
+    error.payload = result;
+    throw error;
+  }
+
+  return result;
+}
+
 async function callAdminCatalog(action, adminPin, extraBody = {}) {
   const { supabaseUrl, anonKey } = getSupabaseFunctionConfig();
   const response = await fetch(`${supabaseUrl}/functions/v1/admin-catalog`, {
@@ -151,8 +194,17 @@ async function callAdminCatalog(action, adminPin, extraBody = {}) {
 
 async function validateAdminPin(pin) {
   const cleanPin = String(pin || "").trim();
-  if (!cleanPin) throw new Error("Escribe el PIN.");
-  await callAdminCatalog("list_catalog", cleanPin);
+
+  if (!cleanPin) {
+    throw new Error("Escribe el PIN.");
+  }
+
+  /*
+    El panel diario se autentica con una función independiente.
+    No depende del catálogo ni de sus tablas para poder abrir.
+  */
+  await callAdminAuth(cleanPin);
+
   return cleanPin;
 }
 
@@ -823,7 +875,10 @@ function initLogin() {
       console.error("Acceso rechazado:", loginError);
       if (error) {
         error.hidden = false;
-        error.textContent = loginError?.status === 401 ? "PIN incorrecto." : `No se pudo validar el PIN. ${loginError?.message || loginError}`;
+        error.textContent =
+          loginError?.status === 401
+            ? "PIN incorrecto."
+            : `No se pudo conectar con admin-auth. ${loginError?.message || loginError}`;
       }
       input.focus();
       input.select();
