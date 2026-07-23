@@ -530,7 +530,7 @@ async function sendReadyNotification(orderId) {
 
     if (result?.sms?.queued) {
       alert(result.sms.alreadyQueued
-        ? "Pedido listo. El SMS ya estaba en la cola y no se duplico."
+        ? "Mensaje bloqueado porque ya se envio otro para este pedido durante los ultimos 30 segundos."
         : "Pedido listo. SMS anadido a la cola; el Android lo enviara automaticamente.");
       return;
     }
@@ -575,12 +575,13 @@ function statusClass(order) {
 }
 
 function itemDetailsHtml(item, compact = false) {
+  const itemNameEs = item.nameEs || item.name || "";
   return `
     <div class="order-item-line">
-      <strong>${escapeHtml(item.quantity)}x ${escapeHtml(item.name)}</strong>
-      ${(item.selections || []).map((selection) => `<p>${escapeHtml(selection.group)}: ${escapeHtml(selection.name)}</p>`).join("")}
-      ${(item.extras || []).map((extra) => `<p>Extra: ${escapeHtml(extra.name)} +${money(extra.price)}</p>`).join("")}
-      ${(item.removables || []).map((remove) => `<p>${escapeHtml(remove)}</p>`).join("")}
+      <strong>${escapeHtml(item.quantity)}x ${escapeHtml(itemNameEs)}</strong>
+      ${(item.selections || []).map((selection) => `<p>${escapeHtml(selection.groupEs || selection.group)}: ${escapeHtml(selection.nameEs || selection.name)}</p>`).join("")}
+      ${(item.extras || []).map((extra) => `<p>Extra: ${escapeHtml(extra.nameEs || extra.name)} +${money(extra.price)}</p>`).join("")}
+      ${(item.removables || []).map((remove) => `<p>${escapeHtml(typeof remove === "string" ? remove : (remove.nameEs || remove.name))}</p>`).join("")}
       ${item.notes ? `<p><strong>Nota:</strong> ${escapeHtml(item.notes)}</p>` : ""}
       ${compact ? "" : `<p class="item-price">${money((item.lineTotal || 0) * (item.quantity || 1))}</p>`}
     </div>
