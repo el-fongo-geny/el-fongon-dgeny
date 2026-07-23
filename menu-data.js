@@ -1,714 +1,565 @@
-const TAX_RATE_SAN_JOSE_CA = 0.10;
+const $ = (selector) => document.querySelector(selector);
+const $$ = (selector) => Array.from(document.querySelectorAll(selector));
+const money = (value) => `$${Number(value || 0).toFixed(2)}`;
 
-const UI_TEXT = {
-  es: {
-    heroTitle: "Menú",
-    heroSubtitle: "Haz tu pedido y recógelo en la ventanilla del camión.",
-    cart: "Carrito",
-    yourOrder: "Tu pedido",
-    subtotal: "Subtotal",
-    tax: "Impuestos",
-    name: "Nombre",
-    phone: "Teléfono",
-    phoneNote: "Te avisaremos por WhatsApp o mensaje cuando tu pedido esté listo.",
-    sendOrder: "Enviar pedido",
-    addToCart: "Agregar",
-    addedToCart: "Añadido al carrito",
-    notes: "Notas especiales",
-    optional: "Opcional",
-    required: "Obligatorio",
-    remove: "Eliminar",
-    emptyCart: "Tu carrito está vacío.",
-    chooseRequired: "Completa las opciones obligatorias.",
-    orderTypeTitle: "¿Es para aquí o para llevar?",
-    dineIn: "Para aquí",
-    takeout: "Para llevar",
-    paymentTitle: "¿Cómo pagarás?",
-    paymentSubtitle: "El pago se realiza en la ventanilla.",
-    cardAtWindow: "Tarjeta en ventanilla",
-    cashAtWindow: "Efectivo en ventanilla",
-    orderSent: "Pedido enviado. Te avisaremos cuando esté listo.",
-    delayWarning: "Aviso: tenemos más de tres pedidos pendientes o en preparación. Tu orden puede tardar un poco más de lo habitual.",
-    orderingClosed: "Los pedidos en linea estan cerrados ahora mismo. El horario habitual es de 11:00 a. m. a 8:30 p. m., hora de California.",
-    unavailable: "Agotado",
-    darkMode: "Modo oscuro",
-    lightMode: "Modo claro"
+const state = {
+  pin: "",
+  catalog: {
+    categories: [], products: [], optionGroups: [], options: [], extras: [],
+    productExtras: [], removables: [], productRemovables: [], inventory: []
   },
-  en: {
-    heroTitle: "Menu",
-    heroSubtitle: "Place your order and pick it up at the truck window.",
-    cart: "Cart",
-    yourOrder: "Your order",
-    subtotal: "Subtotal",
-    tax: "Tax",
-    name: "Name",
-    phone: "Phone",
-    phoneNote: "We will notify you by WhatsApp or text when your order is ready.",
-    sendOrder: "Send order",
-    addToCart: "Add",
-    addedToCart: "Added to cart",
-    notes: "Special instructions",
-    optional: "Optional",
-    required: "Required",
-    remove: "Remove",
-    emptyCart: "Your cart is empty.",
-    chooseRequired: "Complete the required options.",
-    orderTypeTitle: "Is this for here or to go?",
-    dineIn: "For here",
-    takeout: "To go",
-    paymentTitle: "How will you pay?",
-    paymentSubtitle: "Payment is made at the pickup window.",
-    cardAtWindow: "Card at window",
-    cashAtWindow: "Cash at window",
-    orderSent: "Order sent. We will notify you when it is ready.",
-    delayWarning: "Notice: we have more than three orders pending or being prepared. Your order may take a little longer than usual.",
-    orderingClosed: "Online ordering is currently closed. Regular ordering hours are 11:00 AM to 8:30 PM, California time.",
-    unavailable: "Sold out",
-    darkMode: "Dark mode",
-    lightMode: "Light mode"
-  }
+  view: "products",
+  query: "",
+  category: "all",
+  status: "all",
+  selectedProductId: null,
+  creatingProduct: false,
+  editingCategoryId: null,
+  dirty: false,
+  busy: false
 };
 
-const CATEGORIES = [
-  { id: "platos-fuertes", es: "Platos fuertes", en: "Main Plates" },
-  { id: "desayuno", es: "Desayunos y sándwiches", en: "Breakfast & Sandwiches" },
-  { id: "kids", es: "Menú de niños", en: "Kids Menu" },
-  { id: "antojitos", es: "Antojitos", en: "Small Bites" },
-  { id: "acompanamientos", es: "Acompañamientos", en: "Sides" },
-  { id: "postres", es: "Postres", en: "Desserts" },
-  { id: "jugos", es: "Jugos y batidas", en: "Juices & Shakes" },
-  { id: "bebidas", es: "Bebidas", en: "Drinks" }
-];
+function escapeHtml(value) {
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
 
-const PROTEINS = [
-  { id: "pollo-guisado", es: "Pollo guisado", en: "Stewed chicken", price: 0 },
-  { id: "res-guisada", es: "Res guisada", en: "Stewed beef", price: 0 },
-  { id: "puerco-guisado", es: "Puerco guisado", en: "Stewed pork", price: 0 },
-  { id: "bistec", es: "Bistec", en: "Steak", price: 0 },
-  { id: "chuleta-plancha", es: "Chuleta a la plancha", en: "Grilled pork chop", price: 0 },
-  { id: "pechuga-plancha", es: "Pechuga a la plancha", en: "Grilled chicken breast", price: 0 }
-];
+function supabaseConfig() {
+  const cfg = window.FOGON_SUPABASE || {};
+  const url = String(cfg.url || "").replace(/\/$/, "");
+  const anonKey = String(cfg.anonKey || "").trim();
+  if (!url || !anonKey) throw new Error("Faltan la URL o la anon key en supabase-config.js.");
+  return { url, anonKey };
+}
 
-const EXTRA_AVOCADO = { id: "aguacate-extra", es: "Aguacate extra", en: "Extra avocado", price: 1 };
-const EXTRA_MEAT = { id: "carne-extra", es: "Carne extra", en: "Extra meat", price: 4.5 };
+async function callAdminCatalog(action, extraBody = {}, pinOverride = "") {
+  const pin = String(pinOverride || state.pin || "").trim();
+  if (!pin) throw new Error("La sesión terminó. Vuelve a introducir el PIN.");
 
-const MENU_ITEMS = [
-  {
-    id: "bandera",
-    category: "platos-fuertes",
-    es: "La Bandera Dominicana",
-    en: "Dominican Flag Plate",
-    description: { es: "Arroz, habichuelas, plátano maduro y proteína.", en: "Rice, beans, sweet plantain and protein." },
-    price: 20,
-    image: "assets/images/bandera.png",
-    taxable: true,
-    optionGroups: [{ id: "proteina", es: "Elige tu proteína", en: "Choose your protein", required: true, type: "single", options: PROTEINS }],
-    extras: [EXTRA_AVOCADO, EXTRA_MEAT]
-  },
-  {
-    id: "moro-guandules-bandera",
-    category: "platos-fuertes",
-    es: "Moro de Guandules (Bandera)",
-    en: "Rice with Pigeon Peas (Flag Plate)",
-    description: { es: "Moro de guandules con coco, proteína y acompañamientos.", en: "Rice with pigeon peas and coconut, protein and sides." },
-    price: 22,
-    image: "assets/images/moro-guandules-plato.png",
-    taxable: true,
-    optionGroups: [{ id: "proteina", es: "Elige tu proteína", en: "Choose your protein", required: true, type: "single", options: PROTEINS }],
-    extras: [EXTRA_AVOCADO, EXTRA_MEAT]
-  },
-  {
-    id: "moro-habichuelas-bandera",
-    category: "platos-fuertes",
-    es: "Moro de Habichuelas (Bandera)",
-    en: "Rice with Beans (Flag Plate)",
-    description: { es: "Moro de habichuelas con proteína y acompañamientos.", en: "Rice with beans, protein and sides." },
-    price: 22,
-    image: "assets/images/moro-habichuelas-plato.png",
-    taxable: true,
-    optionGroups: [{ id: "proteina", es: "Elige tu proteína", en: "Choose your protein", required: true, type: "single", options: PROTEINS }],
-    extras: [EXTRA_AVOCADO, EXTRA_MEAT]
-  },
-  {
-    id: "mofongo",
-    category: "platos-fuertes",
-    es: "Mofongo",
-    en: "Mofongo",
-    description: { es: "Mofongo dominicano con proteína a elección.", en: "Dominican mofongo with your choice of protein." },
-    price: 22,
-    image: "assets/images/pilon.png",
-    taxable: true,
-    optionGroups: [
-      {
-        id: "base",
-        es: "Base de mofongo",
-        en: "Mofongo base",
-        required: true,
-        type: "single",
-        options: [
-          { id: "con-chicharron", es: "Con base de chicharrón", en: "With pork rind base", price: 0 },
-          { id: "sin-chicharron", es: "Sin base de chicharrón", en: "Without pork rind base", price: 0 }
-        ]
-      },
-      {
-        id: "proteina",
-        es: "Elige tu proteína",
-        en: "Choose your protein",
-        required: true,
-        type: "single",
-        options: [
-          { id: "pollo-frito", es: "Pollo frito", en: "Fried chicken", price: 0 },
-          { id: "camaron", es: "Camarón", en: "Shrimp", price: 0 },
-          { id: "chicharron", es: "Chicharrón", en: "Pork rinds", price: 0 },
-          { id: "bistec", es: "Bistec", en: "Steak", price: 0 }
-        ]
-      }
-    ],
-    extras: [EXTRA_AVOCADO],
-    removables: [
-      { id: "sin-queso-frito", es: "Sin queso frito", en: "No fried cheese" },
-      { id: "sin-salsa-bechamel", es: "Sin salsa bechamel", en: "No bechamel sauce" },
-      { id: "sin-ajo", es: "Sin ajo", en: "No garlic" }
-    ]
-  },
-  {
-    id: "pescado-frito-entero",
-    category: "platos-fuertes",
-    es: "Pescado Frito Entero",
-    en: "Whole Fried Fish",
-    description: { es: "Tilapia o chillo con acompañamiento.", en: "Tilapia or red snapper with a side." },
-    price: 25,
-    image: "assets/images/pescado-frito-entero.png",
-    taxable: true,
-    optionGroups: [
-      {
-        id: "tipo-pescado",
-        es: "Tipo de pescado",
-        en: "Fish type",
-        required: true,
-        type: "single",
-        options: [
-          { id: "tilapia", es: "Tilapia", en: "Tilapia", price: 0 },
-          { id: "chillo", es: "Chillo / Red Snapper", en: "Red snapper", price: 8 }
-        ]
-      },
-      {
-        id: "acompanamiento",
-        es: "Acompañamiento",
-        en: "Side",
-        required: true,
-        type: "single",
-        options: [
-          { id: "tostones", es: "Tostones", en: "Tostones", price: 0 },
-          { id: "papas-fritas", es: "Papas fritas", en: "French fries", price: 0 }
-        ]
-      }
-    ]
-  },
-  {
-    id: "chuleta-plancha",
-    category: "platos-fuertes",
-    es: "Chuleta a la Plancha",
-    en: "Grilled Pork Chop",
-    description: { es: "Chuleta a la plancha con acompañamiento.", en: "Grilled pork chop with a side." },
-    price: 20,
-    image: "assets/images/chuleta-plancha.png",
-    taxable: true,
-    optionGroups: [
-      {
-        id: "acompanamiento",
-        es: "Acompañamiento",
-        en: "Side",
-        required: true,
-        type: "single",
-        options: [
-          { id: "papas-fritas", es: "Papas fritas", en: "French fries", price: 0 },
-          { id: "platanos-fritos", es: "Plátanos fritos", en: "Fried plantains", price: 0 }
-        ]
-      }
-    ],
-    extras: [EXTRA_AVOCADO]
-  },
-  {
-    id: "pica-pollo",
-    category: "platos-fuertes",
-    es: "Pica Pollo",
-    en: "Dominican Fried Chicken",
-    description: { es: "Pollo frito dominicano con acompañamiento.", en: "Dominican fried chicken with a side." },
-    price: 20,
-    image: "assets/images/pica-pollo.png",
-    taxable: true,
-    optionGroups: [
-      {
-        id: "acompanamiento",
-        es: "Acompañamiento",
-        en: "Side",
-        required: true,
-        type: "single",
-        options: [
-          { id: "papas-fritas", es: "Papas fritas", en: "French fries", price: 0 },
-          { id: "platanos-fritos", es: "Plátanos fritos", en: "Fried plantains", price: 0 }
-        ]
-      }
-    ],
-    extras: [EXTRA_AVOCADO]
-  },
-  {
-    id: "alitas",
-    category: "platos-fuertes",
-    es: "Alitas",
-    en: "Chicken Wings",
-    description: { es: "Alitas de pollo con opción normal o picante.", en: "Chicken wings with regular or spicy option." },
-    price: 20,
-    image: "assets/images/alitas.png",
-    taxable: true,
-    optionGroups: [
-      {
-        id: "tipo-alitas",
-        es: "Tipo de alitas",
-        en: "Wing style",
-        required: true,
-        type: "single",
-        options: [
-          { id: "normales", es: "Normales", en: "Regular", price: 0 },
-          { id: "picantes", es: "Picantes", en: "Spicy", price: 0 }
-        ]
-      },
-      {
-        id: "acompanamiento",
-        es: "Acompañamiento",
-        en: "Side",
-        required: true,
-        type: "single",
-        options: [
-          { id: "papas-fritas", es: "Papas fritas", en: "French fries", price: 0 },
-          { id: "tostones", es: "Tostones", en: "Tostones", price: 0 }
-        ]
-      }
-    ],
-    extras: [EXTRA_AVOCADO]
-  },
-  {
-    id: "yaroa",
-    category: "platos-fuertes",
-    es: "Yaroa",
-    en: "Yaroa",
-    description: {
-      es: "Yaroa pequeña o grande con base y proteína a elección.",
-      en: "Small or large Yaroa with your choice of base and protein."
+  const { url, anonKey } = supabaseConfig();
+  const response = await fetch(`${url}/functions/v1/admin-catalog`, {
+    method: "POST",
+    mode: "cors",
+    cache: "no-store",
+    headers: {
+      "Content-Type": "application/json",
+      "apikey": anonKey,
+      "Authorization": `Bearer ${anonKey}`
     },
-    price: 10,
-    image: "assets/images/yaroa.png",
-    taxable: true,
-    optionGroups: [
-      {
-        id: "tamano",
-        es: "Tamaño",
-        en: "Size",
-        required: true,
-        type: "single",
-        options: [
-          { id: "pequena", es: "Pequeña", en: "Small", price: 0 },
-          { id: "grande", es: "Grande", en: "Large", price: 10 }
-        ]
-      },
-      {
-        id: "base",
-        es: "Base",
-        en: "Base",
-        required: true,
-        type: "single",
-        options: [
-          { id: "papas-fritas", es: "Papas fritas", en: "French fries", price: 0 },
-          { id: "platanos-maduros", es: "Plátanos maduros", en: "Sweet plantains", price: 0 }
-        ]
-      },
-      {
-        id: "proteina",
-        es: "Proteína",
-        en: "Protein",
-        required: true,
-        type: "single",
-        options: [
-          { id: "res", es: "Res", en: "Beef", price: 0 },
-          { id: "pollo", es: "Pollo", en: "Chicken", price: 0 }
-        ]
-      }
-    ],
-    extras: [EXTRA_AVOCADO]
-  },
-  {
-    id: "fritura-combinada",
-    category: "platos-fuertes",
-    es: "Fritura Combinada",
-    en: "Mixed Fried Platter",
-    description: { es: "Queso, longaniza y salami con acompañamiento.", en: "Cheese, Dominican sausage and salami with a side." },
-    price: 24,
-    image: "assets/images/fritura-combinada.png",
-    taxable: true,
-    optionGroups: [
-      {
-        id: "acompanamiento",
-        es: "Acompañamiento",
-        en: "Side",
-        required: true,
-        type: "single",
-        options: [
-          { id: "tostones", es: "Tostones", en: "Tostones", price: 0 },
-          { id: "papas-fritas", es: "Papas fritas", en: "French fries", price: 0 }
-        ]
-      }
-    ],
-    extras: [EXTRA_AVOCADO]
-  },
-  {
-    id: "sancocho",
-    category: "platos-fuertes",
-    es: "Sancocho",
-    en: "Sancocho",
-    description: { es: "Sopa dominicana tradicional.", en: "Traditional Dominican stew." },
-    price: 21,
-    image: "assets/images/sancocho.png",
-    taxable: true,
-    extras: [EXTRA_AVOCADO]
-  },
-  {
-    id: "tres-golpes",
-    category: "desayuno",
-    es: "Tres Golpes",
-    en: "Tres Golpes",
-    description: { es: "Desayuno dominicano tradicional.", en: "Traditional Dominican breakfast." },
-    price: 18,
-    image: "assets/images/tres-golpes.png",
-    taxable: true
-  },
-  {
-    id: "sandwich-tres-golpes",
-    category: "desayuno",
-    es: "Sandwis de 3 Golpes",
-    en: "Tres Golpes Sandwich",
-    description: { es: "Sandwis dominicano de tres golpes con acompañamiento.", en: "Dominican tres golpes sandwich with a side." },
-    price: 18,
-    image: "assets/images/sandwis-tres-golpes.png",
-    taxable: true,
-    optionGroups: [
-      {
-        id: "acompanamiento",
-        es: "Acompañamiento",
-        en: "Side",
-        required: true,
-        type: "single",
-        options: [
-          { id: "papas-fritas", es: "Papas fritas", en: "French fries", price: 0 },
-          { id: "tostones", es: "Tostones", en: "Tostones", price: 0 }
-        ]
-      }
-    ]
-  },
-  {
-    id: "chimi",
-    category: "desayuno",
-    es: "Chimi",
-    en: "Dominican Chimi Burger",
-    description: { es: "Chimi dominicano con carne, repollo, tomate, cebolla, queso y salsa mayo-ketchup.", en: "Dominican chimi burger with meat, cabbage, tomato, onion, cheese and mayo-ketchup." },
-    price: 20,
-    image: "assets/images/chimi.png",
-    taxable: true,
-    optionGroups: [
-      {
-        id: "acompanamiento",
-        es: "Acompañamiento",
-        en: "Side",
-        required: true,
-        type: "single",
-        options: [
-          { id: "papas-fritas", es: "Papas fritas", en: "French fries", price: 0 },
-          { id: "tostones", es: "Tostones", en: "Tostones", price: 0 }
-        ]
-      }
-    ],
-    removables: [
-      { id: "sin-repollo", es: "Sin repollo", en: "No cabbage" },
-      { id: "sin-tomate", es: "Sin tomate", en: "No tomato" },
-      { id: "sin-cebolla", es: "Sin cebolla", en: "No onion" },
-      { id: "sin-queso", es: "Sin queso", en: "No cheese" },
-      { id: "sin-mayo-ketchup", es: "Sin mayo-ketchup", en: "No mayo-ketchup" }
-    ]
-  },
-  {
-    id: "tostada-dominicana",
-    category: "desayuno",
-    es: "Tostada Dominicana",
-    en: "Dominican Toasted Sandwich",
-    description: { es: "Tostada dominicana con papas fritas.", en: "Dominican toasted sandwich with fries." },
-    price: 14,
-    image: "assets/images/tostada-dominicana.png",
-    taxable: true
-  },
-  {
-    id: "burritos",
-    category: "desayuno",
-    es: "Burritos",
-    en: "Burritos",
-    description: { es: "Burrito con proteína a elección.", en: "Burrito with your choice of protein." },
-    price: 18,
-    image: "assets/images/burritos.png",
-    taxable: true,
-    optionGroups: [
-      {
-        id: "proteina",
-        es: "Proteína",
-        en: "Protein",
-        required: true,
-        type: "single",
-        options: [
-          { id: "pollo", es: "Pollo", en: "Chicken", price: 0 },
-          { id: "res", es: "Res", en: "Beef", price: 0 },
-          { id: "puerco", es: "Puerco", en: "Pork", price: 0 }
-        ]
-      }
-    ]
-  },
-  {
-    id: "quesadilla",
-    category: "desayuno",
-    es: "Quesadilla",
-    en: "Quesadilla",
-    description: { es: "Quesadilla con proteína a elección.", en: "Quesadilla with your choice of protein." },
-    price: 16,
-    image: "assets/images/quesadilla.png",
-    taxable: true,
-    optionGroups: [
-      {
-        id: "proteina",
-        es: "Proteína",
-        en: "Protein",
-        required: true,
-        type: "single",
-        options: [
-          { id: "pollo", es: "Pollo", en: "Chicken", price: 0 },
-          { id: "res", es: "Res", en: "Beef", price: 0 },
-          { id: "puerco", es: "Puerco", en: "Pork", price: 0 }
-        ]
-      }
-    ]
-  },
-  {
-    id: "mini-bandera-kids",
-    category: "kids",
-    es: "Mini Bandera",
-    en: "Mini Flag Plate",
-    description: { es: "Versión infantil de la bandera dominicana.", en: "Kids version of the Dominican flag plate." },
-    price: 12,
-    image: "assets/images/mini-bandera-kids.png",
-    taxable: true,
-    optionGroups: [{ id: "proteina", es: "Elige tu proteína", en: "Choose your protein", required: true, type: "single", options: PROTEINS }]
-  },
-  {
-    id: "pica-pollo-kid",
-    category: "kids",
-    es: "Pica Pollo de Niño",
-    en: "Kids Dominican Fried Chicken",
-    description: { es: "Pica pollo infantil.", en: "Kids fried chicken meal." },
-    price: 12,
-    image: "assets/images/pica-pollo-kid.png",
-    taxable: true
-  },
-  {
-    id: "quesadilla-kids",
-    category: "kids",
-    es: "Quesadilla de Niño",
-    en: "Kids Quesadilla",
-    description: { es: "Quesadilla infantil con proteína opcional.", en: "Kids quesadilla with optional protein." },
-    price: 10,
-    image: "assets/images/quesadilla-kids.png",
-    taxable: true,
-    optionGroups: [
-      {
-        id: "proteina",
-        es: "Agregar proteína",
-        en: "Add protein",
-        required: true,
-        type: "single",
-        options: [
-          { id: "pollo", es: "Pollo", en: "Chicken", price: 2 },
-          { id: "res", es: "Res", en: "Beef", price: 2 },
-          { id: "puerco", es: "Puerco", en: "Pork", price: 2 }
-        ]
-      }
-    ]
-  },
-  {
-    id: "tostones-salami-kids",
-    category: "kids",
-    es: "Tostones con Salami",
-    en: "Tostones with Salami",
-    description: { es: "Ración infantil de tostones con salami.", en: "Kids portion of tostones with salami." },
-    price: 10,
-    image: "assets/images/tostones-salami-kids.png",
-    taxable: true
-  },
-  {
-    id: "chulitos-de-yuca",
-    category: "antojitos",
-    es: "Chulitos de Yuca",
-    en: "Yuca Cheese Bites",
-    description: { es: "Chulitos de yuca dominicanos, crujientes por fuera y suaves por dentro.", en: "Dominican yuca bites, crispy outside and soft inside." },
-    price: 3.5,
-    image: "assets/images/chulitos-de-yuca.png",
-    taxable: true,
-    optionGroups: [
-      {
-        id: "cantidad",
-        es: "Cantidad",
-        en: "Quantity",
-        required: true,
-        type: "single",
-        options: [
-          { id: "3-piezas", es: "3 piezas", en: "3 pieces", price: 0 },
-          { id: "6-piezas", es: "6 piezas", en: "6 pieces", price: 5.5 }
-        ]
-      }
-    ]
-  },
-  {
-    id: "quipes",
-    category: "antojitos",
-    es: "Quipes",
-    en: "Dominican Kipes",
-    description: { es: "Quipes dominicanos rellenos de carne.", en: "Dominican kipes filled with beef." },
-    price: 4,
-    image: "assets/images/quipes.png",
-    taxable: true
-  },
-  {
-    id: "pastel-en-hoja",
-    category: "antojitos",
-    es: "Pastel en Hoja",
-    en: "Pastel en Hoja",
-    description: { es: "Pastel dominicano envuelto en hoja.", en: "Dominican plantain tamal wrapped in leaf." },
-    price: 7,
-    image: "assets/images/pastel-en-hoja.png",
-    taxable: true,
-    optionGroups: [
-      {
-        id: "relleno",
-        es: "Relleno",
-        en: "Filling",
-        required: true,
-        type: "single",
-        options: [
-          { id: "pollo", es: "Pollo", en: "Chicken", price: 0 },
-          { id: "res", es: "Res", en: "Beef", price: 0 },
-          { id: "cerdo", es: "Cerdo", en: "Pork", price: 0 },
-          { id: "queso", es: "Queso", en: "Cheese", price: 0 }
-        ]
-      }
-    ]
-  },
-  {
-    id: "empanada-dominicana",
-    category: "antojitos",
-    es: "Empanada Dominicana",
-    en: "Dominican Empanada",
-    description: { es: "Empanada con relleno a elección.", en: "Empanada with your choice of filling." },
-    price: 5,
-    image: "assets/images/empanada-dominicana.png",
-    taxable: true,
-    optionGroups: [
-      {
-        id: "relleno",
-        es: "Relleno",
-        en: "Filling",
-        required: true,
-        type: "single",
-        options: [
-          { id: "queso", es: "Queso", en: "Cheese", price: -0.5 },
-          { id: "jamon-queso", es: "Jamón y queso", en: "Ham and cheese", price: -0.5 },
-          { id: "carne", es: "Carne", en: "Beef", price: 0 },
-          { id: "pollo", es: "Pollo", en: "Chicken", price: 0 }
-        ]
-      }
-    ]
-  },
-  { id: "tostones", category: "acompanamientos", es: "Tostones", en: "Tostones", description: { es: "Orden de tostones.", en: "Order of tostones." }, price: 7, image: "assets/images/tostones.png", taxable: true },
-  { id: "aguacate", category: "acompanamientos", es: "Aguacate", en: "Avocado", description: { es: "Porción de aguacate.", en: "Avocado portion." }, price: 2.5, image: "assets/images/aguacate.png", taxable: false },
-  { id: "ensalada-rusa", category: "acompanamientos", es: "Ensalada Rusa", en: "Potato Beet Salad", description: { es: "Ensalada rusa dominicana.", en: "Dominican potato beet salad." }, price: 3.5, image: "assets/images/ensalada-rusa.png", taxable: false },
-  { id: "ensalada-fresca", category: "acompanamientos", es: "Ensalada Verde", en: "Green Salad", description: { es: "Ensalada fresca.", en: "Fresh green salad." }, price: 4.5, image: "assets/images/ensalada-fresca.png", taxable: false },
-  { id: "habichuelas-guisadas", category: "acompanamientos", es: "Habichuelas Guisadas", en: "Stewed Beans", description: { es: "Porción de habichuelas guisadas.", en: "Side of stewed beans." }, price: 4.5, image: "assets/images/habichuelas-guisadas.png", taxable: true },
-  { id: "habichuela-con-dulce", category: "postres", es: "Habichuelas con Dulce", en: "Sweet Cream of Beans", description: { es: "Postre dominicano tradicional.", en: "Traditional Dominican dessert." }, price: 8, image: "assets/images/habichuela-con-dulce.png", taxable: false },
-  { id: "arroz-con-dulce", category: "postres", es: "Arroz con Dulce", en: "Rice Pudding", description: { es: "Arroz dulce con canela.", en: "Sweet rice pudding with cinnamon." }, price: 5, image: "assets/images/arroz-con-dulce.png", taxable: false },
-  { id: "majarete", category: "postres", es: "Majarete", en: "Majarete", description: { es: "Postre dominicano de maíz.", en: "Dominican sweet corn pudding." }, price: 6, image: "assets/images/majarete.png", taxable: false },
-  {
-    id: "jugo-guanabana",
-    category: "jugos",
-    es: "Jugo Natural de Guanábana",
-    en: "Natural Guanabana Juice",
-    description: { es: "Jugo natural con base a elección.", en: "Natural juice with your choice of base." },
-    price: 7,
-    image: "assets/images/jugo-guanabana.png",
-    taxable: false,
-    optionGroups: [{ id: "base", es: "Base", en: "Base", required: true, type: "single", options: [{ id: "leche", es: "Con leche", en: "With milk", price: 0 }, { id: "agua", es: "Con agua", en: "With water", price: 0 }] }]
-  },
-  {
-    id: "jugo-chinola",
-    category: "jugos",
-    es: "Jugo Natural de Chinola",
-    en: "Natural Passion Fruit Juice",
-    description: { es: "Jugo natural con base a elección.", en: "Natural juice with your choice of base." },
-    price: 7,
-    image: "assets/images/jugo-chinola.png",
-    taxable: false,
-    optionGroups: [{ id: "base", es: "Base", en: "Base", required: true, type: "single", options: [{ id: "leche", es: "Con leche", en: "With milk", price: 0 }, { id: "agua", es: "Con agua", en: "With water", price: 0 }] }]
-  },
-  {
-    id: "jugo-tamarindo",
-    category: "jugos",
-    es: "Jugo Natural de Tamarindo",
-    en: "Natural Tamarind Juice",
-    description: { es: "Jugo natural con base a elección.", en: "Natural juice with your choice of base." },
-    price: 6,
-    image: "assets/images/jugo-tamarindo.png",
-    taxable: false,
-    optionGroups: [{ id: "base", es: "Base", en: "Base", required: true, type: "single", options: [{ id: "leche", es: "Con leche", en: "With milk", price: 0 }, { id: "agua", es: "Con agua", en: "With water", price: 0 }] }]
-  },
-  { id: "limonada", category: "jugos", es: "Limonada", en: "Lemonade", description: { es: "Jugo natural de limón.", en: "Fresh lemonade." }, price: 6, image: "assets/images/limonada.png", taxable: false },
-  {
-    id: "batida-zapote",
-    category: "jugos",
-    es: "Batida de Zapote",
-    en: "Mamey Shake",
-    description: { es: "Batida con base a elección.", en: "Shake with your choice of base." },
-    price: 7,
-    image: "assets/images/batida-zapote.png",
-    taxable: false,
-    optionGroups: [{ id: "base", es: "Base", en: "Base", required: true, type: "single", options: [{ id: "leche", es: "Con leche", en: "With milk", price: 0 }, { id: "agua", es: "Con agua", en: "With water", price: 0 }] }]
-  },
-  {
-    id: "batida-de-lechosa",
-    category: "jugos",
-    es: "Batida de Lechosa",
-    en: "Papaya Shake",
-    description: { es: "Batida con base a elección.", en: "Shake with your choice of base." },
-    price: 7,
-    image: "assets/images/batida-de-lechosa.png",
-    taxable: false,
-    optionGroups: [{ id: "base", es: "Base", en: "Base", required: true, type: "single", options: [{ id: "leche", es: "Con leche", en: "With milk", price: 0 }, { id: "agua", es: "Con agua", en: "With water", price: 0 }] }]
-  },
-  { id: "morir-sonando-chinola o limon", category: "jugos", es: "Morir Soñando de Chinola o limon", en: "Passion Fruit Morir Soñando or limón", description: { es: "Bebida dominicana cremosa de chinola.", en: "Creamy Dominican passion fruit drink." }, price: 8, image: "assets/images/morir-sonando-chinola.png", taxable: false },
-  { id: "cafe-santo-domingo", category: "bebidas", es: "Café Santo Domingo", en: "Santo Domingo Coffee", description: { es: "Café dominicano.", en: "Dominican coffee." }, price: 5, image: "assets/images/cafe-santo-domingo.png", taxable: false },
-  { id: "agua", category: "bebidas", es: "Agua", en: "Water", description: { es: "Agua embotellada.", en: "Bottled water." }, price: 2, image: "assets/images/agua.png", taxable: false },
-  { id: "agua-de-coco", category: "bebidas", es: "Agua de Coco", en: "Coconut Water", description: { es: "Agua de coco.", en: "Coconut water." }, price: 4, image: "assets/images/agua-de-coco.png", taxable: false },
-  { id: "coca-cola", category: "bebidas", es: "Coca-Cola", en: "Coca-Cola", description: { es: "Refresco Coca-Cola.", en: "Coca-Cola soda." }, price: 4, image: "assets/images/coca-cola.png", taxable: true },
-  { id: "sprite", category: "bebidas", es: "Sprite", en: "Sprite", description: { es: "Refresco Sprite.", en: "Sprite soda." }, price: 4, image: "assets/images/sprite.png", taxable: true },
-  { id: "malta-india", category: "bebidas", es: "Malta India", en: "Malta India", description: { es: "Malta India.", en: "Malta India." }, price: 5, image: "assets/images/malta-india.png", taxable: true },
-  { id: "country-club-frambuesa", category: "bebidas", es: "Country Club Frambuesa", en: "Country Club Raspberry", description: { es: "Refresco dominicano.", en: "Dominican soda." }, price: 5, image: "assets/images/country-club-frambuesa.png", taxable: true },
-  { id: "country-club-naranja", category: "bebidas", es: "Country Club Naranja", en: "Country Club Orange", description: { es: "Refresco dominicano.", en: "Dominican soda." }, price: 5, image: "assets/images/country-club-naranja.png", taxable: true },
-  { id: "cerveza-modelo", category: "bebidas", es: "Cerveza Modelo", en: "Modelo Beer", description: { es: "Cerveza Modelo fría.", en: "Cold Modelo beer." }, price: 5, image: "assets/images/cerveza-modelo.png", taxable: true },
-  { id: "cerveza-presidente", category: "bebidas", es: "Cerveza Presidente", en: "Presidente Beer", description: { es: "Cerveza Presidente fría.", en: "Cold Presidente beer." }, price: 5, image: "assets/images/cerveza-presidente.png", taxable: true }
-];
+    body: JSON.stringify({ action, adminPin: pin, ...extraBody })
+  });
 
-// Ajuste general solicitado: un dólar adicional a cada producto.
-MENU_ITEMS.forEach((item) => {
-  item.price = Number(item.price || 0) + 1;
-});
+  const raw = await response.text();
+  let result = {};
+  try { result = raw ? JSON.parse(raw) : {}; }
+  catch (_) { result = { detail: raw }; }
+
+  if (!response.ok || !result?.ok) {
+    const message = [result?.detail, result?.error, `HTTP ${response.status}`].filter(Boolean).join(" · ");
+    const error = new Error(message || "Supabase rechazó la solicitud.");
+    error.status = response.status;
+    error.payload = result;
+    throw error;
+  }
+  return result;
+}
+
+function updateSyncStatus() {
+  const status = $("#syncStatus");
+  const label = status.querySelector("span:last-child");
+  status.dataset.state = state.busy ? "busy" : state.dirty ? "dirty" : "saved";
+  label.textContent = state.busy ? "Guardando…" : state.dirty ? "Cambios sin guardar" : "Todo guardado";
+}
+
+function setBusy(busy) {
+  state.busy = Boolean(busy);
+  updateSyncStatus();
+  ["#refreshButton", "#addProductButton", "#saveProductButton", "#deleteProductButton", "#loginButton"].forEach((selector) => {
+    const element = $(selector);
+    if (element) element.disabled = state.busy;
+  });
+}
+
+function setDirty(dirty) {
+  state.dirty = Boolean(dirty);
+  updateSyncStatus();
+}
+
+function toast(message, type = "success") {
+  const item = document.createElement("div");
+  item.className = "toast";
+  item.dataset.type = type;
+  item.textContent = message;
+  $("#toastRegion").appendChild(item);
+  setTimeout(() => item.remove(), 4200);
+}
+
+function categoryName(categoryId) {
+  return state.catalog.categories.find((category) => category.id === categoryId)?.name_es || categoryId || "Sin categoría";
+}
+
+function productStats(productId) {
+  const groups = state.catalog.optionGroups.filter((group) => group.product_id === productId);
+  const groupIds = new Set(groups.map((group) => group.id));
+  return {
+    groups: groups.length,
+    options: state.catalog.options.filter((option) => groupIds.has(option.option_group_id)).length,
+    extras: state.catalog.productExtras.filter((link) => link.product_id === productId).length,
+    removables: state.catalog.productRemovables.filter((link) => link.product_id === productId).length
+  };
+}
+
+function renderSummary() {
+  const products = state.catalog.products;
+  $("#totalProducts").textContent = String(products.length);
+  $("#visibleProducts").textContent = String(products.filter((product) => product.visible).length);
+  $("#hiddenProducts").textContent = String(products.filter((product) => !product.visible).length);
+}
+
+function renderCategoryFilter() {
+  const select = $("#categoryFilter");
+  const current = state.category;
+  select.innerHTML = [
+    `<option value="all">Todas las categorías</option>`,
+    ...state.catalog.categories.map((category) => `<option value="${escapeHtml(category.id)}">${escapeHtml(category.name_es)}</option>`)
+  ].join("");
+  select.value = state.catalog.categories.some((category) => category.id === current) ? current : "all";
+}
+
+function filteredProducts() {
+  const query = state.query.trim().toLowerCase();
+  return state.catalog.products.filter((product) => {
+    const matchesCategory = state.category === "all" || product.category_id === state.category;
+    const matchesStatus = state.status === "all"
+      || (state.status === "visible" && product.visible)
+      || (state.status === "hidden" && !product.visible)
+      || (state.status === "inactive" && !product.active);
+    const text = [product.name_es, product.name_en, product.description_es, product.description_en, categoryName(product.category_id)]
+      .filter(Boolean).join(" ").toLowerCase();
+    return matchesCategory && matchesStatus && (!query || text.includes(query));
+  });
+}
+
+function renderProducts() {
+  renderSummary();
+  renderCategoryFilter();
+
+  const body = $("#productTableBody");
+  const empty = $("#productEmptyState");
+  const products = filteredProducts();
+
+  if (!products.length) {
+    body.innerHTML = "";
+    empty.hidden = false;
+    return;
+  }
+
+  empty.hidden = true;
+  body.innerHTML = products.map((product) => `
+    <tr>
+      <td>
+        <div class="product-cell">
+          <span class="product-thumb">${product.image_url ? `<img src="${escapeHtml(product.image_url)}" alt="" loading="lazy">` : `Sin imagen`}</span>
+          <span class="product-copy"><strong>${escapeHtml(product.name_es)}</strong><small>${escapeHtml(product.name_en || product.description_es || "")}</small></span>
+        </div>
+      </td>
+      <td>${escapeHtml(categoryName(product.category_id))}</td>
+      <td><span class="price-value">${money(product.base_price)}</span></td>
+      <td>
+        <div class="status-control">
+          <label class="status-switch">
+            <input type="checkbox" data-product-visible="${escapeHtml(product.id)}" ${product.visible ? "checked" : ""} aria-label="Mostrar u ocultar ${escapeHtml(product.name_es)}">
+            <span class="status-switch-control" aria-hidden="true"></span>
+          </label>
+          <span class="status-label">${product.visible ? "Visible" : "Oculto"}</span>
+        </div>
+      </td>
+      <td class="align-right"><div class="row-actions"><button class="row-button" type="button" data-edit-product="${escapeHtml(product.id)}">Editar</button></div></td>
+    </tr>
+  `).join("");
+}
+
+function renderCategories() {
+  const list = $("#categoryList");
+  if (!state.catalog.categories.length) {
+    list.innerHTML = `<div class="empty-state"><div class="empty-icon">×</div><h2>No hay categorías</h2><p>Ejecuta primero la carga inicial del catálogo.</p></div>`;
+    return;
+  }
+
+  list.innerHTML = state.catalog.categories.map((category) => {
+    const productCount = state.catalog.products.filter((product) => product.category_id === category.id).length;
+    return `
+      <article class="category-row">
+        <div><small>Nombre en español</small><strong>${escapeHtml(category.name_es)}</strong></div>
+        <div class="category-english"><small>Nombre en inglés</small><span>${escapeHtml(category.name_en || category.name_es)}</span></div>
+        <div class="category-order"><small>Orden</small><span>${Number(category.sort_order || 0)}</span></div>
+        <div><small>Productos</small><span>${productCount}</span></div>
+        <button class="row-button" type="button" data-edit-category="${escapeHtml(category.id)}">Editar</button>
+      </article>`;
+  }).join("");
+}
+
+function renderAll() {
+  renderProducts();
+  renderCategories();
+}
+
+async function loadCatalog({ preserveSelection = true } = {}) {
+  const selectedProductId = preserveSelection ? state.selectedProductId : null;
+  setBusy(true);
+  try {
+    const result = await callAdminCatalog("list_catalog");
+    state.catalog = {
+      categories: result.catalog?.categories || [],
+      products: result.catalog?.products || [],
+      optionGroups: result.catalog?.optionGroups || [],
+      options: result.catalog?.options || [],
+      extras: result.catalog?.extras || [],
+      productExtras: result.catalog?.productExtras || [],
+      removables: result.catalog?.removables || [],
+      productRemovables: result.catalog?.productRemovables || [],
+      inventory: result.catalog?.inventory || []
+    };
+    renderAll();
+
+    if (selectedProductId) {
+      const selected = state.catalog.products.find((product) => product.id === selectedProductId);
+      if (selected && $("#productDrawer").getAttribute("aria-hidden") === "false") fillProductForm(selected, false);
+    }
+  } finally {
+    setBusy(false);
+  }
+}
+
+function switchView(view) {
+  state.view = view;
+  $$('[data-view]').forEach((button) => button.classList.toggle("active", button.dataset.view === view));
+  $("#productsView").hidden = view !== "products";
+  $("#categoriesView").hidden = view !== "categories";
+  $("#pageTitle").textContent = view === "products" ? "Productos" : "Categorías";
+  $("#addProductButton").hidden = view !== "products";
+  closeMobileSidebar();
+}
+
+function openMobileSidebar() {
+  document.body.classList.add("sidebar-open");
+  $("#mobileSidebarBackdrop").hidden = false;
+}
+function closeMobileSidebar() {
+  document.body.classList.remove("sidebar-open");
+  $("#mobileSidebarBackdrop").hidden = true;
+}
+
+function renderProductCategoryOptions(selected = "") {
+  const select = $("#productCategory");
+  select.innerHTML = state.catalog.categories.map((category) => `<option value="${escapeHtml(category.id)}">${escapeHtml(category.name_es)}${category.active ? "" : " — inactiva"}</option>`).join("");
+  if (selected) select.value = selected;
+}
+
+function renderOptionSummary(productId = "") {
+  const stats = productId ? productStats(productId) : { groups: 0, options: 0, extras: 0, removables: 0 };
+  $("#optionSummary").innerHTML = `
+    <article><strong>${stats.groups}</strong><span>Grupos</span></article>
+    <article><strong>${stats.options}</strong><span>Opciones</span></article>
+    <article><strong>${stats.extras}</strong><span>Extras</span></article>
+    <article><strong>${stats.removables}</strong><span>Removibles</span></article>`;
+}
+
+function updateImagePreview() {
+  const url = String($("#imageUrl").value || "").trim();
+  const image = $("#imagePreview");
+  const placeholder = $("#imagePlaceholder");
+  if (!url) {
+    image.hidden = true;
+    image.removeAttribute("src");
+    placeholder.hidden = false;
+    return;
+  }
+  image.onload = () => { image.hidden = false; placeholder.hidden = true; };
+  image.onerror = () => { image.hidden = true; placeholder.hidden = false; };
+  image.src = url;
+}
+
+function fillProductForm(product = null, creating = false) {
+  state.creatingProduct = Boolean(creating);
+  state.selectedProductId = product?.id || null;
+  $("#productId").value = product?.id || "";
+  $("#nameEs").value = product?.name_es || "";
+  $("#nameEn").value = product?.name_en || "";
+  $("#basePrice").value = Number(product?.base_price || 0).toFixed(2);
+  $("#descriptionEs").value = product?.description_es || "";
+  $("#descriptionEn").value = product?.description_en || "";
+  $("#imageUrl").value = product?.image_url || "";
+  $("#visible").checked = product ? product.visible !== false : true;
+  $("#active").checked = product ? product.active !== false : true;
+  $("#taxable").checked = product ? product.taxable !== false : true;
+  $("#sortOrder").value = Number(product?.sort_order || 0);
+
+  const defaultCategory = product?.category_id
+    || (state.category !== "all" ? state.category : "")
+    || state.catalog.categories.find((category) => category.active)?.id
+    || state.catalog.categories[0]?.id || "";
+  renderProductCategoryOptions(defaultCategory);
+  renderOptionSummary(product?.id || "");
+  $("#drawerEyebrow").textContent = creating ? "Nuevo producto" : "Editar producto";
+  $("#drawerTitle").textContent = product?.name_es || "Nuevo producto";
+  $("#deleteProductButton").hidden = creating || !product?.id;
+  updateImagePreview();
+  setDirty(false);
+}
+
+function openProductDrawer(product = null, creating = false) {
+  if (!state.catalog.categories.length) {
+    toast("Primero necesitas al menos una categoría.", "error");
+    return;
+  }
+  fillProductForm(product, creating);
+  $("#drawerBackdrop").hidden = false;
+  $("#productDrawer").setAttribute("aria-hidden", "false");
+  document.body.classList.add("drawer-open");
+  setTimeout(() => $("#nameEs").focus(), 100);
+}
+
+function closeProductDrawer(force = false) {
+  if (!force && state.dirty && !confirm("Hay cambios sin guardar. ¿Quieres descartarlos?")) return;
+  $("#drawerBackdrop").hidden = true;
+  $("#productDrawer").setAttribute("aria-hidden", "true");
+  document.body.classList.remove("drawer-open");
+  state.selectedProductId = null;
+  state.creatingProduct = false;
+  setDirty(false);
+}
+
+function productPayload() {
+  const nameEs = String($("#nameEs").value || "").trim();
+  const nameEn = String($("#nameEn").value || "").trim() || nameEs;
+  const categoryId = String($("#productCategory").value || "").trim();
+  const price = Number($("#basePrice").value || 0);
+  if (!nameEs) throw new Error("Escribe el nombre en español.");
+  if (!categoryId) throw new Error("Selecciona una categoría.");
+  if (!Number.isFinite(price) || price < 0) throw new Error("Escribe un precio válido.");
+
+  const payload = {
+    categoryId,
+    nameEs,
+    nameEn,
+    descriptionEs: String($("#descriptionEs").value || "").trim(),
+    descriptionEn: String($("#descriptionEn").value || "").trim(),
+    basePrice: price,
+    imageUrl: String($("#imageUrl").value || "").trim(),
+    visible: $("#visible").checked,
+    active: $("#active").checked,
+    taxable: $("#taxable").checked,
+    featured: false,
+    sortOrder: Number($("#sortOrder").value || 0)
+  };
+  const id = String($("#productId").value || "").trim();
+  if (id) payload.id = id;
+  return payload;
+}
+
+async function saveProduct(event) {
+  event.preventDefault();
+  setBusy(true);
+  try {
+    const product = productPayload();
+    const action = state.creatingProduct ? "create_product" : "update_product";
+    const result = await callAdminCatalog(action, { product });
+    state.selectedProductId = result.product?.id || product.id || null;
+    state.creatingProduct = false;
+    setDirty(false);
+    await loadCatalog({ preserveSelection: true });
+    closeProductDrawer(true);
+    toast("Producto guardado correctamente.");
+  } catch (error) {
+    console.error(error);
+    toast(`No se pudo guardar. ${error.message || error}`, "error");
+  } finally { setBusy(false); }
+}
+
+async function deleteProduct() {
+  const productId = String($("#productId").value || "").trim();
+  if (!productId) return;
+  const product = state.catalog.products.find((candidate) => candidate.id === productId);
+  if (!confirm(`¿Eliminar definitivamente "${product?.name_es || productId}"?\n\nPara retirarlo temporalmente, usa el interruptor de visibilidad.`)) return;
+
+  setBusy(true);
+  try {
+    await callAdminCatalog("delete_product", { productId });
+    closeProductDrawer(true);
+    await loadCatalog({ preserveSelection: false });
+    toast("Producto eliminado.");
+  } catch (error) {
+    console.error(error);
+    toast(`No se pudo eliminar. ${error.message || error}`, "error");
+  } finally { setBusy(false); }
+}
+
+async function toggleVisibility(productId, visible) {
+  try {
+    await callAdminCatalog("set_product_visibility", { productId, visible });
+    const product = state.catalog.products.find((candidate) => candidate.id === productId);
+    if (product) product.visible = visible;
+    renderProducts();
+    toast(visible ? "Producto visible." : "Producto ocultado.");
+  } catch (error) {
+    console.error(error);
+    renderProducts();
+    toast(`No se pudo cambiar el estado. ${error.message || error}`, "error");
+  }
+}
+
+function fillCategoryForm(category) {
+  state.editingCategoryId = category.id;
+  $("#categoryId").value = category.id;
+  $("#categoryNameEs").value = category.name_es || "";
+  $("#categoryNameEn").value = category.name_en || "";
+  $("#categorySortOrder").value = Number(category.sort_order || 0);
+  $("#categoryActive").checked = category.active !== false;
+  $("#categoryModalTitle").textContent = category.name_es || "Categoría";
+}
+
+function openCategoryModal(category) {
+  fillCategoryForm(category);
+  $("#categoryModal").hidden = false;
+  document.body.classList.add("modal-open");
+  setTimeout(() => $("#categoryNameEs").focus(), 80);
+}
+
+function closeCategoryModal() {
+  $("#categoryModal").hidden = true;
+  document.body.classList.remove("modal-open");
+  state.editingCategoryId = null;
+}
+
+async function saveCategory(event) {
+  event.preventDefault();
+  const nameEs = String($("#categoryNameEs").value || "").trim();
+  const nameEn = String($("#categoryNameEn").value || "").trim() || nameEs;
+  if (!nameEs) { toast("Escribe el nombre de la categoría.", "error"); return; }
+
+  setBusy(true);
+  try {
+    await callAdminCatalog("update_category", {
+      category: {
+        id: String($("#categoryId").value || "").trim(),
+        nameEs,
+        nameEn,
+        sortOrder: Number($("#categorySortOrder").value || 0),
+        active: $("#categoryActive").checked
+      }
+    });
+    closeCategoryModal();
+    await loadCatalog({ preserveSelection: true });
+    toast("Categoría guardada correctamente.");
+  } catch (error) {
+    console.error(error);
+    toast(`No se pudo guardar la categoría. ${error.message || error}`, "error");
+  } finally { setBusy(false); }
+}
+
+async function login(event) {
+  event.preventDefault();
+  const input = $("#pinInput");
+  const error = $("#loginError");
+  const pin = String(input.value || "").trim();
+  error.hidden = true;
+  setBusy(true);
+  try {
+    await callAdminCatalog("list_catalog", {}, pin);
+    state.pin = pin;
+    input.value = "";
+    $("#loginScreen").hidden = true;
+    $("#appShell").hidden = false;
+    await loadCatalog({ preserveSelection: false });
+  } catch (loginError) {
+    console.error(loginError);
+    error.hidden = false;
+    error.textContent = loginError.status === 401 ? "PIN incorrecto." : `No se pudo entrar. ${loginError.message || loginError}`;
+    input.focus();
+    input.select();
+  } finally { setBusy(false); }
+}
+
+function logout() {
+  state.pin = "";
+  closeProductDrawer(true);
+  closeCategoryModal();
+  $("#appShell").hidden = true;
+  $("#loginScreen").hidden = false;
+  $("#pinInput").focus();
+}
+
+function init() {
+  $("#loginForm").addEventListener("submit", login);
+  $("#logoutButton").addEventListener("click", logout);
+  $$('[data-view]').forEach((button) => button.addEventListener("click", () => switchView(button.dataset.view)));
+  $("#mobileMenuButton").addEventListener("click", openMobileSidebar);
+  $("#mobileSidebarBackdrop").addEventListener("click", closeMobileSidebar);
+  $("#refreshButton").addEventListener("click", () => loadCatalog({ preserveSelection: true }).then(() => toast("Catálogo actualizado.")).catch((error) => toast(`No se pudo actualizar. ${error.message || error}`, "error")));
+  $("#addProductButton").addEventListener("click", () => openProductDrawer(null, true));
+  $$('[data-create-product]').forEach((button) => button.addEventListener("click", () => openProductDrawer(null, true)));
+  $("#productSearch").addEventListener("input", (event) => { state.query = event.target.value; renderProducts(); });
+  $("#categoryFilter").addEventListener("change", (event) => { state.category = event.target.value; renderProducts(); });
+  $("#statusFilter").addEventListener("change", (event) => { state.status = event.target.value; renderProducts(); });
+  $("#clearFiltersButton").addEventListener("click", () => {
+    state.query = ""; state.category = "all"; state.status = "all";
+    $("#productSearch").value = ""; $("#categoryFilter").value = "all"; $("#statusFilter").value = "all";
+    renderProducts();
+  });
+
+  document.addEventListener("click", (event) => {
+    const productButton = event.target.closest("[data-edit-product]");
+    if (productButton) {
+      const product = state.catalog.products.find((candidate) => candidate.id === productButton.dataset.editProduct);
+      if (product) openProductDrawer(product, false);
+      return;
+    }
+    const categoryButton = event.target.closest("[data-edit-category]");
+    if (categoryButton) {
+      const category = state.catalog.categories.find((candidate) => candidate.id === categoryButton.dataset.editCategory);
+      if (category) openCategoryModal(category);
+      return;
+    }
+    if (event.target.closest("[data-close-category-modal]")) closeCategoryModal();
+  });
+
+  document.addEventListener("change", (event) => {
+    const input = event.target.closest("[data-product-visible]");
+    if (input) toggleVisibility(input.dataset.productVisible, input.checked);
+  });
+
+  $("#closeDrawerButton").addEventListener("click", () => closeProductDrawer());
+  $("#drawerBackdrop").addEventListener("click", () => closeProductDrawer());
+  $("#cancelProductButton").addEventListener("click", () => closeProductDrawer());
+  $("#deleteProductButton").addEventListener("click", deleteProduct);
+  $("#productForm").addEventListener("submit", saveProduct);
+  $("#productForm").addEventListener("input", () => {
+    setDirty(true);
+    $("#drawerTitle").textContent = String($("#nameEs").value || "").trim() || "Nuevo producto";
+  });
+  $("#productForm").addEventListener("change", () => setDirty(true));
+  $("#imageUrl").addEventListener("input", updateImagePreview);
+  $("#categoryForm").addEventListener("submit", saveCategory);
+
+  document.addEventListener("keydown", (event) => {
+    if (event.key !== "Escape") return;
+    if (!$("#categoryModal").hidden) { closeCategoryModal(); return; }
+    if ($("#productDrawer").getAttribute("aria-hidden") === "false") { closeProductDrawer(); return; }
+    closeMobileSidebar();
+  });
+
+  window.addEventListener("beforeunload", (event) => {
+    if (!state.dirty) return;
+    event.preventDefault();
+    event.returnValue = "";
+  });
+  window.addEventListener("pagehide", () => { state.pin = ""; });
+  $("#pinInput").focus();
+}
+
+init();
