@@ -3,6 +3,38 @@ const $$ = (selector) => Array.from(document.querySelectorAll(selector));
 
 const money = (value) => `$${Number(value || 0).toFixed(2)}`;
 
+const fallbackStorage = new Map();
+function storageGet(key) {
+  try {
+    const value = window.storageGet(key);
+    if (value !== null) { fallbackStorage.set(key, value); return value; }
+  } catch (error) { console.warn("localStorage no disponible; se usará memoria temporal:", error); }
+  return fallbackStorage.has(key) ? fallbackStorage.get(key) : null;
+}
+function storageSet(key, value) {
+  const cleanValue = String(value); fallbackStorage.set(key, cleanValue);
+  try { window.localStorage.setItem(key, cleanValue); return true; }
+  catch (error) { console.warn("No se pudo escribir en localStorage; el dato queda en memoria:", error); return false; }
+}
+function sessionRemove(key) {
+  try { window.sessionStorage.removeItem(key); }
+  catch (error) { console.warn("sessionStorage no disponible:", error); }
+}
+function showAdminBootError(message) {
+  const error = document.querySelector("#pinError");
+  if (error) { error.hidden = false; error.textContent = String(message || "Error desconocido al iniciar el panel."); }
+}
+window.FOGON_ADMIN_BUILD = "46-storage-safe";
+window.addEventListener("error", (event) => {
+  const message = event?.error?.message || event?.message;
+  if (message) { console.error("Error general del panel:", event.error || event); showAdminBootError(`Error del panel: ${message}`); }
+});
+window.addEventListener("unhandledrejection", (event) => {
+  const message = event?.reason?.message || String(event?.reason || "Promesa rechazada");
+  console.error("Error asíncrono del panel:", event.reason); showAdminBootError(`Error del panel: ${message}`);
+});
+
+
 const STORAGE_ORDERS = "fogon_orders";
 const STORAGE_AVAILABILITY = "fogon_availability";
 const STORAGE_KITCHEN_HIDDEN = "fogon_kitchen_hidden";
@@ -84,7 +116,7 @@ let soundUnlocked = false;
 let lastNewOrderSignature = "";
 
 function applyAdminTheme() {
-  const theme = localStorage.getItem(STORAGE_ADMIN_THEME) || "dark";
+  const theme = storageGet(STORAGE_ADMIN_THEME) || "dark";
   const isDark = theme === "dark";
   document.body.classList.toggle("dark-mode", isDark);
   document.body.classList.toggle("light-mode", !isDark);
@@ -94,13 +126,13 @@ function applyAdminTheme() {
 
 function toggleAdminTheme() {
   const isDark = document.body.classList.contains("dark-mode");
-  localStorage.setItem(STORAGE_ADMIN_THEME, isDark ? "light" : "dark");
+  storageSet(STORAGE_ADMIN_THEME, isDark ? "light" : "dark");
   applyAdminTheme();
 }
 
 function safeParse(key, fallback) {
   try {
-    return JSON.parse(localStorage.getItem(key) || JSON.stringify(fallback));
+    return JSON.parse(storageGet(key) || JSON.stringify(fallback));
   } catch (_) {
     return fallback;
   }
@@ -111,7 +143,7 @@ function getOrders() {
 }
 
 function setOrders(orders) {
-  localStorage.setItem(STORAGE_ORDERS, JSON.stringify(orders));
+  storageSet(STORAGE_ORDERS, JSON.stringify(orders));
 }
 
 function saveOrders(orders) {
@@ -266,7 +298,7 @@ function getAdminPinOrThrow() {
 
 function clearAdminSession() {
   adminPinInMemory = "";
-  sessionStorage.removeItem("fogon_admin_unlocked");
+  sessionRemove("fogon_admin_unlocked");
 }
 
 async function backendRequest(path, options = {}) {
@@ -331,7 +363,7 @@ async function syncAvailabilityFromBackend() {
   if (db?.isReady()) {
     try {
       const availability = await db.fetchAvailability();
-      localStorage.setItem(STORAGE_AVAILABILITY, JSON.stringify(availability));
+      storageSet(STORAGE_AVAILABILITY, JSON.stringify(availability));
       renderAvailability();
       renderOrderModeButton();
     } catch (error) {
@@ -344,7 +376,7 @@ async function syncAvailabilityFromBackend() {
   try {
     const data = await backendRequest("/api/availability");
     if (data?.availability) {
-      localStorage.setItem(STORAGE_AVAILABILITY, JSON.stringify(data.availability));
+      storageSet(STORAGE_AVAILABILITY, JSON.stringify(data.availability));
       renderAvailability();
     }
   } catch (error) {
@@ -386,7 +418,7 @@ function getAvailability() {
 async function setAvailability(itemId, available) {
   const availability = getAvailability();
   availability[itemId] = available;
-  localStorage.setItem(STORAGE_AVAILABILITY, JSON.stringify(availability));
+  storageSet(STORAGE_AVAILABILITY, JSON.stringify(availability));
   renderAvailability();
 
   const db = window.FOGON_DB;
@@ -416,7 +448,7 @@ function getKitchenHiddenIds() {
 }
 
 function setKitchenHiddenIds(ids) {
-  localStorage.setItem(STORAGE_KITCHEN_HIDDEN, JSON.stringify(Array.from(new Set(ids))));
+  storageSet(STORAGE_KITCHEN_HIDDEN, JSON.stringify(Array.from(new Set(ids))));
 }
 
 function hideKitchenOrder(orderId) {
@@ -821,7 +853,12 @@ function renderKitchen() {
 function renderAvailability() {
   const availability = getAvailability();
   const query = availabilityQuery.trim().toLowerCase();
-  const menuItems = MENU_ITEMS.map((item) => ({
+  const menuDataItems =
+    typeof MENU_ITEMS !== "undefined" && Array.isArray(MENU_ITEMS)
+      ? MENU_ITEMS
+      : [];
+
+  const menuItems = menuDataItems.map((item) => ({
     id: item.id,
     es: item.es,
     en: item.en,
@@ -883,22 +920,25 @@ function switchTab(tabName) {
 function showAdminPanel() {
   const login = $("#adminLogin");
   const panel = $("#adminPanel");
-  if (login) {
-    login.hidden = true;
-    login.style.display = "none";
-  }
-  if (panel) {
-    panel.hidden = false;
-    panel.style.display = "";
-  }
-  unlockSound();
-  setTimeout(() => {
+  if (login) { login.hidden = true; login.style.display = "none"; }
+  if (panel) { panel.hidden = false; panel.style.display = ""; }
+  try {
     unlockSound();
-    if (newOrders().length) startAlarm();
-  }, 150);
-  renderAll();
-  syncOrdersFromBackend();
-  syncAvailabilityFromBackend();
+    setTimeout(() => {
+      try { unlockSound(); if (newOrders().length) startAlarm(); }
+      catch (error) { console.warn("No se pudo iniciar el sonido:", error); }
+    }, 150);
+    renderAll();
+  } catch (error) {
+    console.error("El panel abrió, pero una sección no pudo renderizarse:", error);
+    const banner = $("#soundBanner");
+    if (banner) {
+      banner.hidden = false;
+      banner.innerHTML = `<p><strong>El panel está abierto, pero una sección produjo un error.</strong><br>${escapeHtml(error?.message || error)}</p>`;
+    }
+  }
+  Promise.resolve(syncOrdersFromBackend()).catch((error) => console.warn("No se pudieron cargar inicialmente los pedidos:", error));
+  Promise.resolve(syncAvailabilityFromBackend()).catch((error) => console.warn("No se pudo cargar inicialmente la disponibilidad:", error));
 }
 
 function initLogin() {
@@ -942,8 +982,9 @@ function initLogin() {
 }
 
 function init() {
-  applyAdminTheme();
   initLogin();
+  try { applyAdminTheme(); }
+  catch (error) { console.warn("No se pudo aplicar el tema guardado:", error); document.body.classList.add("dark-mode"); }
   window.addEventListener("pagehide", clearAdminSession);
 
   document.addEventListener("pointerdown", unlockSound);
@@ -968,8 +1009,8 @@ function init() {
   if (clearOrdersBtn) {
     clearOrdersBtn.addEventListener("click", async () => {
       if (confirm("¿Limpiar todos los pedidos? Esto también borra las comandas de cocina.")) {
-        localStorage.setItem(STORAGE_ORDERS, "[]");
-        localStorage.setItem(STORAGE_KITCHEN_HIDDEN, "[]");
+        storageSet(STORAGE_ORDERS, "[]");
+        storageSet(STORAGE_KITCHEN_HIDDEN, "[]");
         renderAll();
 
         if (window.FOGON_DB?.isReady()) {
