@@ -2045,3 +2045,28 @@ body.light-mode .availability-group h3 {
     width: 100%;
   }
 }
+
+
+/* ===== PASO 1: confirmacion sin abrir carrito ===== */
+.added-to-cart-notice {
+  position: fixed;
+  left: 50%;
+  bottom: max(24px, env(safe-area-inset-bottom));
+  z-index: 90;
+  max-width: calc(100% - 32px);
+  border-radius: 999px;
+  padding: 12px 18px;
+  background: var(--ink);
+  color: var(--surface);
+  font-weight: 900;
+  box-shadow: var(--shadow);
+  opacity: 0;
+  pointer-events: none;
+  transform: translate(-50%, 18px);
+  transition: opacity 160ms ease, transform 160ms ease;
+}
+
+.added-to-cart-notice.is-visible {
+  opacity: 1;
+  transform: translate(-50%, 0);
+}
