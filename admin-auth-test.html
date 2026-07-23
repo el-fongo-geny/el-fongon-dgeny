@@ -1,82 +1,130 @@
-<!doctype html>
-<html lang="es">
-<head>
-  <meta charset="utf-8">
-  <meta name="robots" content="noindex,nofollow">
-  <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>Diagnóstico admin-auth</title>
-  <style>
-    body{font-family:system-ui,sans-serif;background:#f4f4f2;color:#1c1c1b;margin:0;padding:24px}
-    main{max-width:620px;margin:auto;background:#fff;border:1px solid #ddd;border-radius:16px;padding:22px}
-    label{display:grid;gap:7px;font-weight:700}
-    input,button{font:inherit;min-height:46px;border-radius:10px}
-    input{border:1px solid #bbb;padding:0 12px}
-    button{margin-top:12px;border:0;padding:0 16px;background:#c73520;color:#fff;font-weight:800}
-    pre{white-space:pre-wrap;background:#171717;color:#f5f5f5;border-radius:12px;padding:15px;min-height:90px}
-    .ok{color:#177245}.bad{color:#b42318}
-  </style>
-</head>
-<body>
-<main>
-  <h1>Probar acceso del administrador</h1>
-  <p>Esta página no guarda el PIN. Solo prueba la función <code>admin-auth</code>.</p>
-  <form id="testForm">
-    <label>PIN
-      <input id="testPin" type="password" inputmode="numeric" autocomplete="off" required>
-    </label>
-    <button type="submit">Probar admin-auth</button>
-  </form>
-  <h2>Resultado</h2>
-  <pre id="result">Esperando prueba…</pre>
-  <p><a href="admin.html">Volver al administrador</a></p>
-</main>
-<script src="supabase-config.js?v=18-mobile-fixed"></script>
-<script>
-const result = document.getElementById("result");
+const CORS_HEADERS = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers":
+    "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
+};
 
-function headersFor(key) {
-  const headers = {"Content-Type":"application/json","apikey":key};
-  if (key.startsWith("eyJ") && key.split(".").length === 3) {
-    headers.Authorization = `Bearer ${key}`;
-  }
-  return headers;
+function jsonResponse(payload: unknown, status = 200) {
+  return new Response(JSON.stringify(payload), {
+    status,
+    headers: {
+      ...CORS_HEADERS,
+      "Content-Type": "application/json; charset=utf-8",
+      "Cache-Control": "no-store",
+    },
+  });
 }
 
-document.getElementById("testForm").addEventListener("submit", async (event) => {
-  event.preventDefault();
-  const cfg = window.FOGON_SUPABASE || {};
-  const url = String(cfg.url || "").replace(/\/$/, "");
-  const key = String(cfg.anonKey || "").trim();
-  const pinInput = document.getElementById("testPin");
-  const pin = pinInput.value.trim();
-  pinInput.value = "";
+function constantTimeEqual(left: string, right: string) {
+  const encoder = new TextEncoder();
+  const leftBytes = encoder.encode(left);
+  const rightBytes = encoder.encode(right);
 
-  if (!url || !key) {
-    result.textContent = "ERROR: faltan url o anonKey en supabase-config.js";
-    result.className = "bad";
-    return;
+  const maxLength = Math.max(leftBytes.length, rightBytes.length);
+  let difference = leftBytes.length ^ rightBytes.length;
+
+  for (let index = 0; index < maxLength; index += 1) {
+    difference |=
+      (leftBytes[index] || 0) ^
+      (rightBytes[index] || 0);
   }
 
-  result.textContent = "Conectando…";
-  result.className = "";
+  return difference === 0;
+}
+
+Deno.serve(async (request) => {
+  if (request.method === "OPTIONS") {
+    return new Response("ok", {
+      headers: CORS_HEADERS,
+    });
+  }
+
+  if (request.method !== "POST") {
+    return jsonResponse(
+      {
+        ok: false,
+        error: "method_not_allowed",
+      },
+      405,
+    );
+  }
 
   try {
-    const response = await fetch(`${url}/functions/v1/admin-auth`, {
-      method: "POST",
-      mode: "cors",
-      cache: "no-store",
-      headers: headersFor(key),
-      body: JSON.stringify({adminPin: pin})
-    });
+    const body = await request
+      .json()
+      .catch(() => null) as
+      | Record<string, unknown>
+      | null;
 
-    const text = await response.text();
-    result.textContent = `HTTP ${response.status}\n${text || "(respuesta vacía)"}`;
-    result.className = response.ok ? "ok" : "bad";
+    if (!body) {
+      return jsonResponse(
+        {
+          ok: false,
+          error: "invalid_json",
+        },
+        400,
+      );
+    }
+
+    const expectedPin = String(
+      Deno.env.get("ADMIN_PIN") || "",
+    ).trim();
+
+    if (!expectedPin) {
+      console.error(
+        "Falta el Secret ADMIN_PIN.",
+      );
+
+      return jsonResponse(
+        {
+          ok: false,
+          error: "missing_admin_pin_secret",
+        },
+        500,
+      );
+    }
+
+    const receivedPin = String(
+      body.adminPin || "",
+    ).trim();
+
+    if (
+      !receivedPin ||
+      !constantTimeEqual(
+        receivedPin,
+        expectedPin,
+      )
+    ) {
+      return jsonResponse(
+        {
+          ok: false,
+          error: "invalid_admin_pin",
+        },
+        401,
+      );
+    }
+
+    return jsonResponse({
+      ok: true,
+      authenticated: true,
+    });
   } catch (error) {
-    result.textContent = `ERROR DE RED\n${error?.message || error}`;
-    result.className = "bad";
+    console.error(
+      "admin-auth error:",
+      error,
+    );
+
+    return jsonResponse(
+      {
+        ok: false,
+        error: "admin_auth_failed",
+        detail:
+          error instanceof Error
+            ? error.message
+            : String(error),
+      },
+      500,
+    );
   }
 });
-</script>
-</body>
-</html>
