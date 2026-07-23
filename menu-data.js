@@ -13,6 +13,7 @@ const UI_TEXT = {
     phoneNote: "Te avisaremos por WhatsApp o mensaje cuando tu pedido esté listo.",
     sendOrder: "Enviar pedido",
     addToCart: "Agregar",
+    addedToCart: "Añadido al carrito",
     notes: "Notas especiales",
     optional: "Opcional",
     required: "Obligatorio",
@@ -28,6 +29,7 @@ const UI_TEXT = {
     cashAtWindow: "Efectivo en ventanilla",
     orderSent: "Pedido enviado. Te avisaremos cuando esté listo.",
     delayWarning: "Aviso: tenemos más de tres pedidos pendientes o en preparación. Tu orden puede tardar un poco más de lo habitual.",
+    orderingClosed: "Los pedidos en linea estan cerrados ahora mismo. El horario habitual es de 11:00 a. m. a 8:30 p. m., hora de California.",
     unavailable: "Agotado",
     darkMode: "Modo oscuro",
     lightMode: "Modo claro"
@@ -44,6 +46,7 @@ const UI_TEXT = {
     phoneNote: "We will notify you by WhatsApp or text when your order is ready.",
     sendOrder: "Send order",
     addToCart: "Add",
+    addedToCart: "Added to cart",
     notes: "Special instructions",
     optional: "Optional",
     required: "Required",
@@ -59,6 +62,7 @@ const UI_TEXT = {
     cashAtWindow: "Cash at window",
     orderSent: "Order sent. We will notify you when it is ready.",
     delayWarning: "Notice: we have more than three orders pending or being prepared. Your order may take a little longer than usual.",
+    orderingClosed: "Online ordering is currently closed. Regular ordering hours are 11:00 AM to 8:30 PM, California time.",
     unavailable: "Sold out",
     darkMode: "Dark mode",
     lightMode: "Light mode"
@@ -289,11 +293,25 @@ const MENU_ITEMS = [
     category: "platos-fuertes",
     es: "Yaroa",
     en: "Yaroa",
-    description: { es: "Yaroa con base y proteína a elección.", en: "Yaroa with your choice of base and protein." },
-    price: 20,
+    description: {
+      es: "Yaroa pequeña o grande con base y proteína a elección.",
+      en: "Small or large Yaroa with your choice of base and protein."
+    },
+    price: 10,
     image: "assets/images/yaroa.png",
     taxable: true,
     optionGroups: [
+      {
+        id: "tamano",
+        es: "Tamaño",
+        en: "Size",
+        required: true,
+        type: "single",
+        options: [
+          { id: "pequena", es: "Pequeña", en: "Small", price: 0 },
+          { id: "grande", es: "Grande", en: "Large", price: 10 }
+        ]
+      },
       {
         id: "base",
         es: "Base",
