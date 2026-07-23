@@ -1,0 +1,188 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="robots" content="noindex, nofollow, noarchive">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#f6f6f3">
+  <title>Gestor del menú | El Fogón D' Geny</title>
+  <link rel="stylesheet" href="menu-admin.css?v=1">
+</head>
+<body>
+  <main id="loginScreen" class="login-screen">
+    <section class="login-card" aria-labelledby="loginTitle">
+      <div class="brand-mark" aria-hidden="true">FG</div>
+      <p class="eyebrow">El Fogón D' Geny</p>
+      <h1 id="loginTitle">Administrar menú</h1>
+      <p class="login-copy">Introduce el PIN privado para continuar.</p>
+      <form id="loginForm" class="login-form">
+        <label class="field">
+          <span>PIN de administrador</span>
+          <input id="pinInput" type="password" inputmode="numeric" autocomplete="off" placeholder="••••••" required>
+        </label>
+        <button id="loginButton" class="button button-primary button-large" type="submit">Entrar</button>
+        <p id="loginError" class="form-error" hidden></p>
+      </form>
+      <a class="quiet-link" href="admin.html">Volver al panel de pedidos</a>
+    </section>
+  </main>
+
+  <div id="appShell" class="app-shell" hidden>
+    <aside class="sidebar">
+      <div class="sidebar-brand">
+        <div class="brand-mark brand-mark-small" aria-hidden="true">FG</div>
+        <div><strong>El Fogón D' Geny</strong><span>Administración</span></div>
+      </div>
+      <nav class="sidebar-nav" aria-label="Secciones">
+        <button class="nav-item active" type="button" data-view="products">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v14H4zM8 9h8M8 13h5"/></svg>
+          <span>Productos</span>
+        </button>
+        <button class="nav-item" type="button" data-view="categories">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h6v6h-6z"/></svg>
+          <span>Categorías</span>
+        </button>
+      </nav>
+      <div class="sidebar-footer">
+        <a class="sidebar-link" href="admin.html">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 18l-6-6 6-6M3 12h14M17 5h4v14h-4"/></svg>
+          <span>Pedidos y cocina</span>
+        </a>
+        <button id="logoutButton" class="sidebar-link" type="button">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 18l6-6-6-6M21 12H7M7 5H3v14h4"/></svg>
+          <span>Cerrar sesión</span>
+        </button>
+      </div>
+    </aside>
+
+    <main class="workspace">
+      <header class="topbar">
+        <button id="mobileMenuButton" class="icon-button mobile-menu-button" type="button" aria-label="Abrir navegación">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
+        </button>
+        <div class="topbar-title"><p class="eyebrow">Administración del negocio</p><h1 id="pageTitle">Productos</h1></div>
+        <div class="topbar-actions">
+          <span id="syncStatus" class="sync-status"><span class="sync-dot"></span><span>Todo guardado</span></span>
+          <button id="refreshButton" class="button button-secondary" type="button">Actualizar</button>
+          <button id="addProductButton" class="button button-primary" type="button">Nuevo producto</button>
+        </div>
+      </header>
+
+      <div id="toastRegion" class="toast-region" aria-live="polite" aria-atomic="true"></div>
+
+      <section id="productsView" class="view">
+        <div class="summary-grid">
+          <article class="summary-card"><span>Total de productos</span><strong id="totalProducts">0</strong></article>
+          <article class="summary-card"><span>Visibles</span><strong id="visibleProducts">0</strong></article>
+          <article class="summary-card"><span>Ocultos</span><strong id="hiddenProducts">0</strong></article>
+        </div>
+
+        <section class="content-card">
+          <div class="toolbar">
+            <label class="search-box" for="productSearch">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg>
+              <input id="productSearch" type="search" placeholder="Buscar por nombre o descripción…">
+            </label>
+            <select id="categoryFilter" class="select-control" aria-label="Filtrar por categoría"><option value="all">Todas las categorías</option></select>
+            <select id="statusFilter" class="select-control" aria-label="Filtrar por estado">
+              <option value="all">Todos los estados</option><option value="visible">Visibles</option><option value="hidden">Ocultos</option><option value="inactive">Inactivos</option>
+            </select>
+            <button id="clearFiltersButton" class="button button-quiet" type="button">Limpiar filtros</button>
+          </div>
+
+          <div class="table-wrap">
+            <table class="data-table">
+              <thead><tr><th>Producto</th><th>Categoría</th><th>Precio</th><th>Estado</th><th class="align-right">Acciones</th></tr></thead>
+              <tbody id="productTableBody"></tbody>
+            </table>
+          </div>
+          <div id="productEmptyState" class="empty-state" hidden>
+            <div class="empty-icon" aria-hidden="true">⌕</div><h2>No encontramos productos</h2><p>Cambia los filtros o crea un producto nuevo.</p>
+            <button class="button button-primary" type="button" data-create-product>Crear producto</button>
+          </div>
+        </section>
+      </section>
+
+      <section id="categoriesView" class="view" hidden>
+        <section class="content-card">
+          <div class="section-heading">
+            <div><p class="eyebrow">Organización</p><h2>Categorías del menú</h2><p>Edita nombres, orden y estado.</p></div>
+          </div>
+          <div id="categoryList" class="category-list"></div>
+        </section>
+      </section>
+    </main>
+    <div id="mobileSidebarBackdrop" class="mobile-sidebar-backdrop" hidden></div>
+  </div>
+
+  <div id="drawerBackdrop" class="drawer-backdrop" hidden></div>
+  <aside id="productDrawer" class="editor-drawer" aria-hidden="true" aria-labelledby="drawerTitle">
+    <form id="productForm" class="drawer-form">
+      <header class="drawer-header">
+        <div><p id="drawerEyebrow" class="eyebrow">Editar producto</p><h2 id="drawerTitle">Producto</h2></div>
+        <button id="closeDrawerButton" class="icon-button" type="button" aria-label="Cerrar editor">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
+        </button>
+      </header>
+      <div class="drawer-body">
+        <input id="productId" type="hidden">
+        <section class="editor-section">
+          <div class="image-editor">
+            <div class="image-preview"><img id="imagePreview" alt="" hidden><div id="imagePlaceholder" class="image-placeholder">Sin imagen</div></div>
+            <label class="field field-grow"><span>Ruta o URL de la imagen</span><input id="imageUrl" type="text" placeholder="assets/images/plato.png"><small>Debe existir en GitHub o tener una URL pública.</small></label>
+          </div>
+        </section>
+        <section class="editor-section">
+          <div class="editor-section-heading"><span class="section-number">1</span><div><h3>Información principal</h3><p>Datos que verá el cliente.</p></div></div>
+          <div class="form-grid">
+            <label class="field"><span>Nombre en español *</span><input id="nameEs" type="text" maxlength="160" required></label>
+            <label class="field"><span>Nombre en inglés</span><input id="nameEn" type="text" maxlength="160"></label>
+            <label class="field"><span>Precio base *</span><div class="money-field"><span>$</span><input id="basePrice" type="number" min="0" step="0.01" inputmode="decimal" required></div></label>
+            <label class="field"><span>Categoría *</span><select id="productCategory" required></select></label>
+          </div>
+          <div class="form-grid form-grid-textarea">
+            <label class="field"><span>Descripción en español</span><textarea id="descriptionEs" rows="4" maxlength="2000"></textarea></label>
+            <label class="field"><span>Descripción en inglés</span><textarea id="descriptionEn" rows="4" maxlength="2000"></textarea></label>
+          </div>
+        </section>
+        <section class="editor-section">
+          <div class="editor-section-heading"><span class="section-number">2</span><div><h3>Estado</h3><p>Controla cómo aparece en el menú.</p></div></div>
+          <div class="switch-list">
+            <label class="switch-row"><span><strong>Visible en el menú</strong><small>Los clientes pueden encontrarlo.</small></span><input id="visible" type="checkbox"><span class="switch-control" aria-hidden="true"></span></label>
+            <label class="switch-row"><span><strong>Producto activo</strong><small>Permite seguir trabajando con este registro.</small></span><input id="active" type="checkbox"><span class="switch-control" aria-hidden="true"></span></label>
+            <label class="switch-row"><span><strong>Aplicar impuestos</strong><small>Incluye el producto en el cálculo del tax.</small></span><input id="taxable" type="checkbox"><span class="switch-control" aria-hidden="true"></span></label>
+          </div>
+          <label class="field compact-field"><span>Orden dentro de la categoría</span><input id="sortOrder" type="number" min="0" step="1" inputmode="numeric"></label>
+        </section>
+        <section class="editor-section">
+          <div class="editor-section-heading"><span class="section-number">3</span><div><h3>Opciones vinculadas</h3><p>Resumen de tamaños, proteínas y extras.</p></div></div>
+          <div id="optionSummary" class="option-summary"></div>
+          <p class="section-note">La edición visual de opciones será un módulo independiente para evitar cambios accidentales.</p>
+        </section>
+      </div>
+      <footer class="drawer-footer">
+        <button id="deleteProductButton" class="button button-danger" type="button">Eliminar</button>
+        <div class="drawer-footer-right"><button id="cancelProductButton" class="button button-secondary" type="button">Cancelar</button><button id="saveProductButton" class="button button-primary" type="submit">Guardar producto</button></div>
+      </footer>
+    </form>
+  </aside>
+
+  <div id="categoryModal" class="modal" hidden>
+    <div class="modal-backdrop" data-close-category-modal></div>
+    <form id="categoryForm" class="modal-card" role="dialog" aria-modal="true" aria-labelledby="categoryModalTitle">
+      <header class="modal-header"><div><p class="eyebrow">Editar categoría</p><h2 id="categoryModalTitle">Categoría</h2></div><button class="icon-button" type="button" data-close-category-modal aria-label="Cerrar"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button></header>
+      <div class="modal-body">
+        <input id="categoryId" type="hidden">
+        <label class="field"><span>Nombre en español *</span><input id="categoryNameEs" type="text" maxlength="160" required></label>
+        <label class="field"><span>Nombre en inglés</span><input id="categoryNameEn" type="text" maxlength="160"></label>
+        <label class="field"><span>Orden</span><input id="categorySortOrder" type="number" min="0" step="1"></label>
+        <label class="switch-row modal-switch"><span><strong>Categoría activa</strong><small>Permite mostrar sus productos.</small></span><input id="categoryActive" type="checkbox"><span class="switch-control" aria-hidden="true"></span></label>
+      </div>
+      <footer class="modal-footer"><button class="button button-secondary" type="button" data-close-category-modal>Cancelar</button><button class="button button-primary" type="submit">Guardar categoría</button></footer>
+    </form>
+  </div>
+
+  <script src="supabase-config.js?v=18-mobile-fixed"></script>
+  <script src="menu-admin.js?v=1"></script>
+</body>
+</html>
