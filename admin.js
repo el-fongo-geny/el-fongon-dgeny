@@ -7,8 +7,14 @@ const STORAGE_ORDERS = "fogon_orders";
 const STORAGE_AVAILABILITY = "fogon_availability";
 const STORAGE_KITCHEN_HIDDEN = "fogon_kitchen_hidden";
 const STORAGE_ADMIN_THEME = "fogon_admin_theme";
-const ADMIN_PIN = "5425";
 const BACKEND_URL = (window.FOGON_BACKEND_URL || "").replace(/\/$/, "");
+
+/*
+  El PIN no se escribe en este archivo ni se guarda en localStorage,
+  sessionStorage o cookies. Después de validarse en Supabase,
+  permanece únicamente en memoria durante esta carga de la página.
+*/
+let adminPinInMemory = "";
 const ORDER_MODE_MANUAL_KEY = "system:orders-manual";
 const ORDER_MODE_OPEN_KEY = "system:orders-open";
 
@@ -116,6 +122,105 @@ function setOrders(orders) {
 function saveOrders(orders) {
   setOrders(orders);
   renderAll();
+}
+
+
+function getSupabaseFunctionConfig() {
+  const cfg = window.FOGON_SUPABASE || {};
+  const supabaseUrl = String(cfg.url || "").replace(/\/$/, "");
+  const anonKey = String(cfg.anonKey || "").trim();
+
+  if (!supabaseUrl || !anonKey) {
+    throw new Error(
+      "Faltan la URL o la anon key de Supabase en supabase-config.js."
+    );
+  }
+
+  return { supabaseUrl, anonKey };
+}
+
+async function callAdminCatalog(action, adminPin, extraBody = {}) {
+  const { supabaseUrl, anonKey } = getSupabaseFunctionConfig();
+  const endpoint = `${supabaseUrl}/functions/v1/admin-catalog`;
+
+  const response = await fetch(endpoint, {
+    method: "POST",
+    mode: "cors",
+    cache: "no-store",
+    headers: {
+      "Content-Type": "application/json",
+      "apikey": anonKey,
+      "Authorization": `Bearer ${anonKey}`
+    },
+    body: JSON.stringify({
+      action,
+      adminPin,
+      ...extraBody
+    })
+  });
+
+  const rawText = await response.text();
+  let result = {};
+
+  try {
+    result = rawText ? JSON.parse(rawText) : {};
+  } catch (_) {
+    result = { detail: rawText };
+  }
+
+  if (!response.ok || !result?.ok) {
+    const reason = [
+      `HTTP ${response.status}`,
+      result?.error,
+      result?.detail
+    ].filter(Boolean).join(" · ");
+
+    const requestError = new Error(
+      reason || "La función admin-catalog rechazó la solicitud."
+    );
+
+    requestError.status = response.status;
+    requestError.payload = result;
+    throw requestError;
+  }
+
+  return result;
+}
+
+async function validateAdminPin(pin) {
+  const cleanPin = String(pin || "").trim();
+
+  if (!cleanPin) {
+    throw new Error("Escribe el PIN.");
+  }
+
+  /*
+    admin-catalog compara este valor con el Secret ADMIN_PIN
+    almacenado dentro de Supabase.
+  */
+  await callAdminCatalog("list_catalog", cleanPin);
+
+  return cleanPin;
+}
+
+function getAdminPinOrThrow() {
+  if (!adminPinInMemory) {
+    throw new Error(
+      "La sesión de administrador terminó. Recarga la página e introduce el PIN nuevamente."
+    );
+  }
+
+  return adminPinInMemory;
+}
+
+function clearAdminSession() {
+  adminPinInMemory = "";
+
+  /*
+    Elimina cualquier marca que pudiera haber quedado guardada
+    por versiones antiguas del administrador.
+  */
+  sessionStorage.removeItem("fogon_admin_unlocked");
 }
 
 async function backendRequest(path, options = {}) {
@@ -494,7 +599,7 @@ async function sendReadyNotification(orderId) {
       body: JSON.stringify({
         orderId: order.databaseId || order.id,
         publicId: Number(order.id) || null,
-        adminPin: ADMIN_PIN
+        adminPin: getAdminPinOrThrow()
       })
     });
 
@@ -755,48 +860,98 @@ function initLogin() {
   const input = $("#pinInput");
   const loginButton = $("#loginButton");
   const error = $("#pinError");
-  if (!form) {
-    showAdminPanel();
+
+  /*
+    Cada recarga exige introducir el PIN otra vez.
+    No se recupera una sesión desde el almacenamiento del navegador.
+  */
+  clearAdminSession();
+
+  if (!form || !input) {
+    console.error("Falta el formulario de acceso del administrador.");
     return;
   }
 
-  function tryLogin(event) {
+  async function tryLogin(event) {
     if (event) event.preventDefault();
-    unlockSound();
-    const value = String(input?.value || "").trim();
-    if (value !== ADMIN_PIN) {
-      if (error) error.hidden = false;
-      if (input) {
-        input.focus();
-        input.select();
-      }
-      return false;
-    }
-    if (error) error.hidden = true;
-    sessionStorage.setItem("fogon_admin_unlocked", "true");
-    showAdminPanel();
-    beep();
-    return true;
-  }
 
-  if (sessionStorage.getItem("fogon_admin_unlocked") === "true") {
-    showAdminPanel();
-    return;
+    unlockSound();
+
+    const value = String(input.value || "").trim();
+
+    if (error) {
+      error.hidden = true;
+      error.textContent = "";
+    }
+
+    if (loginButton) {
+      loginButton.disabled = true;
+      loginButton.textContent = "Comprobando...";
+    }
+
+    input.disabled = true;
+
+    try {
+      /*
+        El PIN se compara dentro de admin-catalog,
+        no dentro del JavaScript público.
+      */
+      const validatedPin = await validateAdminPin(value);
+
+      /*
+        El PIN permanece únicamente en memoria.
+      */
+      adminPinInMemory = validatedPin;
+      input.value = "";
+
+      showAdminPanel();
+      beep();
+      return true;
+    } catch (loginError) {
+      console.error("Acceso administrativo rechazado:", loginError);
+
+      if (error) {
+        error.hidden = false;
+        error.textContent =
+          loginError?.status === 401
+            ? "PIN incorrecto."
+            : `No se pudo validar el PIN. ${loginError?.message || loginError}`;
+      }
+
+      input.focus();
+      input.select();
+      return false;
+    } finally {
+      input.disabled = false;
+
+      if (loginButton) {
+        loginButton.disabled = false;
+        loginButton.textContent = "Entrar";
+      }
+    }
   }
 
   form.addEventListener("submit", tryLogin);
-  if (loginButton) loginButton.addEventListener("click", tryLogin);
-  if (input) {
-    input.addEventListener("keydown", (event) => {
-      if (event.key === "Enter") tryLogin(event);
-    });
-    input.focus();
+
+  if (loginButton) {
+    loginButton.addEventListener("click", tryLogin);
   }
+
+  input.addEventListener("keydown", (event) => {
+    if (event.key === "Enter") {
+      tryLogin(event);
+    }
+  });
+
+  input.focus();
 }
 
 function init() {
   applyAdminTheme();
   initLogin();
+
+  window.addEventListener("pagehide", clearAdminSession);
+  window.addEventListener("beforeunload", clearAdminSession);
 
   document.addEventListener("pointerdown", unlockSound);
   document.addEventListener("keydown", unlockSound);
