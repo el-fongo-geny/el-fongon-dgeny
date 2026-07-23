@@ -4,35 +4,66 @@ const $$ = (selector) => Array.from(document.querySelectorAll(selector));
 const money = (value) => `$${Number(value || 0).toFixed(2)}`;
 
 const fallbackStorage = new Map();
-function storageGet(key) {
+
+function safeLocalGet(key) {
   try {
-    const value = window.storageGet(key);
-    if (value !== null) { fallbackStorage.set(key, value); return value; }
-  } catch (error) { console.warn("localStorage no disponible; se usará memoria temporal:", error); }
-  return fallbackStorage.has(key) ? fallbackStorage.get(key) : null;
+    const value = window.safeLocalGet(key);
+
+    if (value !== null) {
+      fallbackStorage.set(key, value);
+    }
+
+    return value;
+  } catch (error) {
+    console.warn("localStorage bloqueado; usando memoria temporal:", error);
+
+    return fallbackStorage.has(key)
+      ? fallbackStorage.get(key)
+      : null;
+  }
 }
-function storageSet(key, value) {
-  const cleanValue = String(value); fallbackStorage.set(key, cleanValue);
-  try { window.localStorage.setItem(key, cleanValue); return true; }
-  catch (error) { console.warn("No se pudo escribir en localStorage; el dato queda en memoria:", error); return false; }
+
+function safeLocalSet(key, value) {
+  const cleanValue = String(value);
+  fallbackStorage.set(key, cleanValue);
+
+  try {
+    window.localStorage.setItem(key, cleanValue);
+    return true;
+  } catch (error) {
+    console.warn(
+      "No se pudo escribir en localStorage; se conserva en memoria:",
+      error
+    );
+
+    return false;
+  }
 }
-function sessionRemove(key) {
-  try { window.sessionStorage.removeItem(key); }
-  catch (error) { console.warn("sessionStorage no disponible:", error); }
+
+function safeSessionRemove(key) {
+  try {
+    window.sessionStorage.removeItem(key);
+  } catch (error) {
+    console.warn("sessionStorage bloqueado:", error);
+  }
 }
-function showAdminBootError(message) {
-  const error = document.querySelector("#pinError");
-  if (error) { error.hidden = false; error.textContent = String(message || "Error desconocido al iniciar el panel."); }
+
+function showLoginRuntimeError(error) {
+  const message =
+    error?.message ||
+    String(error || "Error desconocido");
+
+  const errorBox = document.querySelector("#pinError");
+
+  if (errorBox) {
+    errorBox.hidden = false;
+    errorBox.textContent = `Error del panel: ${message}`;
+  }
+
+  console.error("Error del administrador:", error);
 }
-window.FOGON_ADMIN_BUILD = "46-storage-safe";
-window.addEventListener("error", (event) => {
-  const message = event?.error?.message || event?.message;
-  if (message) { console.error("Error general del panel:", event.error || event); showAdminBootError(`Error del panel: ${message}`); }
-});
-window.addEventListener("unhandledrejection", (event) => {
-  const message = event?.reason?.message || String(event?.reason || "Promesa rechazada");
-  console.error("Error asíncrono del panel:", event.reason); showAdminBootError(`Error del panel: ${message}`);
-});
+
+window.FOGON_ADMIN_BUILD = "47-login-first";
 
 
 const STORAGE_ORDERS = "fogon_orders";
@@ -116,7 +147,7 @@ let soundUnlocked = false;
 let lastNewOrderSignature = "";
 
 function applyAdminTheme() {
-  const theme = storageGet(STORAGE_ADMIN_THEME) || "dark";
+  const theme = safeLocalGet(STORAGE_ADMIN_THEME) || "dark";
   const isDark = theme === "dark";
   document.body.classList.toggle("dark-mode", isDark);
   document.body.classList.toggle("light-mode", !isDark);
@@ -126,13 +157,13 @@ function applyAdminTheme() {
 
 function toggleAdminTheme() {
   const isDark = document.body.classList.contains("dark-mode");
-  storageSet(STORAGE_ADMIN_THEME, isDark ? "light" : "dark");
+  safeLocalSet(STORAGE_ADMIN_THEME, isDark ? "light" : "dark");
   applyAdminTheme();
 }
 
 function safeParse(key, fallback) {
   try {
-    return JSON.parse(storageGet(key) || JSON.stringify(fallback));
+    return JSON.parse(safeLocalGet(key) || JSON.stringify(fallback));
   } catch (_) {
     return fallback;
   }
@@ -143,7 +174,7 @@ function getOrders() {
 }
 
 function setOrders(orders) {
-  storageSet(STORAGE_ORDERS, JSON.stringify(orders));
+  safeLocalSet(STORAGE_ORDERS, JSON.stringify(orders));
 }
 
 function saveOrders(orders) {
@@ -298,7 +329,7 @@ function getAdminPinOrThrow() {
 
 function clearAdminSession() {
   adminPinInMemory = "";
-  sessionRemove("fogon_admin_unlocked");
+  safeSessionRemove("fogon_admin_unlocked");
 }
 
 async function backendRequest(path, options = {}) {
@@ -363,7 +394,7 @@ async function syncAvailabilityFromBackend() {
   if (db?.isReady()) {
     try {
       const availability = await db.fetchAvailability();
-      storageSet(STORAGE_AVAILABILITY, JSON.stringify(availability));
+      safeLocalSet(STORAGE_AVAILABILITY, JSON.stringify(availability));
       renderAvailability();
       renderOrderModeButton();
     } catch (error) {
@@ -376,7 +407,7 @@ async function syncAvailabilityFromBackend() {
   try {
     const data = await backendRequest("/api/availability");
     if (data?.availability) {
-      storageSet(STORAGE_AVAILABILITY, JSON.stringify(data.availability));
+      safeLocalSet(STORAGE_AVAILABILITY, JSON.stringify(data.availability));
       renderAvailability();
     }
   } catch (error) {
@@ -418,7 +449,7 @@ function getAvailability() {
 async function setAvailability(itemId, available) {
   const availability = getAvailability();
   availability[itemId] = available;
-  storageSet(STORAGE_AVAILABILITY, JSON.stringify(availability));
+  safeLocalSet(STORAGE_AVAILABILITY, JSON.stringify(availability));
   renderAvailability();
 
   const db = window.FOGON_DB;
@@ -448,7 +479,7 @@ function getKitchenHiddenIds() {
 }
 
 function setKitchenHiddenIds(ids) {
-  storageSet(STORAGE_KITCHEN_HIDDEN, JSON.stringify(Array.from(new Set(ids))));
+  safeLocalSet(STORAGE_KITCHEN_HIDDEN, JSON.stringify(Array.from(new Set(ids))));
 }
 
 function hideKitchenOrder(orderId) {
@@ -853,12 +884,12 @@ function renderKitchen() {
 function renderAvailability() {
   const availability = getAvailability();
   const query = availabilityQuery.trim().toLowerCase();
-  const menuDataItems =
+  const menuSource =
     typeof MENU_ITEMS !== "undefined" && Array.isArray(MENU_ITEMS)
       ? MENU_ITEMS
       : [];
 
-  const menuItems = menuDataItems.map((item) => ({
+  const menuItems = menuSource.map((item) => ({
     id: item.id,
     es: item.es,
     en: item.en,
@@ -920,25 +951,57 @@ function switchTab(tabName) {
 function showAdminPanel() {
   const login = $("#adminLogin");
   const panel = $("#adminPanel");
-  if (login) { login.hidden = true; login.style.display = "none"; }
-  if (panel) { panel.hidden = false; panel.style.display = ""; }
-  try {
-    unlockSound();
-    setTimeout(() => {
-      try { unlockSound(); if (newOrders().length) startAlarm(); }
-      catch (error) { console.warn("No se pudo iniciar el sonido:", error); }
-    }, 150);
-    renderAll();
-  } catch (error) {
-    console.error("El panel abrió, pero una sección no pudo renderizarse:", error);
-    const banner = $("#soundBanner");
-    if (banner) {
-      banner.hidden = false;
-      banner.innerHTML = `<p><strong>El panel está abierto, pero una sección produjo un error.</strong><br>${escapeHtml(error?.message || error)}</p>`;
-    }
+
+  if (login) {
+    login.hidden = true;
+    login.style.display = "none";
   }
-  Promise.resolve(syncOrdersFromBackend()).catch((error) => console.warn("No se pudieron cargar inicialmente los pedidos:", error));
-  Promise.resolve(syncAvailabilityFromBackend()).catch((error) => console.warn("No se pudo cargar inicialmente la disponibilidad:", error));
+
+  if (panel) {
+    panel.hidden = false;
+    panel.style.display = "";
+  }
+
+  /*
+    La interfaz ya está abierta. Pedidos, sonido y disponibilidad
+    se inicializan después y no pueden volver a bloquear el acceso.
+  */
+  setTimeout(() => {
+    try {
+      unlockSound();
+      renderAll();
+
+      if (newOrders().length) {
+        startAlarm();
+      }
+    } catch (error) {
+      console.error(
+        "Una sección secundaria no pudo iniciarse:",
+        error
+      );
+
+      const banner = $("#soundBanner");
+
+      if (banner) {
+        banner.hidden = false;
+        banner.innerHTML = `
+          <p>
+            <strong>El panel abrió correctamente.</strong><br>
+            Una sección secundaria produjo este error:
+            ${escapeHtml(error?.message || error)}
+          </p>
+        `;
+      }
+    }
+
+    Promise.resolve(syncOrdersFromBackend()).catch((error) => {
+      console.warn("No se pudieron cargar los pedidos:", error);
+    });
+
+    Promise.resolve(syncAvailabilityFromBackend()).catch((error) => {
+      console.warn("No se pudo cargar la disponibilidad:", error);
+    });
+  }, 0);
 }
 
 function initLogin() {
@@ -946,45 +1009,100 @@ function initLogin() {
   const input = $("#pinInput");
   const loginButton = $("#loginButton");
   const error = $("#pinError");
+
   clearAdminSession();
-  if (!form || !input) return;
+
+  if (!form || !input || !loginButton) {
+    showLoginRuntimeError(
+      new Error("Faltan elementos del formulario de acceso.")
+    );
+
+    return;
+  }
+
+  let loginRunning = false;
 
   async function tryLogin(event) {
-    if (event) event.preventDefault();
-    unlockSound();
+    if (event) {
+      event.preventDefault();
+      event.stopPropagation();
+    }
+
+    if (loginRunning) {
+      return false;
+    }
+
+    loginRunning = true;
+
     const value = String(input.value || "").trim();
-    if (error) { error.hidden = true; error.textContent = ""; }
+
+    if (error) {
+      error.hidden = true;
+      error.textContent = "";
+    }
+
     input.disabled = true;
-    if (loginButton) { loginButton.disabled = true; loginButton.textContent = "Comprobando…"; }
+    loginButton.disabled = true;
+    loginButton.textContent = "Comprobando…";
+
     try {
-      adminPinInMemory = await validateAdminPin(value);
+      const validatedPin = await validateAdminPin(value);
+
+      adminPinInMemory = validatedPin;
       input.value = "";
+
       showAdminPanel();
-      beep();
       return true;
     } catch (loginError) {
       console.error("Acceso rechazado:", loginError);
+
       if (error) {
         error.hidden = false;
-        error.textContent = adminLoginErrorMessage(loginError);
+        error.textContent =
+          adminLoginErrorMessage(loginError);
       }
+
       input.focus();
       input.select();
       return false;
     } finally {
+      loginRunning = false;
       input.disabled = false;
-      if (loginButton) { loginButton.disabled = false; loginButton.textContent = "Entrar"; }
+      loginButton.disabled = false;
+      loginButton.textContent = "Entrar";
     }
   }
 
+  loginButton.addEventListener("click", tryLogin);
   form.addEventListener("submit", tryLogin);
+
+  input.addEventListener("keydown", (event) => {
+    if (event.key === "Enter") {
+      tryLogin(event);
+    }
+  });
+
   input.focus();
 }
 
 function init() {
-  initLogin();
-  try { applyAdminTheme(); }
-  catch (error) { console.warn("No se pudo aplicar el tema guardado:", error); document.body.classList.add("dark-mode"); }
+  /*
+    El acceso se conecta antes que cualquier preferencia o sección.
+  */
+  try {
+    initLogin();
+  } catch (error) {
+    showLoginRuntimeError(error);
+    return;
+  }
+
+  try {
+    applyAdminTheme();
+  } catch (error) {
+    console.warn("No se pudo aplicar el tema:", error);
+    document.body.classList.add("dark-mode");
+  }
+
   window.addEventListener("pagehide", clearAdminSession);
 
   document.addEventListener("pointerdown", unlockSound);
@@ -1009,8 +1127,8 @@ function init() {
   if (clearOrdersBtn) {
     clearOrdersBtn.addEventListener("click", async () => {
       if (confirm("¿Limpiar todos los pedidos? Esto también borra las comandas de cocina.")) {
-        storageSet(STORAGE_ORDERS, "[]");
-        storageSet(STORAGE_KITCHEN_HIDDEN, "[]");
+        safeLocalSet(STORAGE_ORDERS, "[]");
+        safeLocalSet(STORAGE_KITCHEN_HIDDEN, "[]");
         renderAll();
 
         if (window.FOGON_DB?.isReady()) {
@@ -1085,5 +1203,16 @@ function init() {
     if (window.FOGON_DB?.isReady() || BACKEND_URL) syncAvailabilityFromBackend();
   }, 6000);
 }
+window.addEventListener("error", (event) => {
+  if (event?.error) {
+    showLoginRuntimeError(event.error);
+  }
+});
+
+window.addEventListener("unhandledrejection", (event) => {
+  if (event?.reason) {
+    showLoginRuntimeError(event.reason);
+  }
+});
 
 init();
