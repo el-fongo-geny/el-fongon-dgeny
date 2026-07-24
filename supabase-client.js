@@ -72,7 +72,15 @@
       kitchenHidden: Boolean(row.kitchen_hidden),
       whatsappSent: Boolean(row.whatsapp_sent),
       cloverSynced: Boolean(row.clover_synced),
-      cloverOrderId: row.clover_order_id || null
+      cloverOrderId: row.clover_order_id || null,
+      twilioMessageSid: row.twilio_message_sid || null,
+      twilioStatus: row.twilio_status || "",
+      twilioErrorCode: row.twilio_error_code || null,
+      twilioErrorMessage: row.twilio_error_message || null,
+      twilioSentAt: row.twilio_sent_at || null,
+      twilioDeliveredAt: row.twilio_delivered_at || null,
+      twilioLastAttemptAt: row.twilio_last_attempt_at || null,
+      twilioAttempts: Number(row.twilio_attempts || 0)
     };
   }
 
