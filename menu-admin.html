@@ -6,7 +6,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#f6f6f3">
   <title>Gestor del menú | El Fogón D' Geny</title>
-  <link rel="stylesheet" href="menu-admin.css?v=6-image-editor-20260724">
+  <link rel="stylesheet" href="menu-admin.css?v=7-smart-image-fit-20260724">
 </head>
 <body>
   <main id="loginScreen" class="login-screen">
@@ -267,7 +267,7 @@
         <div>
           <p class="eyebrow">Editor de imagen</p>
           <h2 id="imageCropTitle">Ajustar imagen al menú</h2>
-          <p>Salida final: 1280 × 1114 px. La zona central marcada es la que siempre se conserva en móvil.</p>
+          <p>Salida final: 1280 × 1114 px. “Ajuste recomendado” es el modo ideal para fotos verticales como Tres Golpes.</p>
         </div>
         <button id="closeImageCropButton" class="icon-button" type="button" aria-label="Cerrar editor">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
@@ -285,10 +285,14 @@
         <aside class="image-crop-controls">
           <fieldset class="crop-control-group">
             <legend>Cómo adaptar la foto</legend>
-            <div class="crop-mode-buttons">
-              <button class="crop-mode-button active" type="button" data-crop-mode="contain" aria-pressed="true">
+            <div class="crop-mode-buttons crop-mode-buttons-three">
+              <button class="crop-mode-button" type="button" data-crop-mode="contain" aria-pressed="false">
                 <strong>Mostrar completa</strong>
-                <span>No corta el plato. Completa el fondo.</span>
+                <span>No corta nada, pero puede dejar más fondo lateral.</span>
+              </button>
+              <button class="crop-mode-button active crop-mode-recommended" type="button" data-crop-mode="balanced" aria-pressed="true">
+                <strong>Ajuste recomendado</strong>
+                <span>Amplía el plato y recorta solo una parte pequeña.</span>
               </button>
               <button class="crop-mode-button" type="button" data-crop-mode="cover" aria-pressed="false">
                 <strong>Rellenar y recortar</strong>
@@ -355,6 +359,6 @@
   </div>
 
   <script src="supabase-config.js?v=18-mobile-fixed"></script>
-  <script src="menu-admin.js?v=6-image-editor-20260724"></script>
+  <script src="menu-admin.js?v=7-smart-image-fit-20260724"></script>
 </body>
 </html>
