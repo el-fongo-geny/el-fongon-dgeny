@@ -1,6 +1,6 @@
 const state = {
   lang: localStorage.getItem("fogon_lang") || "",
-  category: CATEGORIES[0].id,
+  category: Array.isArray(CATEGORIES) && CATEGORIES.length ? CATEGORIES[0].id : "",
   cart: [],
   currentProduct: null,
   pendingOrder: null,
@@ -78,6 +78,303 @@ const text = (key) => UI_TEXT[state.lang || "es"][key] || key;
 const itemName = (item) => item[state.lang] || item.es;
 const itemDescription = (item) => item.description?.[state.lang] || item.description?.es || "";
 let lastAvailabilitySnapshot = localStorage.getItem("fogon_availability") || "{}";
+
+let publicCatalogSnapshot = "";
+
+function publicCatalogFunctionConfig() {
+  const cfg = window.FOGON_SUPABASE || {};
+  const supabaseUrl = String(cfg.url || "").replace(/\/$/, "");
+  const anonKey = String(cfg.anonKey || "").trim();
+
+  if (!supabaseUrl || !anonKey) {
+    throw new Error("Faltan la URL o la anon key de Supabase.");
+  }
+
+  return { supabaseUrl, anonKey };
+}
+
+function publicCatalogHeaders(anonKey) {
+  const headers = {
+    "Content-Type": "application/json",
+    "apikey": anonKey
+  };
+
+  const looksLikeJwt =
+    anonKey.startsWith("eyJ") &&
+    anonKey.split(".").length === 3;
+
+  if (looksLikeJwt) {
+    headers.Authorization = `Bearer ${anonKey}`;
+  }
+
+  return headers;
+}
+
+function rowHas(object, key) {
+  return Object.prototype.hasOwnProperty.call(object || {}, key);
+}
+
+function rowBoolean(row, key, fallback = true) {
+  if (!rowHas(row, key) || row[key] == null) return fallback;
+  return row[key] !== false;
+}
+
+function rowNumber(row, keys, fallback = 0) {
+  for (const key of keys) {
+    if (!rowHas(row, key)) continue;
+    const value = Number(row[key]);
+    if (Number.isFinite(value)) return value;
+  }
+  return Number(fallback || 0);
+}
+
+function rowText(row, keys, fallback = "") {
+  for (const key of keys) {
+    if (!rowHas(row, key)) continue;
+    const value = row[key];
+    if (value == null) return "";
+    return String(value);
+  }
+  return String(fallback || "");
+}
+
+function normalizeCatalogArray(value) {
+  return Array.isArray(value) ? value : [];
+}
+
+function catalogSortValue(row) {
+  return rowNumber(row, ["sort_order", "sortOrder"], 0);
+}
+
+function mapCatalogOption(row) {
+  return {
+    id: String(row.id || ""),
+    es: rowText(row, ["name_es", "es"], String(row.id || "")),
+    en: rowText(row, ["name_en", "en"], rowText(row, ["name_es", "es"], String(row.id || ""))),
+    price: rowNumber(row, ["price_delta", "price", "additional_price", "base_price"], 0),
+    sortOrder: catalogSortValue(row)
+  };
+}
+
+function mapCatalogExtra(row) {
+  return {
+    id: String(row.id || ""),
+    es: rowText(row, ["name_es", "es"], String(row.id || "")),
+    en: rowText(row, ["name_en", "en"], rowText(row, ["name_es", "es"], String(row.id || ""))),
+    price: rowNumber(row, ["price", "price_delta", "additional_price", "base_price"], 0),
+    sortOrder: catalogSortValue(row)
+  };
+}
+
+function mapCatalogRemovable(row) {
+  return {
+    id: String(row.id || ""),
+    es: rowText(row, ["name_es", "es"], String(row.id || "")),
+    en: rowText(row, ["name_en", "en"], rowText(row, ["name_es", "es"], String(row.id || ""))),
+    sortOrder: catalogSortValue(row)
+  };
+}
+
+function buildMenuFromPublicCatalog(catalog) {
+  const categoryRows = normalizeCatalogArray(catalog?.categories)
+    .filter((row) => row && row.id && rowBoolean(row, "active", true))
+    .sort((a, b) => catalogSortValue(a) - catalogSortValue(b));
+
+  const productRows = normalizeCatalogArray(catalog?.products)
+    .filter((row) => row && row.id && rowBoolean(row, "active", true) && rowBoolean(row, "visible", true));
+
+  if (!categoryRows.length || !productRows.length) {
+    throw new Error("Supabase devolvió un catálogo vacío.");
+  }
+
+  const fallbackProducts = new Map(
+    normalizeCatalogArray(MENU_ITEMS).map((item) => [String(item.id), item])
+  );
+
+  const groupRows = normalizeCatalogArray(catalog?.optionGroups)
+    .filter((row) => row && row.id && row.product_id && rowBoolean(row, "active", true));
+
+  const optionRows = normalizeCatalogArray(catalog?.options)
+    .filter((row) => row && row.id && row.option_group_id && rowBoolean(row, "active", true));
+
+  const extraRows = normalizeCatalogArray(catalog?.extras)
+    .filter((row) => row && row.id && rowBoolean(row, "active", true));
+
+  const productExtraRows = normalizeCatalogArray(catalog?.productExtras)
+    .filter((row) => row && row.product_id && row.extra_id);
+
+  const removableRows = normalizeCatalogArray(catalog?.removables)
+    .filter((row) => row && row.id && rowBoolean(row, "active", true));
+
+  const productRemovableRows = normalizeCatalogArray(catalog?.productRemovables)
+    .filter((row) => row && row.product_id && row.removable_id);
+
+  const optionsByGroup = new Map();
+  optionRows.forEach((row) => {
+    const groupId = String(row.option_group_id);
+    if (!optionsByGroup.has(groupId)) optionsByGroup.set(groupId, []);
+    optionsByGroup.get(groupId).push(row);
+  });
+
+  const groupsByProduct = new Map();
+  groupRows.forEach((row) => {
+    const productId = String(row.product_id);
+    if (!groupsByProduct.has(productId)) groupsByProduct.set(productId, []);
+    groupsByProduct.get(productId).push(row);
+  });
+
+  const extrasById = new Map(extraRows.map((row) => [String(row.id), row]));
+  const removablesById = new Map(removableRows.map((row) => [String(row.id), row]));
+
+  const categoryOrder = new Map(
+    categoryRows.map((row, index) => [String(row.id), index])
+  );
+
+  const categories = categoryRows.map((row) => ({
+    id: String(row.id),
+    es: rowText(row, ["name_es", "es"], String(row.id)),
+    en: rowText(row, ["name_en", "en"], rowText(row, ["name_es", "es"], String(row.id)))
+  }));
+
+  const products = productRows
+    .map((row) => {
+      const productId = String(row.id);
+      const fallback = fallbackProducts.get(productId) || {};
+
+      const databaseGroups = (groupsByProduct.get(productId) || [])
+        .sort((a, b) => catalogSortValue(a) - catalogSortValue(b))
+        .map((groupRow) => {
+          const groupId = String(groupRow.id);
+          const options = (optionsByGroup.get(groupId) || [])
+            .sort((a, b) => catalogSortValue(a) - catalogSortValue(b))
+            .map(mapCatalogOption);
+
+          return {
+            id: groupId,
+            es: rowText(groupRow, ["name_es", "es"], groupId),
+            en: rowText(groupRow, ["name_en", "en"], rowText(groupRow, ["name_es", "es"], groupId)),
+            required: rowBoolean(groupRow, "required", false),
+            type: /multi|checkbox/i.test(rowText(groupRow, ["type", "selection_type"], "single"))
+              ? "multi"
+              : "single",
+            options
+          };
+        });
+
+      const databaseExtras = productExtraRows
+        .filter((link) => String(link.product_id) === productId)
+        .sort((a, b) => catalogSortValue(a) - catalogSortValue(b))
+        .map((link) => extrasById.get(String(link.extra_id)))
+        .filter(Boolean)
+        .map(mapCatalogExtra);
+
+      const databaseRemovables = productRemovableRows
+        .filter((link) => String(link.product_id) === productId)
+        .sort((a, b) => catalogSortValue(a) - catalogSortValue(b))
+        .map((link) => removablesById.get(String(link.removable_id)))
+        .filter(Boolean)
+        .map(mapCatalogRemovable);
+
+      const image = rowHas(row, "image_url")
+        ? String(row.image_url || "")
+        : String(fallback.image || "");
+
+      return {
+        id: productId,
+        category: String(row.category_id || fallback.category || ""),
+        es: rowText(row, ["name_es", "es"], fallback.es || productId),
+        en: rowText(row, ["name_en", "en"], fallback.en || fallback.es || productId),
+        description: {
+          es: rowText(row, ["description_es"], fallback.description?.es || ""),
+          en: rowText(row, ["description_en"], fallback.description?.en || fallback.description?.es || "")
+        },
+        price: rowNumber(row, ["base_price", "price"], fallback.price || 0),
+        image,
+        taxable: rowHas(row, "taxable") ? row.taxable !== false : fallback.taxable !== false,
+        optionGroups: databaseGroups.length ? databaseGroups : normalizeCatalogArray(fallback.optionGroups),
+        extras: databaseExtras.length ? databaseExtras : normalizeCatalogArray(fallback.extras),
+        removables: databaseRemovables.length ? databaseRemovables : normalizeCatalogArray(fallback.removables),
+        sortOrder: catalogSortValue(row)
+      };
+    })
+    .filter((item) => item.category && categoryOrder.has(item.category))
+    .sort((a, b) => {
+      const categoryDifference =
+        Number(categoryOrder.get(a.category) || 0) -
+        Number(categoryOrder.get(b.category) || 0);
+      return categoryDifference || Number(a.sortOrder || 0) - Number(b.sortOrder || 0);
+    });
+
+  if (!products.length) {
+    throw new Error("Supabase no devolvió productos públicos utilizables.");
+  }
+
+  CATEGORIES.splice(0, CATEGORIES.length, ...categories);
+  MENU_ITEMS.splice(0, MENU_ITEMS.length, ...products);
+
+  if (!CATEGORIES.some((category) => category.id === state.category)) {
+    state.category = CATEGORIES[0]?.id || "";
+  }
+}
+
+async function fetchPublicCatalog() {
+  const { supabaseUrl, anonKey } = publicCatalogFunctionConfig();
+  const response = await fetch(`${supabaseUrl}/functions/v1/public-catalog`, {
+    method: "GET",
+    mode: "cors",
+    cache: "no-store",
+    headers: publicCatalogHeaders(anonKey)
+  });
+
+  const rawText = await response.text();
+  let result = {};
+
+  try {
+    result = rawText ? JSON.parse(rawText) : {};
+  } catch (_) {
+    result = { detail: rawText };
+  }
+
+  if (!response.ok || !result?.ok || !result?.catalog) {
+    const reason = [
+      `HTTP ${response.status}`,
+      result?.error,
+      result?.detail
+    ].filter(Boolean).join(" · ");
+    throw new Error(reason || "No se pudo cargar el catálogo público.");
+  }
+
+  return result.catalog;
+}
+
+async function loadPublicCatalog({ render = false, force = false } = {}) {
+  try {
+    const catalog = await fetchPublicCatalog();
+    const nextSnapshot = JSON.stringify(catalog);
+
+    if (!force && nextSnapshot === publicCatalogSnapshot) {
+      return false;
+    }
+
+    buildMenuFromPublicCatalog(catalog);
+    publicCatalogSnapshot = nextSnapshot;
+
+    if (render) {
+      renderCategories();
+      renderMenu();
+      renderCart();
+    }
+
+    return true;
+  } catch (error) {
+    console.warn(
+      "No se pudo cargar el catálogo público desde Supabase. Se mantiene menu-data.js como respaldo:",
+      error
+    );
+    return false;
+  }
+}
+
 
 function getAvailability() {
   try {
@@ -804,13 +1101,14 @@ function initEvents() {
   });
 }
 
-function init() {
+async function init() {
   applyTheme();
   initEvents();
   window.addEventListener("storage", (event) => {
     if (event.key === "fogon_availability" || event.key === null) refreshAvailabilityIfChanged(true);
   });
   setInterval(refreshAvailabilityIfChanged, 1000);
+  await loadPublicCatalog({ render: false, force: true });
   syncAvailabilityFromBackend();
   if (window.FOGON_DB?.isReady()) {
     window.FOGON_DB.subscribeAvailability(() => syncAvailabilityFromBackend());
@@ -827,6 +1125,20 @@ function init() {
   updateOrderingUi();
   setInterval(updateOrderingUi, 30000);
 
+  setInterval(() => {
+    loadPublicCatalog({ render: true }).catch((error) => {
+      console.warn("No se pudo refrescar el catálogo público:", error);
+    });
+  }, 60000);
+
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible") {
+      loadPublicCatalog({ render: true }).catch((error) => {
+        console.warn("No se pudo refrescar el catálogo al volver a la página:", error);
+      });
+    }
+  });
+
   let scrollTicking = false;
   window.addEventListener("scroll", () => {
     if (scrollTicking) return;
@@ -840,4 +1152,6 @@ function init() {
   handlePageScroll();
 }
 
-init();
+init().catch((error) => {
+  console.error("No se pudo iniciar el menú:", error);
+});
