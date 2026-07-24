@@ -135,9 +135,42 @@ function cycleOrderMode(){
 function orderType(o){var t=o.order_type||"";if(!t&&o.items&&o.items[0])t=o.items[0].orderType||"";return t==="dine-in"?"Para aquí":t==="takeout"?"Para llevar":"No indicado";}
 function payment(o){return o.payment_method==="cash"?"Efectivo":o.payment_method==="card"?"Tarjeta":"No indicado";}
 function status(o){return o.status==="ready"?"Listo":o.status==="accepted"?"Aceptado":"Nuevo";}
-function normalize(row){return {id:String(row.public_id==null?row.id:row.public_id),databaseId:row.id,createdAt:row.created_at,customer:{name:row.customer_name||"",phone:row.customer_phone||""},items:row.items||[],totals:{total:row.total||0},paymentMethod:row.payment_method||"",orderType:row.order_type||"",status:row.status||"new",language:row.language||"es"};}
+function twilioKey(o){return String(o.twilioStatus||"").toLowerCase();}
+function twilioLabel(o){var s=twilioKey(o),m={sending:"Preparando envio",accepted:"Aceptado por Twilio",scheduled:"Programado por Twilio",queued:"En cola de Twilio",sent:"Enviado a la operadora",delivered:"Entregado al telefono",read:"Leido",undelivered:"No entregado",failed:"Envio fallido",canceled:"Envio cancelado"};return m[s]||"Sin envio registrado";}
+function twilioBusy(o){var s=twilioKey(o);return s==="sending"||s==="accepted"||s==="scheduled"||s==="queued"||s==="sent";}
+function twilioCanSend(o){var s=twilioKey(o);return s!=="delivered"&&s!=="read"&&!twilioBusy(o);}
+function twilioButton(o){var s=twilioKey(o);return s==="failed"||s==="undelivered"||s==="canceled"?"Reintentar SMS con Twilio":"Marcar listo / Enviar SMS";}
+function normalize(row){return {id:String(row.public_id==null?row.id:row.public_id),databaseId:row.id,createdAt:row.created_at,customer:{name:row.customer_name||"",phone:row.customer_phone||""},items:row.items||[],totals:{total:row.total||0},paymentMethod:row.payment_method||"",orderType:row.order_type||"",status:row.status||"new",language:row.language||"es",twilioMessageSid:row.twilio_message_sid||null,twilioStatus:row.twilio_status||"",twilioErrorCode:row.twilio_error_code||null,twilioErrorMessage:row.twilio_error_message||null,twilioAttempts:Number(row.twilio_attempts||0)};}
 function itemHtml(item){var h='<div class="item"><strong>'+esc(item.quantity||1)+'x '+esc(item.nameEs||item.name||"")+'</strong>';var a=item.selections||[],i;for(i=0;i<a.length;i++)h+='<p>'+esc(a[i].groupEs||a[i].group)+': '+esc(a[i].nameEs||a[i].name)+'</p>';a=item.extras||[];for(i=0;i<a.length;i++)h+='<p>Extra: '+esc(a[i].nameEs||a[i].name)+'</p>';a=item.removables||[];for(i=0;i<a.length;i++)h+='<p>'+esc(typeof a[i]==="string"?a[i]:(a[i].nameEs||a[i].name))+'</p>';if(item.notes)h+='<p><strong>Nota:</strong> '+esc(item.notes)+'</p>';return h+'</div>';}
-function render(){var h='',k='',i,j,o,cls;for(i=0;i<orders.length;i++){o=orders[i];cls=o.status==="ready"?" ready":o.status==="accepted"?" accepted":"";h+='<div class="order'+cls+'"><div class="row"><div class="left"><strong>Pedido '+esc(o.id)+'</strong><p>'+esc(new Date(o.createdAt).toLocaleString())+'</p></div><div class="right status">'+status(o)+'</div><div class="clear"></div></div><p><strong>'+esc(o.customer.name||"Sin nombre")+'</strong> · '+esc(o.customer.phone||"Sin teléfono")+'</p><p><strong>Tipo:</strong> '+orderType(o)+' · <strong>Pago:</strong> '+payment(o)+'</p>';for(j=0;j<o.items.length;j++)h+=itemHtml(o.items[j]);h+='<h2>Total '+money(o.totals.total)+'</h2>';if(o.status==="new")h+='<button data-action="accept" data-id="'+esc(o.id)+'">Aceptar</button>';if(o.status!=="ready")h+='<button class="secondary" data-action="ready" data-id="'+esc(o.id)+'">Marcar listo</button>';h+='<button class="danger" data-action="delete" data-id="'+esc(o.id)+'">Entregado / quitar</button></div>';if(!hiddenKitchen[o.id]){k+='<div class="order"><strong>Pedido '+esc(o.id)+'</strong>';for(j=0;j<o.items.length;j++)k+=itemHtml(o.items[j]);k+='<button class="secondary" data-action="hide" data-id="'+esc(o.id)+'">Terminado en cocina</button></div>';}}byId("ordersList").innerHTML=h||'<div class="card">No hay pedidos.</div>';byId("kitchenList").innerHTML=k||'<div class="card">No hay comandas.</div>';}
+function render(){
+  var h='',k='',i,j,o,cls,twilioLine,showTwilio;
+  for(i=0;i<orders.length;i++){
+    o=orders[i];
+    cls=o.status==="ready"?" ready":o.status==="accepted"?" accepted":"";
+    h+='<div class="order'+cls+'"><div class="row"><div class="left"><strong>Pedido '+esc(o.id)+'</strong><p>'+esc(new Date(o.createdAt).toLocaleString())+'</p></div><div class="right status">'+status(o)+'</div><div class="clear"></div></div><p><strong>'+esc(o.customer.name||"Sin nombre")+'</strong> · '+esc(o.customer.phone||"Sin teléfono")+'</p><p><strong>Tipo:</strong> '+orderType(o)+' · <strong>Pago:</strong> '+payment(o)+'</p>';
+    for(j=0;j<o.items.length;j++)h+=itemHtml(o.items[j]);
+    h+='<h2>Total '+money(o.totals.total)+'</h2>';
+    if(o.status==="new")h+='<button data-action="accept" data-id="'+esc(o.id)+'">Aceptar</button>';
+    twilioLine='';
+    if(o.twilioStatus||o.status==="ready"){
+      twilioLine='<p><strong>Twilio:</strong> '+esc(twilioLabel(o));
+      if(o.twilioAttempts>0)twilioLine+=' · Intentos: '+esc(o.twilioAttempts);
+      if(o.twilioErrorMessage)twilioLine+=' · '+esc(o.twilioErrorMessage);
+      twilioLine+='</p>';
+      h+=twilioLine;
+    }
+    showTwilio=twilioCanSend(o);
+    if(showTwilio)h+='<button class="secondary" data-action="ready" data-id="'+esc(o.id)+'">'+esc(twilioButton(o))+'</button>';
+    h+='<button class="danger" data-action="delete" data-id="'+esc(o.id)+'">Entregado / quitar</button></div>';
+    if(!hiddenKitchen[o.id]){
+      k+='<div class="order"><strong>Pedido '+esc(o.id)+'</strong>';
+      for(j=0;j<o.items.length;j++)k+=itemHtml(o.items[j]);
+      k+='<button class="secondary" data-action="hide" data-id="'+esc(o.id)+'">Terminado en cocina</button></div>';
+    }
+  }
+  byId("ordersList").innerHTML=h||'<div class="card">No hay pedidos.</div>';
+  byId("kitchenList").innerHTML=k||'<div class="card">No hay comandas.</div>';
+}
 function loadOrders(){byId("connectionMessage").innerHTML="Actualizando…";request("GET","orders?select=*&order=created_at.desc",null,function(err,data){if(err){byId("connectionMessage").className="error";byId("connectionMessage").innerHTML=esc(err.message);return;}orders=[];var i;for(i=0;i<(data||[]).length;i++)orders.push(normalize(data[i]));byId("connectionMessage").className="ok";byId("connectionMessage").innerHTML="Conectado. Última actualización: "+new Date().toLocaleTimeString();render();});}
 function findOrder(id){var i;for(i=0;i<orders.length;i++)if(String(orders[i].id)===String(id))return orders[i];return null;}
 function changeStatus(id,next){
@@ -145,11 +178,22 @@ function changeStatus(id,next){
   if(!o)return;
   if(next==="ready"){
     functionRequest("rapid-action",{adminPin:PIN,orderId:o.databaseId,publicId:Number(o.id)},function(err,data){
-      if(err){alert("No se pudo enviar el mensaje: "+err.message);loadOrders();return;}
-      if(data&&data.sms&&data.sms.queued===false){
-        alert("Pedido marcado como listo, pero el mensaje no entro en la cola: "+(data.sms.detail||data.sms.reason||"error"));
+      var sms,reason,msg;
+      if(err){alert("No se pudo ejecutar Twilio: "+err.message);loadOrders();return;}
+      sms=data&&data.sms?data.sms:{};
+      if(sms.accepted&&!sms.alreadyProcessed){
+        alert("Pedido listo. Twilio acepto el SMS. Estado inicial: "+(sms.messageStatus||"queued")+". La entrega se confirmara en el panel.");
+      }else if(sms.alreadyProcessed){
+        if(sms.reason==="already_delivered")msg="Este SMS ya figura como entregado. No se envio otro.";
+        else if(sms.reason==="already_in_progress")msg="Twilio ya esta procesando este SMS. No se envio un duplicado.";
+        else if(sms.reason==="cooldown")msg="El reintento se bloqueo temporalmente para evitar dos mensajes seguidos.";
+        else msg="El SMS ya estaba procesado y no se duplico.";
+        alert(msg);
       }else{
-        alert("Pedido marcado como listo y mensaje enviado a la cola.");
+        reason=sms.detail||sms.reason||"error desconocido";
+        if(sms.reason==="invalid_phone")reason="el telefono del cliente no es valido";
+        if(sms.reason==="empty_message")reason="el mensaje quedo vacio";
+        alert("Pedido marcado como listo, pero Twilio no acepto el SMS: "+reason);
       }
       loadOrders();
     });
