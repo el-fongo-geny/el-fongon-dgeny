@@ -570,3 +570,30 @@ body.image-crop-open { overflow: hidden; }
   .crop-mode-button { min-height: 72px; }
   .crop-information p { grid-template-columns: 1fr; gap: 2px; }
 }
+
+
+/* ===== V7 AJUSTE INTELIGENTE DE IMÁGENES ===== */
+.crop-mode-buttons-three {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+.crop-mode-recommended {
+  position: relative;
+}
+.crop-mode-recommended::before {
+  content: "RECOMENDADO";
+  display: inline-flex;
+  width: max-content;
+  margin-bottom: 7px;
+  border-radius: 999px;
+  padding: 3px 7px;
+  background: var(--success-soft);
+  color: var(--success);
+  font-size: .62rem;
+  font-weight: 900;
+  letter-spacing: .06em;
+}
+@media (max-width: 860px) {
+  .crop-mode-buttons-three {
+    grid-template-columns: 1fr;
+  }
+}
