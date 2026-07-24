@@ -1,6 +1,8 @@
 (() => {
   "use strict";
 
+window.FOGON_MENU_ADMIN_BUILD = "7-smart-image-fit-20260724";
+
   const $ = (selector) => document.querySelector(selector);
   const $$ = (selector) => Array.from(document.querySelectorAll(selector));
   const money = (value) => `$${Number(value || 0).toFixed(2)}`;
@@ -568,7 +570,7 @@
     sourceName: "producto.jpg",
     sourceWidth: 0,
     sourceHeight: 0,
-    mode: "contain",
+    mode: "balanced",
     background: "blur",
     zoom: 1,
     offsetX: 0,
@@ -640,7 +642,7 @@
   }
 
   function resetImageEditorTransform() {
-    imageEditor.mode = "contain";
+    imageEditor.mode = "balanced";
     imageEditor.background = "blur";
     imageEditor.zoom = 1;
     imageEditor.offsetX = 0;
@@ -669,7 +671,7 @@
     imageEditor.sourceName = String(sourceName || "producto.jpg").slice(0, 180);
     imageEditor.sourceWidth = sourceWidth;
     imageEditor.sourceHeight = sourceHeight;
-    imageEditor.mode = "contain";
+    imageEditor.mode = "balanced";
     imageEditor.background = "blur";
     imageEditor.zoom = 1;
     imageEditor.offsetX = 0;
@@ -744,7 +746,23 @@
       IMAGE_OUTPUT_HEIGHT / dimensions.height
     );
 
-    return (mode === "cover" ? coverScale : containScale) * imageEditor.zoom;
+    /*
+      balanced es el ajuste recomendado para fotos verticales o cuadradas:
+      conserva casi todo el plato, pero amplía la foto lo suficiente para que
+      no parezca una miniatura estrecha dentro de la tarjeta.
+    */
+    const balancedScale = Math.min(
+      coverScale,
+      containScale + (coverScale - containScale) * 0.48
+    );
+
+    const baseScale = mode === "cover"
+      ? coverScale
+      : mode === "balanced"
+        ? balancedScale
+        : containScale;
+
+    return baseScale * imageEditor.zoom;
   }
 
   function clampImageOffsets() {
@@ -756,6 +774,23 @@
     if (imageEditor.mode === "cover") {
       const maxX = Math.max(0, (drawWidth - IMAGE_OUTPUT_WIDTH) / 2);
       const maxY = Math.max(0, (drawHeight - IMAGE_OUTPUT_HEIGHT) / 2);
+      imageEditor.offsetX = Math.max(-maxX, Math.min(maxX, imageEditor.offsetX));
+      imageEditor.offsetY = Math.max(-maxY, Math.min(maxY, imageEditor.offsetY));
+      return;
+    }
+
+    if (imageEditor.mode === "balanced") {
+      /*
+        Permite recolocar el plato sin dejarlo salir demasiado de la zona útil.
+        Cuando un eje ya sobrepasa el marco, el movimiento se limita al recorte
+        disponible; cuando queda fondo, se permite un desplazamiento moderado.
+      */
+      const maxX = drawWidth >= IMAGE_OUTPUT_WIDTH
+        ? (drawWidth - IMAGE_OUTPUT_WIDTH) / 2
+        : Math.min((IMAGE_OUTPUT_WIDTH - drawWidth) / 2, IMAGE_OUTPUT_WIDTH * 0.12);
+      const maxY = drawHeight >= IMAGE_OUTPUT_HEIGHT
+        ? (drawHeight - IMAGE_OUTPUT_HEIGHT) / 2
+        : Math.min((IMAGE_OUTPUT_HEIGHT - drawHeight) / 2, IMAGE_OUTPUT_HEIGHT * 0.12);
       imageEditor.offsetX = Math.max(-maxX, Math.min(maxX, imageEditor.offsetX));
       imageEditor.offsetY = Math.max(-maxY, Math.min(maxY, imageEditor.offsetY));
       return;
@@ -821,11 +856,11 @@
       IMAGE_OUTPUT_HEIGHT / dimensions.height
     ) * 1.12;
 
-    if ("filter" in context) context.filter = "blur(34px) saturate(.9)";
-    drawSource(context, coverScale, 0, 0, 0.88);
+    if ("filter" in context) context.filter = "blur(28px) saturate(1.08) contrast(.96)";
+    drawSource(context, coverScale, 0, 0, 0.96);
     context.restore();
 
-    context.fillStyle = "rgba(255, 248, 239, .22)";
+    context.fillStyle = "rgba(255, 248, 239, .10)";
     context.fillRect(0, 0, IMAGE_OUTPUT_WIDTH, IMAGE_OUTPUT_HEIGHT);
   }
 
@@ -916,7 +951,7 @@
   }
 
   function setImageEditorMode(mode) {
-    if (mode !== "contain" && mode !== "cover") return;
+    if (mode !== "contain" && mode !== "balanced" && mode !== "cover") return;
     imageEditor.mode = mode;
     imageEditor.zoom = 1;
     imageEditor.offsetX = 0;
