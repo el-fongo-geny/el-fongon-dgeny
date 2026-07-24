@@ -5,7 +5,7 @@
   const $$ = (selector) => Array.from(document.querySelectorAll(selector));
   const money = (value) => `$${Number(value || 0).toFixed(2)}`;
 
-  window.FOGON_MENU_ADMIN_BUILD = "4-image-upload";
+  window.FOGON_MENU_ADMIN_BUILD = "5-direct-upload-20260724";
 
   const state = {
     pin: "",
