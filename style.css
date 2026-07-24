@@ -2073,9 +2073,9 @@ body.light-mode .availability-group h3 {
 
 
 /* =========================================================
-   IMÁGENES NORMALIZADAS V6
-   El editor genera 1280 × 1114 px. El menú nunca vuelve a cortar
-   automáticamente la fotografía: muestra el archivo completo.
+   IMÁGENES NORMALIZADAS V7
+   El editor genera 1280 × 1114 px con ajuste inteligente. Como el archivo
+   ya tiene la proporción exacta, el menú lo muestra sin un segundo recorte.
    ========================================================= */
 .product-image {
   aspect-ratio: 640 / 557;
