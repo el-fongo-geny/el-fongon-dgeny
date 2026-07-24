@@ -6,7 +6,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#f6f6f3">
   <title>Gestor del menú | El Fogón D' Geny</title>
-  <link rel="stylesheet" href="menu-admin.css?v=5-direct-upload-20260724">
+  <link rel="stylesheet" href="menu-admin.css?v=6-image-editor-20260724">
 </head>
 <body>
   <main id="loginScreen" class="login-screen">
@@ -156,8 +156,8 @@
           <div class="editor-section-heading image-heading">
             <span class="section-number">0</span>
             <div>
-              <h3>Imagen del artículo <small style="font-size:11px;font-weight:800;color:#cf321f;letter-spacing:.08em;vertical-align:middle;">SUBIDA DIRECTA V5</small></h3>
-              <p>Elige una foto del móvil, tableta o computadora.</p>
+              <h3>Imagen del artículo <small class="image-editor-version">EDITOR DE ENCUADRE V6</small></h3>
+              <p>Admite fotos verticales, cuadradas u horizontales. Tú decides el encuadre antes de subirla.</p>
             </div>
           </div>
 
@@ -179,13 +179,14 @@
               <div class="image-upload-actions">
                 <button id="chooseImageButton" class="button button-primary image-upload-button" type="button">
                   <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 16V4M7 9l5-5 5 5M5 20h14"/></svg>
-                  <span>Subir imagen</span>
+                  <span>Cambiar / subir imagen</span>
                 </button>
+                <button id="editImageButton" class="button button-secondary" type="button" hidden>Editar encuadre</button>
                 <button id="removeImageButton" class="button button-secondary" type="button" hidden>Quitar imagen</button>
               </div>
 
               <p id="imageUploadStatus" class="image-upload-status" aria-live="polite">
-                En móvil abrirá Fotos, Cámara o Archivos; en PC abrirá el explorador de archivos.
+                Selecciona una foto y se abrirá el editor. El archivo final se adapta automáticamente al formato del menú.
               </p>
 
               <details class="image-url-details">
@@ -257,6 +258,81 @@
     </form>
   </aside>
 
+
+
+  <div id="imageCropModal" class="image-crop-modal" hidden>
+    <div class="image-crop-backdrop" data-close-image-editor></div>
+    <section class="image-crop-card" role="dialog" aria-modal="true" aria-labelledby="imageCropTitle">
+      <header class="image-crop-header">
+        <div>
+          <p class="eyebrow">Editor de imagen</p>
+          <h2 id="imageCropTitle">Ajustar imagen al menú</h2>
+          <p>Salida final: 1280 × 1114 px. La zona central marcada es la que siempre se conserva en móvil.</p>
+        </div>
+        <button id="closeImageCropButton" class="icon-button" type="button" aria-label="Cerrar editor">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
+        </button>
+      </header>
+
+      <div class="image-crop-body">
+        <div class="image-crop-stage-panel">
+          <div id="imageCropStage" class="image-crop-stage">
+            <canvas id="imageCropCanvas" width="1280" height="1114" aria-label="Vista previa del encuadre"></canvas>
+          </div>
+          <p class="image-crop-help">Arrastra la imagen con el ratón o el dedo. Usa el control de zoom para acercar o alejar.</p>
+        </div>
+
+        <aside class="image-crop-controls">
+          <fieldset class="crop-control-group">
+            <legend>Cómo adaptar la foto</legend>
+            <div class="crop-mode-buttons">
+              <button class="crop-mode-button active" type="button" data-crop-mode="contain" aria-pressed="true">
+                <strong>Mostrar completa</strong>
+                <span>No corta el plato. Completa el fondo.</span>
+              </button>
+              <button class="crop-mode-button" type="button" data-crop-mode="cover" aria-pressed="false">
+                <strong>Rellenar y recortar</strong>
+                <span>Ocupa todo el marco. Tú eliges el corte.</span>
+              </button>
+            </div>
+          </fieldset>
+
+          <label class="field crop-background-field">
+            <span>Fondo cuando se muestra completa</span>
+            <select id="cropBackground">
+              <option value="blur">Desenfoque de la misma foto</option>
+              <option value="neutral">Neutro cálido</option>
+              <option value="white">Blanco</option>
+              <option value="dark">Oscuro</option>
+            </select>
+          </label>
+
+          <label class="field crop-zoom-field">
+            <span>Zoom <strong id="cropZoomValue">100 %</strong></span>
+            <input id="cropZoom" type="range" min="1" max="3" value="1" step="0.01">
+          </label>
+
+          <div class="crop-tool-row">
+            <button id="rotateImageLeft" class="button button-secondary" type="button">↶ Girar</button>
+            <button id="rotateImageRight" class="button button-secondary" type="button">Girar ↷</button>
+            <button id="resetImageCrop" class="button button-quiet" type="button">Restablecer</button>
+          </div>
+
+          <div class="crop-information">
+            <p><strong>Archivo original</strong><span id="cropSourceInfo">—</span></p>
+            <p><strong>Formato final</strong><span>1280 × 1114 px · JPG</span></p>
+            <p><strong>Consejo</strong><span>Mantén el plato dentro de la línea discontinua para que también se vea completo en móvil.</span></p>
+          </div>
+        </aside>
+      </div>
+
+      <footer class="image-crop-footer">
+        <button id="cancelImageCropButton" class="button button-secondary" type="button">Cancelar</button>
+        <button id="applyImageCropButton" class="button button-primary" type="button">Aplicar y subir imagen</button>
+      </footer>
+    </section>
+  </div>
+
   <div id="categoryModal" class="modal" hidden>
     <div class="modal-backdrop" data-close-category-modal></div>
     <form id="categoryForm" class="modal-card" role="dialog" aria-modal="true" aria-labelledby="categoryModalTitle">
@@ -279,6 +355,6 @@
   </div>
 
   <script src="supabase-config.js?v=18-mobile-fixed"></script>
-  <script src="menu-admin.js?v=5-direct-upload-20260724"></script>
+  <script src="menu-admin.js?v=6-image-editor-20260724"></script>
 </body>
 </html>
