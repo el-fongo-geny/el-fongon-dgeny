@@ -723,49 +723,6 @@ async function edgeFunctionErrorDetails(error) {
 }
 
 
-async function callRapidActionSmsFallback(order) {
-  const cfg = window.FOGON_SUPABASE || {};
-  const supabaseUrl = String(cfg.url || "").replace(/\/$/, "");
-  const anonKey = String(cfg.anonKey || "").trim();
-
-  if (!supabaseUrl || !anonKey) {
-    throw new Error("Faltan la URL o la anon key de Supabase.");
-  }
-
-  const response = await fetch(`${supabaseUrl}/functions/v1/rapid-action`, {
-    method: "POST",
-    mode: "cors",
-    cache: "no-store",
-    headers: buildEdgeFunctionHeaders(anonKey),
-    body: JSON.stringify({
-      orderId: order.databaseId || order.id,
-      publicId: Number(order.id) || null,
-      adminPin: getAdminPinOrThrow()
-    })
-  });
-
-  const rawText = await response.text();
-  let result = {};
-
-  try {
-    result = rawText ? JSON.parse(rawText) : {};
-  } catch (_) {
-    result = { detail: rawText };
-  }
-
-  if (!response.ok || !result?.ok) {
-    const reason = [
-      `HTTP ${response.status}`,
-      result?.error,
-      result?.detail
-    ].filter(Boolean).join(" · ");
-
-    throw new Error(reason || "No se pudo activar el SMS de respaldo.");
-  }
-
-  return result;
-}
-
 async function sendReadyNotification(orderId) {
   const orders = getOrders();
   const order = orders.find(
@@ -838,17 +795,10 @@ async function sendReadyNotification(orderId) {
     saveOrders(updatedOrders);
     await syncOrdersFromBackend();
 
-    if (result.cooldownActive) {
+    if (result.alreadySent) {
       alert(
-        `Ya se envió un WhatsApp para el pedido ${order.id}. ` +
-        `Podrás volver a enviarlo en ${result.retryAfterSeconds || 60} segundos.`
-      );
-      return;
-    }
-
-    if (result.resent) {
-      alert(
-        `WhatsApp reenviado correctamente para el pedido ${order.id}.`
+        `El pedido ${order.id} ya tenía el WhatsApp enviado. ` +
+        "No se envió un duplicado."
       );
       return;
     }
@@ -858,63 +808,14 @@ async function sendReadyNotification(orderId) {
       "WhatsApp enviado correctamente."
     );
   } catch (whatsappError) {
-    console.error(
-      "Falló WhatsApp; intentando SMS de respaldo:",
-      whatsappError
+    console.error("Falló el envío por WhatsApp:", whatsappError);
+
+    alert(
+      `No se pudo enviar el WhatsApp al cliente.
+
+` +
+      `${whatsappError?.message || whatsappError}`
     );
-
-    try {
-      const smsResult = await callRapidActionSmsFallback(order);
-
-      const updatedOrders = getOrders().map((candidate) => (
-        String(candidate.id) === String(orderId)
-          ? {
-              ...candidate,
-              status: "ready",
-              readyAt: new Date().toISOString(),
-              smsQueued: Boolean(
-                smsResult?.sms?.queued || candidate.smsQueued
-              )
-            }
-          : candidate
-      ));
-
-      saveOrders(updatedOrders);
-      await syncOrdersFromBackend();
-
-      if (smsResult?.sms?.queued) {
-        alert(
-          `WhatsApp falló: ${whatsappError?.message || whatsappError}
-
-` +
-          "Se activó el SMS de respaldo mediante la APK."
-        );
-        return;
-      }
-
-      const fallbackReason =
-        smsResult?.sms?.detail ||
-        smsResult?.sms?.reason ||
-        "el SMS no entró en la cola";
-
-      alert(
-        `WhatsApp falló: ${whatsappError?.message || whatsappError}
-
-` +
-        `También falló el SMS de respaldo: ${fallbackReason}.`
-      );
-    } catch (smsError) {
-      console.error("También falló el SMS de respaldo:", smsError);
-
-      alert(
-        `No se pudo notificar al cliente.
-
-` +
-        `WhatsApp: ${whatsappError?.message || whatsappError}
-` +
-        `SMS de respaldo: ${smsError?.message || smsError}`
-      );
-    }
   }
 }
 
