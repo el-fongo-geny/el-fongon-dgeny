@@ -43,6 +43,16 @@ function safeLocalSet(key, value) {
   }
 }
 
+function safeLocalRemove(key) {
+  fallbackStorage.delete(key);
+
+  try {
+    window.localStorage.removeItem(key);
+  } catch (error) {
+    console.warn("No se pudo borrar localStorage:", error);
+  }
+}
+
 function safeSessionRemove(key) {
   try {
     window.sessionStorage.removeItem(key);
@@ -66,7 +76,7 @@ function showLoginRuntimeError(error) {
   console.error("Error del administrador:", error);
 }
 
-window.FOGON_ADMIN_BUILD = "49-admin-js-restored";
+window.FOGON_ADMIN_BUILD = "50-sound-session-8h";
 
 
 const STORAGE_ORDERS = "fogon_orders";
@@ -74,6 +84,8 @@ const STORAGE_AVAILABILITY = "fogon_availability";
 const STORAGE_KITCHEN_HIDDEN = "fogon_kitchen_hidden";
 const STORAGE_ADMIN_THEME = "fogon_admin_theme";
 const STORAGE_KITCHEN_SELECTED = "fogon_kitchen_selected";
+const STORAGE_ADMIN_TRUSTED_SESSION = "fogon_admin_trusted_session_v1";
+const ADMIN_TRUSTED_SESSION_MS = 8 * 60 * 60 * 1000;
 /* El PIN no está escrito en el código público. */
 let adminPinInMemory = "";
 
@@ -155,6 +167,8 @@ let availabilityQuery = "";
 let alarmTimer = null;
 let audioCtx = null;
 let soundUnlocked = false;
+let soundConfirmationPlayed = false;
+let lastSoundUnlockAttemptAt = 0;
 let lastNewOrderSignature = "";
 
 function applyAdminTheme() {
@@ -372,13 +386,100 @@ async function validateAdminPin(pin) {
 }
 
 function getAdminPinOrThrow() {
-  if (!adminPinInMemory) throw new Error("La sesión terminó. Recarga e introduce el PIN nuevamente.");
+  if (!adminPinInMemory) {
+    throw new Error(
+      "La sesión terminó. Introduce nuevamente el PIN del panel."
+    );
+  }
+
   return adminPinInMemory;
 }
 
-function clearAdminSession() {
+function readTrustedAdminSession() {
+  let session = null;
+
+  try {
+    session = JSON.parse(
+      safeLocalGet(STORAGE_ADMIN_TRUSTED_SESSION) || "null"
+    );
+  } catch (_) {
+    session = null;
+  }
+
+  const pin = String(session?.pin || "").trim();
+  const expiresAt = Number(session?.expiresAt || 0);
+
+  if (!pin || !Number.isFinite(expiresAt) || expiresAt <= Date.now()) {
+    safeLocalRemove(STORAGE_ADMIN_TRUSTED_SESSION);
+    return null;
+  }
+
+  return {
+    pin,
+    expiresAt,
+    createdAt: Number(session?.createdAt || 0)
+  };
+}
+
+function saveTrustedAdminSession(pin) {
+  const createdAt = Date.now();
+  const expiresAt = createdAt + ADMIN_TRUSTED_SESSION_MS;
+
+  safeLocalSet(
+    STORAGE_ADMIN_TRUSTED_SESSION,
+    JSON.stringify({
+      pin: String(pin || "").trim(),
+      createdAt,
+      expiresAt
+    })
+  );
+
+  return expiresAt;
+}
+
+function clearAdminSession({ forgetTrustedDevice = true } = {}) {
   adminPinInMemory = "";
   safeSessionRemove("fogon_admin_unlocked");
+
+  if (forgetTrustedDevice) {
+    safeLocalRemove(STORAGE_ADMIN_TRUSTED_SESSION);
+  }
+}
+
+function showLoginPanel(message = "") {
+  const login = $("#adminLogin");
+  const panel = $("#adminPanel");
+  const input = $("#pinInput");
+  const error = $("#pinError");
+
+  if (panel) {
+    panel.hidden = true;
+    panel.style.display = "none";
+  }
+
+  if (login) {
+    login.hidden = false;
+    login.style.display = "";
+  }
+
+  if (error) {
+    error.hidden = !message;
+    error.textContent = message;
+  }
+
+  if (input) {
+    input.disabled = false;
+    input.value = "";
+    setTimeout(() => input.focus(), 0);
+  }
+}
+
+function logoutAdmin(message = "") {
+  stopAlarm();
+  clearAdminSession({ forgetTrustedDevice: true });
+  showLoginPanel(
+    message || "Sesión cerrada. Introduce el PIN para volver a entrar."
+  );
 }
 
 async function backendRequest(path, options = {}) {
@@ -562,90 +663,251 @@ function kitchenOrders(orders = getOrders()) {
   return orders.filter((order) => !hidden.has(order.id));
 }
 
-function setSoundBanner(message = "") {
+function setSoundBanner(message = "", forceVisible = null) {
   const banner = $("#soundBanner");
   if (!banner) return;
-  const text = banner.querySelector("p");
-  if (message && text) text.innerHTML = message;
-  banner.hidden = Boolean(soundUnlocked);
+
+  const text =
+    banner.querySelector("#soundBannerText") ||
+    banner.querySelector("p");
+
+  if (message && text) {
+    text.innerHTML = message;
+  }
+
+  banner.hidden =
+    forceVisible === null
+      ? soundUnlocked
+      : !Boolean(forceVisible);
 }
 
-function unlockSound() {
-  try {
-    const AudioContextClass = window.AudioContext || window.webkitAudioContext;
-    if (!AudioContextClass) {
-      soundUnlocked = false;
-      setSoundBanner("<strong>Sonido no disponible</strong><br>Este navegador no permite Web Audio.");
-      return false;
-    }
-    if (!audioCtx) audioCtx = new AudioContextClass();
+function ensureAudioContext() {
+  const AudioContextClass =
+    window.AudioContext ||
+    window.webkitAudioContext;
 
-    const resumeResult = audioCtx.state === "suspended" ? audioCtx.resume() : Promise.resolve();
-    Promise.resolve(resumeResult).then(() => {
-      soundUnlocked = audioCtx.state === "running";
-      setSoundBanner();
-    }).catch(() => {
-      soundUnlocked = false;
-      setSoundBanner("<strong>Activa el sonido</strong><br>Toca el panel una vez. El navegador bloqueó el audio hasta una interacción.");
+  if (!AudioContextClass) {
+    soundUnlocked = false;
+    setSoundBanner(
+      "<strong>Sonido no disponible</strong><br>Este navegador no permite Web Audio.",
+      true
+    );
+    return null;
+  }
+
+  if (!audioCtx || audioCtx.state === "closed") {
+    audioCtx = new AudioContextClass();
+
+    audioCtx.addEventListener?.("statechange", () => {
+      refreshSoundState();
     });
 
-    soundUnlocked = audioCtx.state === "running" || audioCtx.state === "suspended";
-    setSoundBanner();
+    if (!audioCtx.addEventListener) {
+      audioCtx.onstatechange = refreshSoundState;
+    }
+  }
+
+  return audioCtx;
+}
+
+function refreshSoundState() {
+  soundUnlocked =
+    Boolean(audioCtx) &&
+    audioCtx.state === "running";
+
+  if (soundUnlocked) {
+    setSoundBanner("", false);
     return true;
-  } catch (_) {
+  }
+
+  const state = audioCtx?.state || "sin iniciar";
+
+  setSoundBanner(
+    "<strong>Toca para activar el sonido</strong><br>" +
+    `Estado actual: ${escapeHtml(state)}. ` +
+    "Pulsa “Activar y probar sonido” una vez después de abrir o recargar el panel.",
+    true
+  );
+
+  return false;
+}
+
+function playTonePattern(testOnly = false) {
+  if (!audioCtx || audioCtx.state !== "running") {
+    return false;
+  }
+
+  try {
+    const now = audioCtx.currentTime;
+    const master = audioCtx.createGain();
+
+    master.gain.setValueAtTime(0.0001, now);
+    master.gain.exponentialRampToValueAtTime(
+      testOnly ? 0.34 : 0.68,
+      now + 0.02
+    );
+    master.gain.exponentialRampToValueAtTime(
+      0.0001,
+      now + (testOnly ? 0.34 : 0.82)
+    );
+
+    master.connect(audioCtx.destination);
+
+    const notes = testOnly
+      ? [{ offset: 0, frequency: 880, duration: 0.2 }]
+      : [
+          { offset: 0, frequency: 940, duration: 0.16 },
+          { offset: 0.2, frequency: 720, duration: 0.16 },
+          { offset: 0.4, frequency: 940, duration: 0.2 }
+        ];
+
+    notes.forEach((note) => {
+      const oscillator = audioCtx.createOscillator();
+      oscillator.type = "sine";
+      oscillator.frequency.setValueAtTime(
+        note.frequency,
+        now + note.offset
+      );
+      oscillator.connect(master);
+      oscillator.start(now + note.offset);
+      oscillator.stop(
+        now + note.offset + note.duration
+      );
+    });
+
+    return true;
+  } catch (error) {
+    console.warn("No se pudo reproducir el sonido:", error);
     soundUnlocked = false;
-    setSoundBanner("<strong>Activa el sonido</strong><br>Toca el panel una vez. El navegador bloqueó el audio hasta una interacción.");
+    refreshSoundState();
     return false;
   }
 }
 
-function beep() {
-  if (!soundUnlocked && !unlockSound()) return;
-  if (!audioCtx) return;
-  try {
-    const now = audioCtx.currentTime;
-    const master = audioCtx.createGain();
-    master.gain.setValueAtTime(0.0001, now);
-    master.gain.exponentialRampToValueAtTime(0.65, now + 0.025);
-    master.gain.exponentialRampToValueAtTime(0.0001, now + 0.75);
-    master.connect(audioCtx.destination);
+async function unlockSound({
+  playTest = false,
+  announce = false
+} = {}) {
+  const now = Date.now();
 
-    [0, 0.18, 0.36].forEach((offset, index) => {
-      const osc = audioCtx.createOscillator();
-      osc.type = "sine";
-      osc.frequency.setValueAtTime(index % 2 === 0 ? 920 : 720, now + offset);
-      osc.connect(master);
-      osc.start(now + offset);
-      osc.stop(now + offset + 0.16);
+  if (
+    now - lastSoundUnlockAttemptAt < 350 &&
+    audioCtx?.state !== "running"
+  ) {
+    return false;
+  }
+
+  lastSoundUnlockAttemptAt = now;
+
+  try {
+    const context = ensureAudioContext();
+    if (!context) return false;
+
+    if (
+      context.state === "suspended" ||
+      context.state === "interrupted"
+    ) {
+      await context.resume();
+    }
+
+    soundUnlocked = context.state === "running";
+
+    if (!soundUnlocked) {
+      refreshSoundState();
+      return false;
+    }
+
+    if (playTest && !soundConfirmationPlayed) {
+      playTonePattern(true);
+      soundConfirmationPlayed = true;
+    }
+
+    if (announce) {
+      setSoundBanner(
+        "<strong>Sonido activado</strong><br>" +
+        "La alarma está preparada y sonará con cada pedido nuevo.",
+        true
+      );
+
+      setTimeout(() => {
+        if (audioCtx?.state === "running") {
+          setSoundBanner("", false);
+        }
+      }, 1800);
+    } else {
+      setSoundBanner("", false);
+    }
+
+    return true;
+  } catch (error) {
+    console.warn("Safari bloqueó el sonido:", error);
+    soundUnlocked = false;
+    refreshSoundState();
+    return false;
+  }
+}
+
+async function beep() {
+  if (!audioCtx || audioCtx.state !== "running") {
+    const unlocked = await unlockSound({
+      playTest: false,
+      announce: false
     });
-  } catch (_) {}
+
+    if (!unlocked) {
+      return false;
+    }
+  }
+
+  return playTonePattern(false);
 }
 
 function startAlarm() {
-  const banner = $("#soundBanner");
-  if (!soundUnlocked && banner) banner.hidden = false;
   if (alarmTimer) return;
-  beep();
+
+  if (!refreshSoundState()) {
+    setSoundBanner(
+      "<strong>Hay un pedido pendiente, pero el sonido está bloqueado</strong><br>" +
+      "Pulsa “Activar y probar sonido” para iniciar la alarma.",
+      true
+    );
+  }
+
+  void beep();
+
   alarmTimer = setInterval(() => {
-    if (newOrders().length) beep();
-    else stopAlarm();
+    if (newOrders().length) {
+      void beep();
+    } else {
+      stopAlarm();
+    }
   }, 1200);
 }
 
 function stopAlarm() {
-  if (alarmTimer) clearInterval(alarmTimer);
+  if (alarmTimer) {
+    clearInterval(alarmTimer);
+  }
+
   alarmTimer = null;
 }
 
 function updateAlarm() {
   const pending = newOrders();
-  const signature = pending.map((order) => order.id).join("|");
+  const signature = pending
+    .map((order) => order.id)
+    .join("|");
+
   if (pending.length) {
-    if (signature !== lastNewOrderSignature) beep();
+    if (signature !== lastNewOrderSignature) {
+      void beep();
+    }
+
     startAlarm();
   } else {
     stopAlarm();
   }
+
   lastNewOrderSignature = signature;
 }
 
@@ -1161,7 +1423,7 @@ function showAdminPanel() {
   */
   setTimeout(() => {
     try {
-      unlockSound();
+      refreshSoundState();
       renderAll();
 
       if (newOrders().length) {
@@ -1207,17 +1469,21 @@ function initLogin() {
   const loginButton = $("#loginButton");
   const error = $("#pinError");
 
-  clearAdminSession();
-
   if (!form || !input || !loginButton) {
     showLoginRuntimeError(
       new Error("Faltan elementos del formulario de acceso.")
     );
-
     return;
   }
 
   let loginRunning = false;
+
+  function setLoginBusy(busy, label = "Entrar") {
+    loginRunning = Boolean(busy);
+    input.disabled = Boolean(busy);
+    loginButton.disabled = Boolean(busy);
+    loginButton.textContent = busy ? label : "Entrar";
+  }
 
   async function tryLogin(event) {
     if (event) {
@@ -1225,11 +1491,16 @@ function initLogin() {
       event.stopPropagation();
     }
 
-    if (loginRunning) {
-      return false;
-    }
+    if (loginRunning) return false;
 
-    loginRunning = true;
+    /*
+      Este intento ocurre dentro del gesto del botón.
+      iPad/Safari necesita ese gesto para permitir audio.
+    */
+    void unlockSound({
+      playTest: false,
+      announce: false
+    });
 
     const value = String(input.value || "").trim();
 
@@ -1238,20 +1509,33 @@ function initLogin() {
       error.textContent = "";
     }
 
-    input.disabled = true;
-    loginButton.disabled = true;
-    loginButton.textContent = "Comprobando…";
+    setLoginBusy(true, "Comprobando…");
 
     try {
-      const validatedPin = await validateAdminPin(value);
+      const validatedPin =
+        await validateAdminPin(value);
 
       adminPinInMemory = validatedPin;
+      saveTrustedAdminSession(validatedPin);
       input.value = "";
 
       showAdminPanel();
+
+      /*
+        Si el gesto inicial consiguió abrir AudioContext,
+        confirma con un sonido corto.
+      */
+      if (audioCtx?.state === "running") {
+        playTonePattern(true);
+        soundConfirmationPlayed = true;
+      } else {
+        refreshSoundState();
+      }
+
       return true;
     } catch (loginError) {
       console.error("Acceso rechazado:", loginError);
+      clearAdminSession({ forgetTrustedDevice: true });
 
       if (error) {
         error.hidden = false;
@@ -1263,10 +1547,56 @@ function initLogin() {
       input.select();
       return false;
     } finally {
-      loginRunning = false;
-      input.disabled = false;
-      loginButton.disabled = false;
-      loginButton.textContent = "Entrar";
+      setLoginBusy(false);
+    }
+  }
+
+  async function restoreTrustedSession() {
+    const storedSession =
+      readTrustedAdminSession();
+
+    if (!storedSession) {
+      input.focus();
+      return false;
+    }
+
+    if (error) {
+      error.hidden = true;
+      error.textContent = "";
+    }
+
+    setLoginBusy(true, "Restaurando sesión…");
+
+    try {
+      /*
+        El PIN guardado se vuelve a validar en admin-auth.
+        Así, cambiar ADMIN_PIN en Supabase invalida el dispositivo.
+      */
+      const validatedPin =
+        await validateAdminPin(storedSession.pin);
+
+      adminPinInMemory = validatedPin;
+      showAdminPanel();
+      refreshSoundState();
+      return true;
+    } catch (restoreError) {
+      console.warn(
+        "No se pudo restaurar la sesión de 8 horas:",
+        restoreError
+      );
+
+      clearAdminSession({ forgetTrustedDevice: true });
+
+      if (error) {
+        error.hidden = false;
+        error.textContent =
+          "La sesión guardada terminó o ya no es válida. Introduce el PIN.";
+      }
+
+      return false;
+    } finally {
+      setLoginBusy(false);
+      if (!adminPinInMemory) input.focus();
     }
   }
 
@@ -1279,7 +1609,7 @@ function initLogin() {
     }
   });
 
-  input.focus();
+  void restoreTrustedSession();
 }
 
 function init() {
@@ -1288,7 +1618,7 @@ function init() {
   */
   try {
     initKitchenGesturesAndMissingButton();
-initLogin();
+    initLogin();
   } catch (error) {
     showLoginRuntimeError(error);
     return;
@@ -1301,19 +1631,63 @@ initLogin();
     document.body.classList.add("dark-mode");
   }
 
-  window.addEventListener("pagehide", clearAdminSession);
+  /*
+    No cerramos la sesión al recargar ni al cerrar la pestaña.
+    El dispositivo permanece validado durante un máximo de 8 horas.
+  */
 
-  document.addEventListener("pointerdown", unlockSound);
-  document.addEventListener("keydown", unlockSound);
-  document.addEventListener("visibilitychange", () => {
-    if (!document.hidden) {
-      unlockSound();
-      updateAlarm();
-    }
-  });
+  const activateSoundFromGesture = () => {
+    void unlockSound({
+      playTest: !soundConfirmationPlayed,
+      announce: !soundUnlocked
+    }).then((unlocked) => {
+      if (unlocked && newOrders().length) {
+        startAlarm();
+      }
+    });
+  };
 
-  const banner = $("#soundBanner");
-  if (banner) banner.hidden = true;
+  document.addEventListener(
+    "pointerdown",
+    activateSoundFromGesture,
+    { passive: true }
+  );
+
+  document.addEventListener(
+    "touchend",
+    activateSoundFromGesture,
+    { passive: true }
+  );
+
+  document.addEventListener(
+    "keydown",
+    activateSoundFromGesture
+  );
+
+  const recoverAfterForeground = () => {
+    if (document.hidden) return;
+
+    refreshSoundState();
+    void syncOrdersFromBackend();
+    updateAlarm();
+  };
+
+  document.addEventListener(
+    "visibilitychange",
+    recoverAfterForeground
+  );
+
+  window.addEventListener(
+    "pageshow",
+    recoverAfterForeground
+  );
+
+  window.addEventListener(
+    "focus",
+    recoverAfterForeground
+  );
+
+  refreshSoundState();
 
   const orderModeBtn = $("#orderModeBtn");
   if (orderModeBtn) orderModeBtn.addEventListener("click", cycleOrderMode);
@@ -1341,11 +1715,38 @@ initLogin();
     });
   }
 
+  const logoutButton = $("#adminLogoutBtn");
+  if (logoutButton) {
+    logoutButton.addEventListener("click", () => {
+      logoutAdmin();
+    });
+  }
+
   const soundBtn = $("#enableSoundBtn");
   if (soundBtn) {
-    soundBtn.addEventListener("click", () => {
-      unlockSound();
-      if (newOrders().length) beep();
+    soundBtn.addEventListener("click", async (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+
+      soundBtn.disabled = true;
+      soundBtn.textContent = "Activando…";
+
+      try {
+        const unlocked = await unlockSound({
+          playTest: true,
+          announce: true
+        });
+
+        if (unlocked && newOrders().length) {
+          startAlarm();
+        }
+      } finally {
+        soundBtn.disabled = false;
+        soundBtn.textContent =
+          soundUnlocked
+            ? "Probar sonido"
+            : "Activar y probar sonido";
+      }
     });
   }
 
@@ -1388,6 +1789,18 @@ initLogin();
     window.FOGON_DB.subscribeOrders(() => syncOrdersFromBackend());
     window.FOGON_DB.subscribeAvailability(() => syncAvailabilityFromBackend());
   }
+
+  setInterval(() => {
+    if (!adminPinInMemory) return;
+
+    const session = readTrustedAdminSession();
+
+    if (!session) {
+      logoutAdmin(
+        "Han pasado 8 horas. Introduce nuevamente el PIN del panel."
+      );
+    }
+  }, 30000);
 
   setInterval(() => {
     if (window.FOGON_DB?.isReady() || BACKEND_URL) syncOrdersFromBackend();
