@@ -836,8 +836,12 @@ function buildCartItem(form) {
 
 function addToCart(cartItem) {
   state.cart.push(cartItem);
-  renderCart();
+
+  // Cierra el producto inmediatamente después de agregarlo.
+  // Así, incluso si una actualización visual falla, el modal no queda abierto.
   closeProduct();
+
+  renderCart();
   showAddedToCartNotice();
 }
 
@@ -873,9 +877,14 @@ function renderCart() {
     `).join("");
   }
   const totals = getTotals();
-  $("#subtotalValue").textContent = money(totals.subtotal);
-  $("#taxValue").textContent = money(totals.tax);
-  $("#totalValue").textContent = money(totals.total);
+
+  const subtotalValue = $("#subtotalValue");
+  const taxValue = $("#taxValue");
+  const totalValue = $("#totalValue");
+
+  if (subtotalValue) subtotalValue.textContent = money(totals.subtotal);
+  if (taxValue) taxValue.textContent = money(totals.tax);
+  if (totalValue) totalValue.textContent = money(totals.total);
 }
 
 function updateCartFabCompact(forceExpanded = false) {
@@ -942,13 +951,80 @@ function nextSimpleOrderId() {
 function openPayment(order) {
   state.pendingOrder = order;
   state.orderType = "";
-  $("#orderTypeStep").hidden = false;
-  $("#paymentMethodStep").hidden = true;
+
+  const orderTypeStep = $("#orderTypeStep");
+  const paymentMethodStep = $("#paymentMethodStep");
+  const orderThanksStep = $("#orderThanksStep");
+
+  if (orderTypeStep) orderTypeStep.hidden = false;
+  if (paymentMethodStep) paymentMethodStep.hidden = true;
+  if (orderThanksStep) orderThanksStep.hidden = true;
+
   $("#paymentModal").setAttribute("aria-hidden", "false");
+}
+
+function showOrderThanks(orderNumber, activeOrderCount = 0) {
+  const orderTypeStep = $("#orderTypeStep");
+  const paymentMethodStep = $("#paymentMethodStep");
+  const orderThanksStep = $("#orderThanksStep");
+
+  if (orderTypeStep) orderTypeStep.hidden = true;
+  if (paymentMethodStep) paymentMethodStep.hidden = true;
+  if (orderThanksStep) orderThanksStep.hidden = false;
+
+  const isEnglish = state.lang === "en";
+  const title = $("#orderThanksTitle");
+  const message = $("#orderThanksMessage");
+  const number = $("#orderThanksNumber");
+  const delay = $("#orderThanksDelay");
+  const closeButton = $("#closeOrderThanksBtn");
+
+  if (title) {
+    title.textContent = isEnglish
+      ? "Thank you for your order"
+      : "Gracias por tu pedido";
+  }
+
+  if (message) {
+    message.textContent = isEnglish
+      ? "We will notify you on WhatsApp when your order is ready."
+      : "Te informaremos por WhatsApp cuando tu pedido esté listo.";
+  }
+
+  if (number) {
+    number.textContent = orderNumber
+      ? (isEnglish ? `Order #${orderNumber}` : `Pedido #${orderNumber}`)
+      : "";
+    number.hidden = !orderNumber;
+  }
+
+  if (delay) {
+    delay.hidden = activeOrderCount <= 3;
+    delay.textContent = isEnglish
+      ? "We currently have several orders in preparation, so your order may take a little longer."
+      : "Tenemos varios pedidos en preparación, por lo que tu pedido puede tardar un poco más.";
+  }
+
+  if (closeButton) {
+    closeButton.textContent = isEnglish ? "Close" : "Cerrar";
+  }
+
+  // Impide volver a enviar el mismo pedido desde esta ventana.
+  state.pendingOrder = null;
+  state.orderType = "";
 }
 
 function closePayment() {
   $("#paymentModal").setAttribute("aria-hidden", "true");
+
+  const orderTypeStep = $("#orderTypeStep");
+  const paymentMethodStep = $("#paymentMethodStep");
+  const orderThanksStep = $("#orderThanksStep");
+
+  if (orderTypeStep) orderTypeStep.hidden = false;
+  if (paymentMethodStep) paymentMethodStep.hidden = true;
+  if (orderThanksStep) orderThanksStep.hidden = true;
+
   state.pendingOrder = null;
   state.orderType = "";
 }
@@ -987,83 +1063,102 @@ async function saveOrder(paymentMethod) {
   if (!state.pendingOrder || orderSubmissionInProgress) return;
 
   orderSubmissionInProgress = true;
-  const paymentButtons = Array.from(document.querySelectorAll("[data-payment]"));
 
-  const releaseSubmissionLock = () => {
-    orderSubmissionInProgress = false;
-    paymentButtons.forEach((button) => {
-      button.disabled = false;
-      button.removeAttribute("aria-disabled");
-    });
-  };
+  const paymentButtons = Array.from(
+    document.querySelectorAll("[data-payment]")
+  );
 
   paymentButtons.forEach((button) => {
     button.disabled = true;
     button.setAttribute("aria-disabled", "true");
   });
 
-  if (!currentOrderingState().open) {
-    closePayment();
-    alert(orderingClosedMessage());
-    updateOrderingUi();
-    releaseSubmissionLock();
-    releaseSubmissionLock();
-    return;
-  }
+  try {
+    if (!currentOrderingState().open) {
+      closePayment();
+      alert(orderingClosedMessage());
+      updateOrderingUi();
+      return;
+    }
 
-  let order = { ...state.pendingOrder, paymentMethod, orderType: state.orderType, status: "new" };
-  order.items = (order.items || []).map((item, index) => index === 0
-    ? { ...item, orderType: state.orderType }
-    : item);
-  const db = window.FOGON_DB;
+    const originalPendingId = state.pendingOrder.id;
 
-  if (db?.isReady()) {
-    try {
+    let order = {
+      ...state.pendingOrder,
+      paymentMethod,
+      orderType: state.orderType,
+      status: "new"
+    };
+
+    order.items = (order.items || []).map((item, index) => (
+      index === 0
+        ? { ...item, orderType: state.orderType }
+        : item
+    ));
+
+    const db = window.FOGON_DB;
+
+    if (db?.isReady()) {
       order = await db.createOrder(order);
       order.orderType = state.orderType;
-    } catch (error) {
-      console.error(error);
-      alert(state.lang === "en"
-        ? "The order could not be sent. Please try again."
-        : "No se pudo enviar el pedido. Inténtalo otra vez.");
-      releaseSubmissionLock();
-      releaseSubmissionLock();
-      return;
-    }
-  } else if (BACKEND_URL) {
-    try {
+    } else if (BACKEND_URL) {
       const result = await postOrderToBackend(order);
       if (result?.orderId) order.backendOrderId = result.orderId;
-    } catch (error) {
-      console.error("No se pudo enviar el pedido al backend:", error);
-      alert(state.lang === "en"
-        ? "The order could not be sent. Please try again."
-        : "No se pudo enviar el pedido. Inténtalo otra vez.");
-      return;
+    } else {
+      throw new Error(
+        state.lang === "en"
+          ? "The ordering service is temporarily unavailable. Please try again."
+          : "El servicio de pedidos no está disponible ahora mismo. Inténtalo otra vez."
+      );
     }
-  } else {
-    alert(state.lang === "en"
-      ? "The ordering service is temporarily unavailable. Please try again."
-      : "El servicio de pedidos no está disponible ahora mismo. Inténtalo otra vez.");
-    return;
+
+    const orders = JSON.parse(
+      localStorage.getItem(STORAGE_ORDERS) || "[]"
+    );
+
+    orders.unshift(order);
+    localStorage.setItem(STORAGE_ORDERS, JSON.stringify(orders));
+
+    const activeOrderCount = await countActiveOrders();
+
+    state.cart = [];
+
+    const customerName = $("#customerName");
+    const customerPhone = $("#customerPhone");
+
+    if (customerName) customerName.value = "";
+    if (customerPhone) customerPhone.value = "";
+
+    renderCart();
+    closeCart();
+
+    const displayOrderNumber =
+      order.publicId ||
+      order.public_id ||
+      order.id ||
+      originalPendingId ||
+      "";
+
+    showOrderThanks(displayOrderNumber, activeOrderCount);
+  } catch (error) {
+    console.error("No se pudo guardar el pedido:", error);
+
+    alert(
+      error?.message ||
+      (
+        state.lang === "en"
+          ? "The order could not be sent. Please try again."
+          : "No se pudo enviar el pedido. Inténtalo otra vez."
+      )
+    );
+  } finally {
+    orderSubmissionInProgress = false;
+
+    paymentButtons.forEach((button) => {
+      button.disabled = false;
+      button.removeAttribute("aria-disabled");
+    });
   }
-
-  const orders = JSON.parse(localStorage.getItem(STORAGE_ORDERS) || "[]");
-  orders.unshift(order);
-  localStorage.setItem(STORAGE_ORDERS, JSON.stringify(orders));
-
-  const activeOrderCount = await countActiveOrders();
-
-  state.cart = [];
-  $("#customerName").value = "";
-  $("#customerPhone").value = "";
-  renderCart();
-  closeCart();
-  closePayment();
-  releaseSubmissionLock();
-  alert(activeOrderCount > 3 ? `${text("orderSent")}
-
-${text("delayWarning")}` : text("orderSent"));
 }
 
 function initEvents() {
@@ -1109,7 +1204,13 @@ function initEvents() {
     }
 
     const paymentButton = event.target.closest("[data-payment]");
-    if (paymentButton && state.pendingOrder && state.orderType) saveOrder(paymentButton.dataset.payment);
+    if (paymentButton && state.pendingOrder && state.orderType) {
+      saveOrder(paymentButton.dataset.payment);
+    }
+
+    if (event.target.closest("#closeOrderThanksBtn")) {
+      closePayment();
+    }
   });
 
   document.addEventListener("submit", (event) => {
