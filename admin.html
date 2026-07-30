@@ -14,6 +14,20 @@
       font-size: 12px;
       text-align: center;
     }
+
+    .sound-banner {
+      align-items: center;
+      gap: 14px;
+    }
+
+    .sound-banner p {
+      flex: 1 1 320px;
+      margin: 0;
+    }
+
+    .sound-banner .primary-btn {
+      flex: 0 0 auto;
+    }
   </style>
 </head>
 <body class="admin-body dark-mode">
@@ -27,7 +41,7 @@
       </label>
       <button id="loginButton" class="primary-btn full" type="button">Entrar</button>
       <p id="pinError" class="error-text" hidden>PIN incorrecto.</p>
-      <p id="adminBuildLabel" class="admin-build-label">Acceso V49</p>
+      <p id="adminBuildLabel" class="admin-build-label">Acceso V50 · sesión de 8 horas</p>
     </form>
   </main>
 
@@ -49,12 +63,19 @@
           Pedidos: AUTOMATICO
         </button>
         <button id="adminThemeToggleBtn" class="secondary-btn" type="button">Modo claro</button>
+        <button id="adminLogoutBtn" class="secondary-btn" type="button">Cerrar sesión</button>
         <button id="clearOrdersBtn" class="secondary-btn danger-btn" type="button">Limpiar pedidos</button>
       </div>
     </header>
 
-    <div id="soundBanner" class="sound-banner" hidden>
-      <p><strong>Sonido del iPad</strong><br>El sonido se activa con el PIN. Mantén esta pestaña abierta; sonará en bucle con cada pedido nuevo hasta aceptar el pedido.</p>
+    <div id="soundBanner" class="sound-banner">
+      <p id="soundBannerText">
+        <strong>Toca para activar el sonido</strong><br>
+        Después de abrir o recargar el panel, pulsa el botón una vez para que Safari permita la alarma.
+      </p>
+      <button id="enableSoundBtn" class="primary-btn" type="button">
+        Activar y probar sonido
+      </button>
     </div>
 
     <nav class="admin-tabs" aria-label="Secciones del panel">
@@ -110,15 +131,12 @@
   if (!Element.prototype.closest) Element.prototype.closest = function (selector) { var node = this; while (node && node.nodeType === 1) { if (node.matches(selector)) return node; node = node.parentElement || node.parentNode; } return null; };
   if (!Array.from) Array.from = function (value) { return [].slice.call(value); };
   </script>
-
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="supabase-config.js?v=18-mobile-fixed"></script>
   <script src="supabase-client.js?v=30-order-fix"></script>
   <script src="backend-config.js?v=18-mobile-fixed"></script>
   <script>
-  // Si GitHub Pages entrega HTML o un archivo incorrecto en lugar de admin.js,
-  // el panel mostrará el problema en pantalla en vez de dejar el botón muerto.
-  window.FOGON_ADMIN_EXPECTED_BUILD = "49-admin-js-restored";
+  window.FOGON_ADMIN_EXPECTED_BUILD = "50-sound-session-8h";
 
   window.reportAdminScriptLoadFailure = function () {
     var errorBox = document.getElementById("pinError");
@@ -127,7 +145,7 @@
     if (errorBox) {
       errorBox.hidden = false;
       errorBox.textContent =
-        "No se cargó admin.js correctamente. Reemplaza el archivo admin.js de la raíz del repositorio y recarga sin caché.";
+        "No se cargó admin.js correctamente. Reemplaza admin.js y recarga sin caché.";
     }
 
     if (loginButton) {
@@ -136,7 +154,7 @@
     }
   };
   </script>
-  <script src="admin.js?v=49-admin-js-restored" onerror="window.reportAdminScriptLoadFailure()"></script>
+  <script src="admin.js?v=50-sound-session-8h" onerror="window.reportAdminScriptLoadFailure()"></script>
   <script>
   window.setTimeout(function () {
     if (window.FOGON_ADMIN_BUILD !== window.FOGON_ADMIN_EXPECTED_BUILD) {
