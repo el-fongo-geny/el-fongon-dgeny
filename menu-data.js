@@ -1433,17 +1433,40 @@ const MENU_ITEMS = [
   },
 
   {
-    id: "morir-sonando-chinola-o-limon",
+    id: "morir-sonando",
     category: "jugos",
-    es: "Morir Soñando de Chinola o Limón",
-    en: "Passion Fruit or Lemon Morir Soñando",
+    es: "Morir Soñando",
+    en: "Morir Soñando",
     description: {
-      es: "Bebida dominicana cremosa de chinola o limón.",
-      en: "Creamy Dominican passion fruit or lemon drink."
+      es: "Bebida dominicana cremosa. Elige entre limón o chinola.",
+      en: "Creamy Dominican drink. Choose lemon or passion fruit."
     },
     price: 8,
     image: "assets/images/morir-sonando-chinola.png",
-    taxable: false
+    taxable: false,
+    optionGroups: [
+      {
+        id: "sabor",
+        es: "Elige el sabor",
+        en: "Choose the flavor",
+        required: true,
+        type: "single",
+        options: [
+          {
+            id: "limon",
+            es: "Limón",
+            en: "Lemon",
+            price: 0
+          },
+          {
+            id: "chinola",
+            es: "Chinola",
+            en: "Passion fruit",
+            price: 0
+          }
+        ]
+      }
+    ]
   },
 
   {
