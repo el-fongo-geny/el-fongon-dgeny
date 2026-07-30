@@ -495,6 +495,93 @@ window.FOGON_MENU_ADMIN_BUILD = "7-smart-image-fit-20260724";
     }
   }
 
+
+  const WEEKLY_CLOSED_DAY_KEY = "system:weekly-closed-day";
+
+  function ensureScheduleView() {
+    if ($("#scheduleView")) return;
+    const nav = $(".sidebar-nav");
+    const workspace = $(".workspace");
+    if (!nav || !workspace) return;
+
+    const button = document.createElement("button");
+    button.className = "nav-item";
+    button.type = "button";
+    button.dataset.view = "schedule";
+    button.innerHTML = `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M7 3v6M17 3v6M5 11h14v9H5z"/></svg><span>Horario y cierres</span>`;
+    nav.appendChild(button);
+
+    const section = document.createElement("section");
+    section.id = "scheduleView";
+    section.className = "view";
+    section.hidden = true;
+    section.innerHTML = `
+      <section class="content-card schedule-settings-card">
+        <div class="schedule-settings-copy">
+          <p class="eyebrow">Operación del local</p>
+          <h2>Cierre semanal automático</h2>
+          <p>El día elegido permanecerá cerrado las 24 horas según California.</p>
+        </div>
+        <div class="schedule-settings-form">
+          <label class="field">
+            <span>Día semanal de cierre</span>
+            <select id="weeklyClosedDay" class="select-control">
+              <option value="-1">Ningún día</option>
+              <option value="0">Domingo</option>
+              <option value="1">Lunes</option>
+              <option value="2">Martes</option>
+              <option value="3">Miércoles</option>
+              <option value="4">Jueves</option>
+              <option value="5">Viernes</option>
+              <option value="6">Sábado</option>
+            </select>
+          </label>
+          <button id="saveWeeklyClosedDay" class="button button-primary" type="button">Guardar día de cierre</button>
+          <p id="weeklyClosedDayStatus" class="schedule-settings-status"></p>
+        </div>
+      </section>`;
+    workspace.appendChild(section);
+  }
+
+  async function loadWeeklyClosedDay() {
+    const select = $("#weeklyClosedDay");
+    const status = $("#weeklyClosedDayStatus");
+    if (!select) return;
+    try {
+      const db = window.FOGON_DB;
+      if (!db?.isReady?.()) throw new Error("Supabase no está disponible.");
+      const availability = await db.fetchAvailability();
+      const value = Number(availability[WEEKLY_CLOSED_DAY_KEY]);
+      select.value = Number.isInteger(value) && value >= -1 && value <= 6 ? String(value) : "2";
+      if (status) status.textContent = "Configuración cargada.";
+    } catch (error) {
+      console.error(error);
+      if (status) status.textContent = "No se pudo cargar.";
+    }
+  }
+
+  async function saveWeeklyClosedDay() {
+    const select = $("#weeklyClosedDay");
+    const status = $("#weeklyClosedDayStatus");
+    const button = $("#saveWeeklyClosedDay");
+    if (!select || !button) return;
+    button.disabled = true;
+    if (status) status.textContent = "Guardando…";
+    try {
+      const db = window.FOGON_DB;
+      if (!db?.isReady?.()) throw new Error("Supabase no está disponible.");
+      await db.setAvailability(WEEKLY_CLOSED_DAY_KEY, Number(select.value));
+      if (status) status.textContent = "Día de cierre guardado.";
+      toast("Día de cierre guardado.", "success");
+    } catch (error) {
+      console.error(error);
+      if (status) status.textContent = "No se pudo guardar.";
+      toast("No se pudo guardar el día de cierre.", "error");
+    } finally {
+      button.disabled = false;
+    }
+  }
+
   function switchView(view) {
     state.view = view;
 
@@ -504,13 +591,16 @@ window.FOGON_MENU_ADMIN_BUILD = "7-smart-image-fit-20260724";
 
     const productsView = $("#productsView");
     const categoriesView = $("#categoriesView");
+    const scheduleView = $("#scheduleView");
     const pageTitle = $("#pageTitle");
     const addProductButton = $("#addProductButton");
 
     if (productsView) productsView.hidden = view !== "products";
     if (categoriesView) categoriesView.hidden = view !== "categories";
-    if (pageTitle) pageTitle.textContent = view === "products" ? "Productos" : "Categorías";
+    if (scheduleView) scheduleView.hidden = view !== "schedule";
+    if (pageTitle) pageTitle.textContent = view === "products" ? "Productos" : view === "categories" ? "Categorías" : "Horario y cierres";
     if (addProductButton) addProductButton.hidden = view !== "products";
+    if (view === "schedule") loadWeeklyClosedDay();
 
     closeMobileSidebar();
   }
