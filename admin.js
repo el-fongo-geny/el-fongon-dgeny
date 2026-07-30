@@ -73,6 +73,7 @@ const STORAGE_ORDERS = "fogon_orders";
 const STORAGE_AVAILABILITY = "fogon_availability";
 const STORAGE_KITCHEN_HIDDEN = "fogon_kitchen_hidden";
 const STORAGE_ADMIN_THEME = "fogon_admin_theme";
+const STORAGE_KITCHEN_SELECTED = "fogon_kitchen_selected";
 /* El PIN no está escrito en el código público. */
 let adminPinInMemory = "";
 
@@ -530,9 +531,18 @@ function setKitchenHiddenIds(ids) {
   safeLocalSet(STORAGE_KITCHEN_HIDDEN, JSON.stringify(Array.from(new Set(ids))));
 }
 
+function getSelectedKitchenOrderId() {
+  return String(safeLocalGet(STORAGE_KITCHEN_SELECTED) || "");
+}
+
+function setSelectedKitchenOrderId(orderId) {
+  safeLocalSet(STORAGE_KITCHEN_SELECTED, String(orderId || ""));
+}
+
 function hideKitchenOrder(orderId) {
   const ids = getKitchenHiddenIds();
   setKitchenHiddenIds([...ids, orderId]);
+  if (getSelectedKitchenOrderId() === String(orderId)) setSelectedKitchenOrderId("");
   renderKitchen();
   updateCounters();
 }
@@ -819,6 +829,132 @@ async function sendReadyNotification(orderId) {
   }
 }
 
+
+async function sendDailyMissingReport() {
+  const button = $("#sendDailyMissingBtn");
+  if (button?.disabled) return;
+  try {
+    button.disabled = true;
+    button.textContent = "Enviando faltantes…";
+    const { supabaseUrl, anonKey } = getSupabaseFunctionConfig();
+    const response = await fetch(`${supabaseUrl}/functions/v1/send-daily-missing`, {
+      method: "POST",
+      mode: "cors",
+      cache: "no-store",
+      headers: buildEdgeFunctionHeaders(anonKey),
+      body: JSON.stringify({ action: "send_now", adminPin: getAdminPinOrThrow() })
+    });
+    const raw = await response.text();
+    let result = {};
+    try { result = raw ? JSON.parse(raw) : {}; } catch (_) { result = { detail: raw }; }
+    if (!response.ok || !result?.ok) {
+      throw new Error([`HTTP ${response.status}`, result?.error, result?.detail].filter(Boolean).join(" · "));
+    }
+    alert(`Faltantes enviados a +1 650-722-4407. ${Number(result.count || 0)} elemento(s).`);
+  } catch (error) {
+    console.error(error);
+    alert(`No se pudieron enviar los faltantes.\n\n${error?.message || error}`);
+  } finally {
+    if (button) {
+      button.disabled = false;
+      button.textContent = "Enviar faltantes del día por WhatsApp";
+    }
+  }
+}
+
+let kitchenSwipe = null;
+
+function selectKitchenCard(card) {
+  const id = String(card?.dataset?.kitchenOrderId || "");
+  if (!id) return;
+  setSelectedKitchenOrderId(id);
+  $$(".kitchen-order-card").forEach((item) => {
+    item.classList.toggle("kitchen-selected", String(item.dataset.kitchenOrderId) === id);
+  });
+}
+
+function startKitchenSwipe(card, x, y) {
+  if (!card?.classList.contains("kitchen-selected")) return;
+  kitchenSwipe = { card, startX: x, startY: y, dx: 0, horizontal: false };
+}
+
+function moveKitchenSwipe(x, y) {
+  if (!kitchenSwipe) return;
+  const dx = x - kitchenSwipe.startX;
+  const dy = y - kitchenSwipe.startY;
+  if (!kitchenSwipe.horizontal) {
+    if (Math.abs(dx) < 10 && Math.abs(dy) < 10) return;
+    if (Math.abs(dy) >= Math.abs(dx) || dx >= 0) {
+      kitchenSwipe = null;
+      return;
+    }
+    kitchenSwipe.horizontal = true;
+    kitchenSwipe.card.classList.add("kitchen-dragging");
+  }
+  kitchenSwipe.dx = Math.min(0, dx);
+  kitchenSwipe.card.style.transform = `translate3d(${Math.max(-180, kitchenSwipe.dx)}px,0,0)`;
+}
+
+function finishKitchenSwipe() {
+  if (!kitchenSwipe) return;
+  const { card, dx, horizontal } = kitchenSwipe;
+  kitchenSwipe = null;
+  card.classList.remove("kitchen-dragging");
+  if (horizontal && dx <= -90) {
+    const id = String(card.dataset.kitchenOrderId || "");
+    card.classList.add("kitchen-closing");
+    setTimeout(() => hideKitchenOrder(id), 190);
+    return;
+  }
+  card.style.transform = "";
+}
+
+function initKitchenGesturesAndMissingButton() {
+  const style = document.createElement("style");
+  style.textContent = `
+    .kitchen-order-card{touch-action:pan-y;user-select:none;-webkit-user-select:none;transition:transform 180ms ease,opacity 180ms ease,box-shadow 180ms ease;will-change:transform,opacity}
+    .kitchen-order-card.kitchen-selected{outline:4px solid rgba(255,174,0,.95);box-shadow:0 0 0 7px rgba(255,174,0,.18)}
+    .kitchen-order-card.kitchen-dragging{transition:none}
+    .kitchen-order-card.kitchen-closing{transform:translate3d(-120%,80px,0) rotate(-7deg)!important;opacity:0}
+    .kitchen-swipe-hint{display:none;margin:10px 0;font-weight:800}
+    .kitchen-order-card.kitchen-selected .kitchen-swipe-hint{display:block}
+  `;
+  document.head.appendChild(style);
+
+  document.addEventListener("click", (event) => {
+    const missing = event.target.closest("#sendDailyMissingBtn");
+    if (missing) {
+      event.preventDefault();
+      sendDailyMissingReport();
+      return;
+    }
+    const card = event.target.closest(".kitchen-order-card");
+    if (card && !event.target.closest("button,a,input,select,textarea")) selectKitchenCard(card);
+  });
+
+  document.addEventListener("pointerdown", (event) => {
+    const card = event.target.closest(".kitchen-order-card");
+    if (card) startKitchenSwipe(card, event.clientX, event.clientY);
+  });
+  document.addEventListener("pointermove", (event) => moveKitchenSwipe(event.clientX, event.clientY));
+  document.addEventListener("pointerup", finishKitchenSwipe);
+  document.addEventListener("pointercancel", finishKitchenSwipe);
+
+  document.addEventListener("touchstart", (event) => {
+    const card = event.target.closest(".kitchen-order-card");
+    const touch = event.touches?.[0];
+    if (card && touch) startKitchenSwipe(card, touch.clientX, touch.clientY);
+  }, { passive: true });
+  document.addEventListener("touchmove", (event) => {
+    const touch = event.touches?.[0];
+    if (!touch) return;
+    moveKitchenSwipe(touch.clientX, touch.clientY);
+    if (kitchenSwipe?.horizontal) event.preventDefault();
+  }, { passive: false });
+  document.addEventListener("touchend", finishKitchenSwipe);
+  document.addEventListener("touchcancel", finishKitchenSwipe);
+}
+
 function orderTypeLabel(type) {
   if (type === "dine-in") return "Para aquí";
   if (type === "takeout") return "Para llevar";
@@ -925,7 +1061,7 @@ function renderKitchen() {
   if (!kitchenList) return;
 
   kitchenList.innerHTML = visibleOrders.length ? visibleOrders.map((order) => `
-    <article class="kitchen-order-card">
+    <article class="kitchen-order-card ${getSelectedKitchenOrderId() === String(order.id) ? "kitchen-selected" : ""}" data-kitchen-order-id="${escapeHtml(order.id)}">
       <div class="kitchen-order-head">
         <strong>${escapeHtml(order.id)}</strong>
         <span>${statusLabel(order)}</span>
@@ -933,6 +1069,7 @@ function renderKitchen() {
       <div class="kitchen-items">
         ${(order.items || []).map((item) => itemDetailsHtml(item, true)).join("")}
       </div>
+      <p class="kitchen-swipe-hint">Toca para preparar · desliza a la izquierda para retirar de Cocina</p>
       <button class="secondary-btn full" data-kitchen-done="${escapeHtml(order.id)}" type="button">Terminado en cocina</button>
     </article>
   `).join("") : `<p class="empty-state">No hay comandas pendientes para cocina.</p>`;
@@ -1150,7 +1287,8 @@ function init() {
     El acceso se conecta antes que cualquier preferencia o sección.
   */
   try {
-    initLogin();
+    initKitchenGesturesAndMissingButton();
+initLogin();
   } catch (error) {
     showLoginRuntimeError(error);
     return;
