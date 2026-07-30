@@ -17,6 +17,8 @@ const STORAGE_ORDER_COUNTER = "fogon_order_counter";
 const BACKEND_URL = (window.FOGON_BACKEND_URL || "").replace(/\/$/, "");
 const ORDER_MODE_MANUAL_KEY = "system:orders-manual";
 const ORDER_MODE_OPEN_KEY = "system:orders-open";
+const WEEKLY_CLOSED_DAY_KEY = "system:weekly-closed-day";
+let orderSubmissionInProgress = false;
 const CALIFORNIA_TIME_ZONE = "America/Los_Angeles";
 const ORDER_OPEN_MINUTES = 11 * 60;
 const ORDER_CLOSE_MINUTES = 20 * 60 + 30;
@@ -38,22 +40,47 @@ function californiaMinutesNow(date = new Date()) {
   return hour * 60 + minute;
 }
 
+function californiaWeekdayNow(date = new Date()) {
+  const shortDay = new Intl.DateTimeFormat("en-US", {
+    timeZone: CALIFORNIA_TIME_ZONE,
+    weekday: "short"
+  }).format(date);
+  return ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].indexOf(shortDay);
+}
+
 function currentOrderingState() {
   const availability = getAvailability();
   const manual = availability[ORDER_MODE_MANUAL_KEY] === true;
   const forcedOpen = availability[ORDER_MODE_OPEN_KEY] === true;
-  const automaticOpen = californiaMinutesNow() >= ORDER_OPEN_MINUTES &&
+  const configuredClosedDay = Number(availability[WEEKLY_CLOSED_DAY_KEY]);
+  const weeklyClosed =
+    Number.isInteger(configuredClosedDay) &&
+    configuredClosedDay >= 0 &&
+    configuredClosedDay <= 6 &&
+    californiaWeekdayNow() === configuredClosedDay;
+
+  const automaticOpen =
+    !weeklyClosed &&
+    californiaMinutesNow() >= ORDER_OPEN_MINUTES &&
     californiaMinutesNow() < ORDER_CLOSE_MINUTES;
+
   return {
-    mode: manual ? (forcedOpen ? "open" : "closed") : "auto",
-    open: manual ? forcedOpen : automaticOpen
+    mode: weeklyClosed ? "weekly-closed" : manual ? (forcedOpen ? "open" : "closed") : "auto",
+    open: weeklyClosed ? false : (manual ? forcedOpen : automaticOpen),
+    weeklyClosed
   };
 }
 
 function orderingClosedMessage() {
+  const status = currentOrderingState();
+  if (status.weeklyClosed) {
+    return state.lang === "en"
+      ? "Online ordering is closed today for the restaurant's weekly closing day."
+      : "Los pedidos en línea están cerrados hoy por el día semanal de cierre del local.";
+  }
   return state.lang === "en"
     ? "Online ordering is currently closed. Regular ordering hours are 11:00 AM to 8:30 PM, California time."
-    : "Los pedidos en linea estan cerrados ahora mismo. El horario habitual es de 11:00 a. m. a 8:30 p. m., hora de California.";
+    : "Los pedidos en línea están cerrados ahora mismo. El horario habitual es de 11:00 a. m. a 8:30 p. m., hora de California.";
 }
 
 function updateOrderingUi() {
@@ -796,8 +823,8 @@ function buildCartItem(form) {
     nameEs: item.es,
     nameEn: item.en,
     basePrice: Number(item.price),
-    taxable: item.taxable !== false,
-    taxRate: TAX_RATE_SAN_JOSE_CA,
+    taxable: false,
+    taxRate: 0,
     selections,
     extras,
     removables,
@@ -816,8 +843,8 @@ function addToCart(cartItem) {
 
 function getTotals() {
   const subtotal = state.cart.reduce((sum, item) => sum + item.lineTotal * item.quantity, 0);
-  const tax = state.cart.reduce((sum, item) => item.taxable ? sum + item.lineTotal * item.quantity * item.taxRate : sum, 0);
-  return { subtotal, tax, total: subtotal + tax };
+  const tax = 0;
+  return { subtotal, tax, total: subtotal };
 }
 
 function renderCart() {
@@ -957,11 +984,30 @@ async function countActiveOrders() {
 }
 
 async function saveOrder(paymentMethod) {
-  if (!state.pendingOrder) return;
+  if (!state.pendingOrder || orderSubmissionInProgress) return;
+
+  orderSubmissionInProgress = true;
+  const paymentButtons = Array.from(document.querySelectorAll("[data-payment]"));
+
+  const releaseSubmissionLock = () => {
+    orderSubmissionInProgress = false;
+    paymentButtons.forEach((button) => {
+      button.disabled = false;
+      button.removeAttribute("aria-disabled");
+    });
+  };
+
+  paymentButtons.forEach((button) => {
+    button.disabled = true;
+    button.setAttribute("aria-disabled", "true");
+  });
+
   if (!currentOrderingState().open) {
     closePayment();
     alert(orderingClosedMessage());
     updateOrderingUi();
+    releaseSubmissionLock();
+    releaseSubmissionLock();
     return;
   }
 
@@ -980,6 +1026,8 @@ async function saveOrder(paymentMethod) {
       alert(state.lang === "en"
         ? "The order could not be sent. Please try again."
         : "No se pudo enviar el pedido. Inténtalo otra vez.");
+      releaseSubmissionLock();
+      releaseSubmissionLock();
       return;
     }
   } else if (BACKEND_URL) {
@@ -1012,6 +1060,7 @@ async function saveOrder(paymentMethod) {
   renderCart();
   closeCart();
   closePayment();
+  releaseSubmissionLock();
   alert(activeOrderCount > 3 ? `${text("orderSent")}
 
 ${text("delayWarning")}` : text("orderSent"));
