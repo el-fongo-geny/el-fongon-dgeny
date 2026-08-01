@@ -150,6 +150,19 @@ const PROTEINS = [
   }
 ];
 
+const BANDERA_PROTEINS = [
+  ...PROTEINS.map((protein) => ({
+    ...protein,
+    price: protein.id === "bistec" ? 1 : Number(protein.price || 0)
+  })),
+  {
+    id: "camarones",
+    es: "Camarones",
+    en: "Shrimp",
+    price: 2
+  }
+];
+
 const EXTRA_AVOCADO = {
   id: "aguacate-extra",
   es: "Aguacate extra",
@@ -184,7 +197,28 @@ const MENU_ITEMS = [
         en: "Choose your protein",
         required: true,
         type: "single",
-        options: PROTEINS
+        options: BANDERA_PROTEINS
+      },
+      {
+        id: "ensalada",
+        es: "Elige tu ensalada",
+        en: "Choose your salad",
+        required: true,
+        type: "single",
+        options: [
+          {
+            id: "ensalada-rusa",
+            es: "Ensalada rusa",
+            en: "Russian potato salad",
+            price: 0
+          },
+          {
+            id: "ensalada-verde",
+            es: "Ensalada verde",
+            en: "Green salad",
+            price: 0
+          }
+        ]
       }
     ],
     extras: [
@@ -298,9 +332,9 @@ const MENU_ITEMS = [
           },
           {
             id: "camaron",
-            es: "Camarón",
-            en: "Shrimp",
-            price: 0
+            es: "Camarones (+$2)",
+            en: "Shrimp (+$2)",
+            price: 2
           },
           {
             id: "chicharron",
@@ -310,9 +344,9 @@ const MENU_ITEMS = [
           },
           {
             id: "bistec",
-            es: "Bistec",
-            en: "Steak",
-            price: 0
+            es: "Bistec (+$1)",
+            en: "Steak (+$1)",
+            price: 1
           }
         ]
       }
@@ -596,6 +630,12 @@ const MENU_ITEMS = [
             es: "Pollo",
             en: "Chicken",
             price: 0
+          },
+          {
+            id: "mixta",
+            es: "Mixta",
+            en: "Mixed",
+            price: 0
           }
         ]
       }
@@ -643,6 +683,35 @@ const MENU_ITEMS = [
     extras: [
       EXTRA_AVOCADO
     ]
+  },
+
+  {
+    id: "mix-dominicano",
+    category: "platos-fuertes",
+    es: "Mix Dominicano",
+    en: "Dominican Mix",
+    description: {
+      es: "Longaniza, salami y queso.",
+      en: "Dominican sausage, salami and cheese."
+    },
+    price: 23,
+    image: "assets/images/mix.png",
+    taxable: true
+  },
+
+  {
+    id: "plato-del-dia",
+    category: "platos-fuertes",
+    es: "Plato del Día",
+    en: "Daily Special",
+    description: {
+      es: "El contenido y el precio varían según el día.",
+      en: "Contents and price vary by day."
+    },
+    price: -1,
+    image: "assets/images/plato-del-dia.png",
+    taxable: true,
+    visible: false
   },
 
   {
@@ -1130,7 +1199,7 @@ const MENU_ITEMS = [
       es: "Orden de tostones.",
       en: "Order of tostones."
     },
-    price: 7,
+    price: 6,
     image: "assets/images/tostones.png",
     taxable: true
   },
@@ -1188,6 +1257,20 @@ const MENU_ITEMS = [
     },
     price: 4.5,
     image: "assets/images/habichuelas-guisadas.png",
+    taxable: true
+  },
+
+  {
+    id: "papas-fritas",
+    category: "acompanamientos",
+    es: "Papas Fritas",
+    en: "French Fries",
+    description: {
+      es: "Porción de papas fritas.",
+      en: "Side of French fries."
+    },
+    price: 6,
+    image: "assets/images/papas-fritas.png",
     taxable: true
   },
 
@@ -1467,6 +1550,20 @@ const MENU_ITEMS = [
         ]
       }
     ]
+  },
+
+  {
+    id: "red-bull",
+    category: "bebidas",
+    es: "Red Bull",
+    en: "Red Bull",
+    description: {
+      es: "Bebida energética Red Bull.",
+      en: "Red Bull energy drink."
+    },
+    price: 5,
+    image: "assets/images/red-bull.png",
+    taxable: true
   },
 
   {
