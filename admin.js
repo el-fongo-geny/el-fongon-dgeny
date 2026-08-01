@@ -76,7 +76,7 @@ function showLoginRuntimeError(error) {
   console.error("Error del administrador:", error);
 }
 
-window.FOGON_ADMIN_BUILD = "50-sound-session-8h";
+window.FOGON_ADMIN_BUILD = "51-vertical-order-cards";
 
 
 const STORAGE_ORDERS = "fogon_orders";
@@ -170,6 +170,10 @@ let soundUnlocked = false;
 let soundConfirmationPlayed = false;
 let lastSoundUnlockAttemptAt = 0;
 let lastNewOrderSignature = "";
+let ordersRenderInitialized = false;
+let knownOrderIds = new Set();
+let expandedOrderIds = new Set();
+let pendingOrderFocusId = "";
 
 function applyAdminTheme() {
   const theme = safeLocalGet(STORAGE_ADMIN_THEME) || "dark";
@@ -1273,43 +1277,190 @@ function updateCounters() {
   if (kitchenVisibleCount) kitchenVisibleCount.textContent = kitchen.length;
 }
 
+
+function orderCreatedTimestamp(order) {
+  const value = Date.parse(order?.createdAt || "");
+  return Number.isFinite(value) ? value : 0;
+}
+
+function orderElapsedLabel(order) {
+  const createdAt = orderCreatedTimestamp(order);
+  if (!createdAt) return "";
+
+  const elapsedMinutes = Math.max(
+    0,
+    Math.floor((Date.now() - createdAt) / 60000)
+  );
+
+  if (elapsedMinutes < 1) return "Ahora";
+  if (elapsedMinutes === 1) return "Hace 1 min";
+  if (elapsedMinutes < 60) return `Hace ${elapsedMinutes} min`;
+
+  const hours = Math.floor(elapsedMinutes / 60);
+  const minutes = elapsedMinutes % 60;
+
+  return minutes
+    ? `Hace ${hours} h ${minutes} min`
+    : `Hace ${hours} h`;
+}
+
+function prepareOrderCardExpansion(orders) {
+  const currentIds = new Set(
+    orders.map((order) => String(order.id))
+  );
+
+  if (!ordersRenderInitialized) {
+    const firstPending =
+      orders.find((order) => order.status === "new" || !order.status) ||
+      orders[0];
+
+    if (firstPending) {
+      expandedOrderIds.add(String(firstPending.id));
+    }
+
+    ordersRenderInitialized = true;
+  } else {
+    const newlyArrived = orders
+      .filter((order) => !knownOrderIds.has(String(order.id)))
+      .sort((left, right) =>
+        orderCreatedTimestamp(right) - orderCreatedTimestamp(left)
+      );
+
+    if (newlyArrived.length) {
+      const newest = newlyArrived[0];
+      const newestId = String(newest.id);
+
+      expandedOrderIds.add(newestId);
+      pendingOrderFocusId = newestId;
+    }
+  }
+
+  expandedOrderIds = new Set(
+    [...expandedOrderIds].filter((id) => currentIds.has(id))
+  );
+  knownOrderIds = currentIds;
+}
+
+function focusNewOrderCard() {
+  if (!pendingOrderFocusId) return;
+
+  const orderId = pendingOrderFocusId;
+  pendingOrderFocusId = "";
+
+  window.requestAnimationFrame(() => {
+    const card = Array.from(
+      document.querySelectorAll("[data-order-card]")
+    ).find((candidate) => candidate.dataset.orderCard === orderId);
+
+    if (!card) return;
+
+    card.classList.add("order-card-arrived");
+
+    try {
+      card.scrollIntoView({
+        behavior: "smooth",
+        block: "nearest",
+        inline: "start"
+      });
+    } catch (_) {
+      card.scrollIntoView();
+    }
+
+    window.setTimeout(() => {
+      card.classList.remove("order-card-arrived");
+    }, 1800);
+  });
+}
+
+function toggleOrderCard(orderId) {
+  const cleanId = String(orderId || "");
+  if (!cleanId) return;
+
+  if (expandedOrderIds.has(cleanId)) {
+    expandedOrderIds.delete(cleanId);
+  } else {
+    expandedOrderIds.add(cleanId);
+  }
+
+  renderOrders();
+}
+
 function renderOrders() {
-  const orders = getOrders();
+  const orders = getOrders()
+    .slice()
+    .sort((left, right) =>
+      orderCreatedTimestamp(right) - orderCreatedTimestamp(left)
+    );
+
+  prepareOrderCardExpansion(orders);
   updateCounters();
 
   const ordersList = $("#ordersList");
   if (!ordersList) return;
 
   ordersList.innerHTML = orders.length ? orders.map((order) => {
+    const orderId = String(order.id);
     const isNew = order.status === "new" || !order.status;
     const isReady = order.status === "ready";
+    const expanded = expandedOrderIds.has(orderId);
+    const panelId = `order-body-${orderId.replace(/[^a-zA-Z0-9_-]/g, "-")}`;
+
     return `
-    <article class="order-card ${isNew ? "is-new" : "is-accepted"}">
-      <div class="order-head">
-        <div>
-          <strong>${escapeHtml(order.id)}</strong>
-          <p>${new Date(order.createdAt).toLocaleString()}</p>
+    <article
+      class="order-card ${isNew ? "is-new" : "is-accepted"} ${expanded ? "is-expanded" : "is-collapsed"}"
+      data-order-card="${escapeHtml(orderId)}"
+    >
+      <button
+        class="order-card-toggle"
+        data-toggle-order="${escapeHtml(orderId)}"
+        type="button"
+        aria-expanded="${expanded ? "true" : "false"}"
+        aria-controls="${escapeHtml(panelId)}"
+      >
+        <span class="order-card-topline">
+          <span class="order-number">#${escapeHtml(orderId)}</span>
+          <span class="order-status ${statusClass(order)}">${statusLabel(order)}</span>
+        </span>
+        <span class="order-customer-name">${escapeHtml(order.customer?.name || "Sin nombre")}</span>
+        <span class="order-card-meta">
+          <span>${escapeHtml(orderElapsedLabel(order))}</span>
+          <span>${escapeHtml(orderTypeLabel(order.orderType || ((order.items || [])[0] || {}).orderType))}</span>
+        </span>
+        <span class="order-card-summary">
+          ${(order.items || []).length} artículo${(order.items || []).length === 1 ? "" : "s"}
+          <span class="order-chevron" aria-hidden="true">⌄</span>
+        </span>
+      </button>
+
+      <div id="${escapeHtml(panelId)}" class="order-card-body" ${expanded ? "" : "hidden"}>
+        <div class="order-contact">
+          <p><strong>Teléfono:</strong> ${escapeHtml(order.customer?.phone || "Sin teléfono")}</p>
+          <p><strong>Pago:</strong> ${escapeHtml(paymentLabel(order.paymentMethod))}</p>
+          <p><strong>Entrada:</strong> ${escapeHtml(new Date(order.createdAt).toLocaleString())}</p>
         </div>
-        <span class="order-status ${statusClass(order)}">${statusLabel(order)}</span>
-      </div>
-      <p><strong>${escapeHtml(order.customer?.name || "Sin nombre")}</strong> · ${escapeHtml(order.customer?.phone || "Sin teléfono")}</p>
-      <p><strong>Tipo:</strong> ${escapeHtml(orderTypeLabel(order.orderType || ((order.items || [])[0] || {}).orderType))}</p>
-      <p><strong>Pago:</strong> ${escapeHtml(paymentLabel(order.paymentMethod))}</p>
-      <div class="order-items">
-        ${(order.items || []).map((item) => itemDetailsHtml(item)).join("")}
-      </div>
-      <div class="order-total">
-        <span>Total</span>
-        <strong>${money(order.totals?.total)}</strong>
-      </div>
-      ${isNew ? `<button class="primary-btn full accept-order" data-accept-order="${escapeHtml(order.id)}" type="button">Aceptar pedido y parar sonido</button>` : `<p class="accepted-note">${isReady ? "Pedido listo" : "Pedido aceptado"}${order.acceptedAt ? ` · ${new Date(order.acceptedAt).toLocaleTimeString()}` : ""}</p>`}
-      <div class="order-actions-row">
-        ${!isNew ? `<button class="secondary-btn" data-ready-order="${escapeHtml(order.id)}" type="button">Pedido listo / Enviar WhatsApp</button>` : ""}
-        <button class="secondary-btn danger-btn" data-deliver-order="${escapeHtml(order.id)}" type="button">Entregado / quitar para todos</button>
+
+        <div class="order-items">
+          ${(order.items || []).map((item) => itemDetailsHtml(item)).join("")}
+        </div>
+
+        <div class="order-total">
+          <span>Total</span>
+          <strong>${money(order.totals?.total)}</strong>
+        </div>
+
+        ${isNew
+          ? `<button class="primary-btn full accept-order" data-accept-order="${escapeHtml(orderId)}" type="button">Aceptar pedido y parar sonido</button>`
+          : `<p class="accepted-note">${isReady ? "Pedido listo" : "Pedido aceptado"}${order.acceptedAt ? ` · ${new Date(order.acceptedAt).toLocaleTimeString()}` : ""}</p>`}
+
+        <div class="order-actions-row">
+          ${!isNew ? `<button class="secondary-btn" data-ready-order="${escapeHtml(orderId)}" type="button">Pedido listo / Enviar WhatsApp</button>` : ""}
+          <button class="secondary-btn danger-btn" data-deliver-order="${escapeHtml(orderId)}" type="button">Entregado / quitar para todos</button>
+        </div>
       </div>
     </article>`;
   }).join("") : `<p class="empty-state">No hay pedidos todavía.</p>`;
 
+  focusNewOrderCard();
   updateAlarm();
 }
 
@@ -1766,6 +1917,12 @@ function init() {
   document.addEventListener("click", (event) => {
     const tabButton = event.target.closest("[data-admin-tab]");
     if (tabButton) switchTab(tabButton.dataset.adminTab);
+
+    const toggleButton = event.target.closest("[data-toggle-order]");
+    if (toggleButton) {
+      toggleOrderCard(toggleButton.dataset.toggleOrder);
+      return;
+    }
 
     const acceptButton = event.target.closest("[data-accept-order]");
     if (acceptButton) acceptOrder(acceptButton.dataset.acceptOrder);
