@@ -604,3 +604,198 @@ body.image-crop-open { overflow: hidden; }
 .schedule-settings-copy p:last-child{max-width:680px;margin:0;color:var(--muted);line-height:1.55}
 .schedule-settings-form{display:grid;gap:16px;width:min(560px,100%)}
 .schedule-settings-status{min-height:22px;margin:0;color:var(--muted);font-weight:700}
+
+
+/* =========================================================
+   Editor visual de subopciones V8
+   ========================================================= */
+.option-editor-heading {
+  align-items: center;
+}
+.option-editor-heading > div:nth-child(2) {
+  flex: 1;
+  min-width: 0;
+}
+.option-add-group {
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+.option-groups-editor {
+  display: grid;
+  gap: 14px;
+  margin-top: 14px;
+}
+.option-groups-empty {
+  display: grid;
+  gap: 5px;
+  margin-top: 14px;
+  border: 1px dashed var(--line-strong);
+  border-radius: 12px;
+  padding: 20px;
+  background: var(--surface-soft);
+  color: var(--muted);
+  text-align: center;
+}
+.option-groups-empty strong {
+  color: var(--ink);
+}
+.option-group-card {
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
+}
+.option-group-header {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: start;
+  border-bottom: 1px solid var(--line);
+  padding: 14px;
+  background: var(--surface-soft);
+}
+.option-group-title {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-width: 0;
+}
+.option-group-index {
+  display: grid;
+  flex: 0 0 28px;
+  width: 28px;
+  height: 28px;
+  place-items: center;
+  border-radius: 8px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: .76rem;
+  font-weight: 850;
+}
+.option-group-title strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.option-group-actions,
+.option-row-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.option-mini-button {
+  min-height: 34px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 0 10px;
+  background: var(--surface);
+  color: var(--ink);
+  font-size: .78rem;
+  font-weight: 760;
+}
+.option-mini-button:hover {
+  background: var(--surface-soft);
+}
+.option-mini-button.danger {
+  border-color: #f1c6c2;
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+.option-group-body {
+  display: grid;
+  gap: 14px;
+  padding: 14px;
+}
+.option-group-fields {
+  display: grid;
+  grid-template-columns: minmax(0,1fr) minmax(0,1fr);
+  gap: 10px;
+}
+.option-group-settings {
+  display: grid;
+  grid-template-columns: minmax(190px,1fr) minmax(170px,1fr);
+  gap: 10px;
+  align-items: stretch;
+}
+.option-required-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  min-height: 66px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 10px 12px;
+  background: var(--surface-soft);
+}
+.option-required-card strong,
+.option-required-card small {
+  display: block;
+}
+.option-required-card small {
+  margin-top: 3px;
+  color: var(--muted);
+  font-size: .72rem;
+}
+.option-list-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.option-list-heading strong {
+  font-size: .84rem;
+}
+.option-rows {
+  display: grid;
+  gap: 8px;
+}
+.option-row {
+  display: grid;
+  grid-template-columns: minmax(130px,1fr) minmax(130px,1fr) 105px auto;
+  gap: 8px;
+  align-items: end;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 10px;
+  background: var(--surface-soft);
+}
+.option-row .field > span {
+  font-size: .72rem;
+}
+.option-row .field input {
+  min-height: 40px;
+}
+.option-row-price .money-field {
+  min-height: 40px;
+  background: var(--surface);
+}
+.option-row-empty {
+  border: 1px dashed var(--line-strong);
+  border-radius: 10px;
+  padding: 14px;
+  color: var(--muted);
+  font-size: .8rem;
+  text-align: center;
+}
+@media (max-width: 720px) {
+  .option-editor-heading {
+    display: grid;
+    grid-template-columns: 28px minmax(0,1fr);
+  }
+  .option-add-group {
+    grid-column: 1 / -1;
+    width: 100%;
+  }
+  .option-group-fields,
+  .option-group-settings {
+    grid-template-columns: 1fr;
+  }
+  .option-row {
+    grid-template-columns: 1fr;
+  }
+  .option-row-actions {
+    justify-content: flex-end;
+  }
+}
