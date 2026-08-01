@@ -634,7 +634,7 @@ function renderMenu() {
   const grid = $("#menuGrid");
   let imageIndex = 0;
   grid.innerHTML = CATEGORIES.map((category) => {
-    const items = MENU_ITEMS.filter((item) => item.category === category.id);
+    const items = MENU_ITEMS.filter((item) => item.category === category.id && item.visible !== false);
     if (!items.length) return "";
     return `
       <section class="category-section" id="cat-${category.id}" data-category-section="${category.id}">
