@@ -2096,3 +2096,194 @@ body.light-mode .availability-group h3 {
     object-fit: contain !important;
   }
 }
+
+
+/* =========================================================
+   V51 · Pedidos como tarjetas verticales desplegables
+   ========================================================= */
+body.admin-body #ordersTab .admin-card.wide {
+  overflow: hidden;
+}
+
+body.admin-body .orders-list {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  width: 100%;
+  margin-top: 14px;
+  padding: 2px 2px 16px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scroll-snap-type: x proximity;
+  overscroll-behavior-x: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
+body.admin-body .orders-list > .empty-state {
+  width: 100%;
+}
+
+body.admin-body .order-card {
+  flex: 0 0 clamp(280px, 31vw, 340px);
+  width: clamp(280px, 31vw, 340px);
+  max-height: calc(100svh - 250px);
+  overflow: hidden;
+  padding: 0;
+  scroll-snap-align: start;
+  border-radius: 16px;
+  background: var(--surface);
+  color: var(--ink);
+  box-shadow: var(--soft-shadow);
+  transition:
+    border-color 180ms ease,
+    box-shadow 180ms ease,
+    transform 180ms ease;
+}
+
+body.admin-body .order-card-toggle {
+  display: grid;
+  gap: 7px;
+  width: 100%;
+  min-height: 148px;
+  border: 0;
+  padding: 14px;
+  background: color-mix(in srgb, var(--surface) 90%, var(--bg));
+  color: var(--ink);
+  text-align: left;
+}
+
+body.admin-body .order-card.is-new .order-card-toggle {
+  background:
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--accent) 20%, var(--surface)),
+      var(--surface)
+    );
+}
+
+body.admin-body .order-card-topline,
+body.admin-body .order-card-meta,
+body.admin-body .order-card-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+body.admin-body .order-number {
+  font-size: 1.05rem;
+  font-weight: 950;
+  letter-spacing: .01em;
+}
+
+body.admin-body .order-customer-name {
+  overflow: hidden;
+  font-size: 1.3rem;
+  font-weight: 950;
+  line-height: 1.05;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+body.admin-body .order-card-meta,
+body.admin-body .order-card-summary {
+  color: var(--muted);
+  font-size: .8rem;
+  font-weight: 800;
+}
+
+body.admin-body .order-card-summary {
+  margin-top: 4px;
+  border-top: 1px solid var(--line);
+  padding-top: 9px;
+}
+
+body.admin-body .order-chevron {
+  display: inline-block;
+  font-size: 1.2rem;
+  transition: transform 180ms ease;
+}
+
+body.admin-body .order-card.is-expanded .order-chevron {
+  transform: rotate(180deg);
+}
+
+body.admin-body .order-card-body {
+  max-height: calc(100svh - 405px);
+  overflow-y: auto;
+  border-top: 1px solid var(--line);
+  padding: 13px;
+  -webkit-overflow-scrolling: touch;
+}
+
+body.admin-body .order-card-body[hidden] {
+  display: none !important;
+}
+
+body.admin-body .order-contact {
+  display: grid;
+  gap: 3px;
+  margin-bottom: 10px;
+}
+
+body.admin-body .order-contact p {
+  margin: 0;
+}
+
+body.admin-body .order-card .order-item-line {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 10px;
+  background: color-mix(in srgb, var(--surface) 84%, var(--bg));
+}
+
+body.admin-body .order-card .order-actions-row {
+  display: grid;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+body.admin-body .order-card .order-actions-row button {
+  width: 100%;
+}
+
+body.admin-body .order-card-arrived {
+  animation: fogon-order-arrived 1.7s ease both;
+}
+
+@keyframes fogon-order-arrived {
+  0% {
+    transform: translateY(-8px) scale(.98);
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 70%, transparent);
+  }
+  35% {
+    transform: translateY(0) scale(1.015);
+    box-shadow: 0 0 0 7px color-mix(in srgb, var(--accent) 22%, transparent);
+  }
+  100% {
+    transform: translateY(0) scale(1);
+    box-shadow: var(--soft-shadow);
+  }
+}
+
+@media (max-width: 720px) {
+  body.admin-body .order-card {
+    flex-basis: min(86vw, 330px);
+    width: min(86vw, 330px);
+  }
+
+  body.admin-body .order-card-body {
+    max-height: calc(100svh - 360px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  body.admin-body .order-card,
+  body.admin-body .order-chevron {
+    transition: none;
+  }
+
+  body.admin-body .order-card-arrived {
+    animation: none;
+  }
+}
