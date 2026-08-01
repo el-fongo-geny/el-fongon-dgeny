@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-window.FOGON_MENU_ADMIN_BUILD = "7-smart-image-fit-20260724";
+window.FOGON_MENU_ADMIN_BUILD = "8-subopciones-20260801";
 
   const $ = (selector) => document.querySelector(selector);
   const $$ = (selector) => Array.from(document.querySelectorAll(selector));
@@ -31,7 +31,8 @@ window.FOGON_MENU_ADMIN_BUILD = "7-smart-image-fit-20260724";
     editingCategoryId: null,
     dirty: false,
     busy: false,
-    imageUploading: false
+    imageUploading: false,
+    optionDraftGroups: []
   };
 
   function escapeHtml(value) {
@@ -644,6 +645,301 @@ window.FOGON_MENU_ADMIN_BUILD = "7-smart-image-fit-20260724";
       <article><strong>${stats.extras}</strong><span>Extras</span></article>
       <article><strong>${stats.removables}</strong><span>Removibles</span></article>
     `;
+  }
+
+
+  function createLocalOptionId(prefix = "option") {
+    if (window.crypto?.randomUUID) return `${prefix}:${window.crypto.randomUUID()}`;
+    return `${prefix}:${Date.now()}:${Math.random().toString(36).slice(2, 10)}`;
+  }
+
+  function productOptionDraft(productId = "") {
+    const groups = state.catalog.optionGroups
+      .filter((group) => group.product_id === productId && group.active !== false)
+      .sort((a, b) => Number(a.sort_order || 0) - Number(b.sort_order || 0));
+
+    return groups.map((group, groupIndex) => ({
+      id: String(group.id || ""),
+      clientId: createLocalOptionId("group"),
+      nameEs: String(group.name_es || ""),
+      nameEn: String(group.name_en || group.name_es || ""),
+      required: group.required === true,
+      selectionType: String(group.selection_type || "single") === "multiple" ? "multiple" : "single",
+      sortOrder: Number(group.sort_order ?? groupIndex * 10),
+      options: state.catalog.options
+        .filter((option) => option.option_group_id === group.id && option.active !== false)
+        .sort((a, b) => Number(a.sort_order || 0) - Number(b.sort_order || 0))
+        .map((option, optionIndex) => ({
+          id: String(option.id || ""),
+          clientId: createLocalOptionId("choice"),
+          nameEs: String(option.name_es || ""),
+          nameEn: String(option.name_en || option.name_es || ""),
+          priceDelta: Number(option.price_delta || 0),
+          sortOrder: Number(option.sort_order ?? optionIndex * 10)
+        }))
+    }));
+  }
+
+  function optionDraftSummary() {
+    return {
+      groups: state.optionDraftGroups.length,
+      options: state.optionDraftGroups.reduce(
+        (total, group) => total + group.options.length,
+        0
+      )
+    };
+  }
+
+  function renderOptionDraftSummary() {
+    const summary = $("#optionSummary");
+    if (!summary) return;
+    const stats = optionDraftSummary();
+    summary.innerHTML = `
+      <article><strong>${stats.groups}</strong><span>Grupos</span></article>
+      <article><strong>${stats.options}</strong><span>Subopciones</span></article>
+      <article><strong>${state.optionDraftGroups.filter((group) => group.required).length}</strong><span>Obligatorios</span></article>
+      <article><strong>${state.optionDraftGroups.filter((group) => !group.required).length}</strong><span>Opcionales</span></article>
+    `;
+  }
+
+  function renderOptionGroupsEditor() {
+    const editor = $("#optionGroupsEditor");
+    const empty = $("#optionGroupsEmpty");
+    if (!editor || !empty) return;
+
+    renderOptionDraftSummary();
+    empty.hidden = state.optionDraftGroups.length > 0;
+
+    editor.innerHTML = state.optionDraftGroups.map((group, groupIndex) => `
+      <article class="option-group-card" data-option-group="${escapeHtml(group.clientId)}">
+        <header class="option-group-header">
+          <div class="option-group-title">
+            <span class="option-group-index">${groupIndex + 1}</span>
+            <strong>${escapeHtml(group.nameEs || "Grupo sin nombre")}</strong>
+          </div>
+          <div class="option-group-actions">
+            <button class="option-mini-button danger" type="button"
+              data-remove-option-group="${escapeHtml(group.clientId)}">Eliminar grupo</button>
+          </div>
+        </header>
+
+        <div class="option-group-body">
+          <div class="option-group-fields">
+            <label class="field">
+              <span>Nombre del grupo en español *</span>
+              <input type="text" maxlength="160"
+                value="${escapeHtml(group.nameEs)}"
+                placeholder="Ej.: Elige tu proteína"
+                data-option-group-field="nameEs"
+                data-option-group-id="${escapeHtml(group.clientId)}">
+            </label>
+            <label class="field">
+              <span>Nombre del grupo en inglés</span>
+              <input type="text" maxlength="160"
+                value="${escapeHtml(group.nameEn)}"
+                placeholder="Ej.: Choose your protein"
+                data-option-group-field="nameEn"
+                data-option-group-id="${escapeHtml(group.clientId)}">
+            </label>
+          </div>
+
+          <div class="option-group-settings">
+            <label class="option-required-card">
+              <span>
+                <strong>Elección obligatoria</strong>
+                <small>El cliente debe elegir antes de agregar.</small>
+              </span>
+              <span class="switch-row">
+                <input type="checkbox" ${group.required ? "checked" : ""}
+                  data-option-group-required="${escapeHtml(group.clientId)}">
+                <span class="switch-control" aria-hidden="true"></span>
+              </span>
+            </label>
+
+            <label class="field">
+              <span>Tipo de selección</span>
+              <select data-option-group-selection="${escapeHtml(group.clientId)}">
+                <option value="single" ${group.selectionType === "single" ? "selected" : ""}>Una sola opción</option>
+                <option value="multiple" ${group.selectionType === "multiple" ? "selected" : ""}>Varias opciones</option>
+              </select>
+            </label>
+          </div>
+
+          <div class="option-list-heading">
+            <strong>Opciones de este grupo</strong>
+            <button class="option-mini-button" type="button"
+              data-add-option="${escapeHtml(group.clientId)}">+ Añadir opción</button>
+          </div>
+
+          <div class="option-rows">
+            ${group.options.length ? group.options.map((option) => `
+              <div class="option-row" data-option-row="${escapeHtml(option.clientId)}">
+                <label class="field">
+                  <span>Nombre en español *</span>
+                  <input type="text" maxlength="160"
+                    value="${escapeHtml(option.nameEs)}"
+                    placeholder="Ej.: Bistec"
+                    data-option-field="nameEs"
+                    data-group-id="${escapeHtml(group.clientId)}"
+                    data-option-id="${escapeHtml(option.clientId)}">
+                </label>
+                <label class="field">
+                  <span>Nombre en inglés</span>
+                  <input type="text" maxlength="160"
+                    value="${escapeHtml(option.nameEn)}"
+                    placeholder="Ej.: Steak"
+                    data-option-field="nameEn"
+                    data-group-id="${escapeHtml(group.clientId)}"
+                    data-option-id="${escapeHtml(option.clientId)}">
+                </label>
+                <label class="field option-row-price">
+                  <span>Precio extra</span>
+                  <div class="money-field">
+                    <span>$</span>
+                    <input type="number" min="0" step="0.01" inputmode="decimal"
+                      value="${Number(option.priceDelta || 0).toFixed(2)}"
+                      data-option-field="priceDelta"
+                      data-group-id="${escapeHtml(group.clientId)}"
+                      data-option-id="${escapeHtml(option.clientId)}">
+                  </div>
+                </label>
+                <div class="option-row-actions">
+                  <button class="option-mini-button danger" type="button"
+                    data-remove-option="${escapeHtml(option.clientId)}"
+                    data-group-id="${escapeHtml(group.clientId)}">Eliminar</button>
+                </div>
+              </div>
+            `).join("") : `<div class="option-row-empty">Añade al menos una opción a este grupo.</div>`}
+          </div>
+        </div>
+      </article>
+    `).join("");
+  }
+
+  function addOptionGroup() {
+    state.optionDraftGroups.push({
+      id: "",
+      clientId: createLocalOptionId("group"),
+      nameEs: "",
+      nameEn: "",
+      required: true,
+      selectionType: "single",
+      sortOrder: state.optionDraftGroups.length * 10,
+      options: [{
+        id: "",
+        clientId: createLocalOptionId("choice"),
+        nameEs: "",
+        nameEn: "",
+        priceDelta: 0,
+        sortOrder: 0
+      }]
+    });
+    renderOptionGroupsEditor();
+    setDirty(true);
+  }
+
+  function removeOptionGroup(clientId) {
+    const group = state.optionDraftGroups.find((item) => item.clientId === clientId);
+    if (!group) return;
+    const label = group.nameEs || "este grupo";
+    if (!confirm(`¿Eliminar “${label}” y todas sus opciones?`)) return;
+    state.optionDraftGroups = state.optionDraftGroups.filter((item) => item.clientId !== clientId);
+    renderOptionGroupsEditor();
+    setDirty(true);
+  }
+
+  function addOptionToGroup(clientId) {
+    const group = state.optionDraftGroups.find((item) => item.clientId === clientId);
+    if (!group) return;
+    group.options.push({
+      id: "",
+      clientId: createLocalOptionId("choice"),
+      nameEs: "",
+      nameEn: "",
+      priceDelta: 0,
+      sortOrder: group.options.length * 10
+    });
+    renderOptionGroupsEditor();
+    setDirty(true);
+  }
+
+  function removeOptionFromGroup(groupClientId, optionClientId) {
+    const group = state.optionDraftGroups.find((item) => item.clientId === groupClientId);
+    if (!group) return;
+    group.options = group.options.filter((item) => item.clientId !== optionClientId);
+    renderOptionGroupsEditor();
+    setDirty(true);
+  }
+
+  function updateOptionDraftFromInput(target) {
+    const groupClientId = target.dataset.optionGroupId || target.dataset.groupId || "";
+    const group = state.optionDraftGroups.find((item) => item.clientId === groupClientId);
+    if (!group) return;
+
+    if (target.dataset.optionGroupField) {
+      group[target.dataset.optionGroupField] = target.value;
+      const card = target.closest(".option-group-card");
+      const title = card?.querySelector(".option-group-title strong");
+      if (title && target.dataset.optionGroupField === "nameEs") {
+        title.textContent = target.value.trim() || "Grupo sin nombre";
+      }
+    }
+
+    if (target.dataset.optionGroupRequired) {
+      group.required = target.checked;
+      renderOptionDraftSummary();
+    }
+
+    if (target.dataset.optionGroupSelection) {
+      group.selectionType = target.value === "multiple" ? "multiple" : "single";
+    }
+
+    if (target.dataset.optionField) {
+      const option = group.options.find((item) => item.clientId === target.dataset.optionId);
+      if (!option) return;
+      const field = target.dataset.optionField;
+      option[field] = field === "priceDelta"
+        ? Math.max(0, Number(target.value || 0))
+        : target.value;
+    }
+
+    setDirty(true);
+  }
+
+  function optionGroupsPayload() {
+    return state.optionDraftGroups.map((group, groupIndex) => {
+      const nameEs = String(group.nameEs || "").trim();
+      if (!nameEs) throw new Error(`Escribe el nombre del grupo ${groupIndex + 1}.`);
+      if (!group.options.length) {
+        throw new Error(`Añade al menos una opción al grupo “${nameEs}”.`);
+      }
+
+      return {
+        id: group.id || null,
+        nameEs,
+        nameEn: String(group.nameEn || "").trim() || nameEs,
+        required: Boolean(group.required),
+        selectionType: group.selectionType === "multiple" ? "multiple" : "single",
+        sortOrder: groupIndex * 10,
+        options: group.options.map((option, optionIndex) => {
+          const optionNameEs = String(option.nameEs || "").trim();
+          if (!optionNameEs) {
+            throw new Error(`Completa el nombre de la opción ${optionIndex + 1} en “${nameEs}”.`);
+          }
+          const priceDelta = Number(option.priceDelta || 0);
+          if (!Number.isFinite(priceDelta) || priceDelta < 0) {
+            throw new Error(`El precio adicional de “${optionNameEs}” no es válido.`);
+          }
+          return {
+            id: option.id || null,
+            nameEs: optionNameEs,
+            nameEn: String(option.nameEn || "").trim() || optionNameEs,
+            priceDelta,
+            sortOrder: optionIndex * 10
+          };
+        })
+      };
+    });
   }
 
   const IMAGE_MAX_SOURCE_BYTES = 20 * 1024 * 1024;
@@ -1325,7 +1621,8 @@ window.FOGON_MENU_ADMIN_BUILD = "7-smart-image-fit-20260724";
       "";
 
     renderProductCategoryOptions(defaultCategory);
-    renderOptionSummary(product?.id || "");
+    state.optionDraftGroups = product?.id ? productOptionDraft(product.id) : [];
+    renderOptionGroupsEditor();
 
     $("#drawerEyebrow").textContent = creating ? "Nuevo producto" : "Editar producto";
     $("#drawerTitle").textContent = product?.name_es || "Nuevo producto";
@@ -1406,7 +1703,8 @@ window.FOGON_MENU_ADMIN_BUILD = "7-smart-image-fit-20260724";
       active: $("#active").checked,
       taxable: $("#taxable").checked,
       featured: false,
-      sortOrder: Number($("#sortOrder").value || 0)
+      sortOrder: Number($("#sortOrder").value || 0),
+      optionGroups: optionGroupsPayload()
     };
 
     const id = String($("#productId").value || "").trim();
@@ -1724,6 +2022,38 @@ window.FOGON_MENU_ADMIN_BUILD = "7-smart-image-fit-20260724";
     $("#drawerBackdrop")?.addEventListener("click", () => closeProductDrawer());
     $("#cancelProductButton")?.addEventListener("click", () => closeProductDrawer());
     $("#deleteProductButton")?.addEventListener("click", deleteProduct);
+    $("#addOptionGroupButton")?.addEventListener("click", addOptionGroup);
+
+    $("#optionGroupsEditor")?.addEventListener("click", (event) => {
+      const removeGroup = event.target.closest("[data-remove-option-group]");
+      if (removeGroup) {
+        removeOptionGroup(removeGroup.dataset.removeOptionGroup);
+        return;
+      }
+
+      const addOption = event.target.closest("[data-add-option]");
+      if (addOption) {
+        addOptionToGroup(addOption.dataset.addOption);
+        return;
+      }
+
+      const removeOption = event.target.closest("[data-remove-option]");
+      if (removeOption) {
+        removeOptionFromGroup(
+          removeOption.dataset.groupId,
+          removeOption.dataset.removeOption
+        );
+      }
+    });
+
+    $("#optionGroupsEditor")?.addEventListener("input", (event) => {
+      updateOptionDraftFromInput(event.target);
+    });
+
+    $("#optionGroupsEditor")?.addEventListener("change", (event) => {
+      updateOptionDraftFromInput(event.target);
+    });
+
     $("#productForm")?.addEventListener("submit", saveProduct);
 
     $("#productForm")?.addEventListener("input", () => {
