@@ -76,7 +76,7 @@ function showLoginRuntimeError(error) {
   console.error("Error del administrador:", error);
 }
 
-window.FOGON_ADMIN_BUILD = "52-mobile-scroll-stable";
+window.FOGON_ADMIN_BUILD = "53-mobile-stable-orders";
 
 
 const STORAGE_ORDERS = "fogon_orders";
@@ -173,6 +173,7 @@ let lastNewOrderSignature = "";
 let ordersRenderInitialized = false;
 let knownOrderIds = new Set();
 let expandedOrderIds = new Set();
+let lastOrdersRenderSignature = "";
 
 function applyAdminTheme() {
   const theme = safeLocalGet(STORAGE_ADMIN_THEME) || "dark";
@@ -519,18 +520,24 @@ function orderFromBackend(row) {
 async function syncOrdersFromBackend() {
   const db = window.FOGON_DB;
 
+  async function applyOrdersIfChanged(nextOrders) {
+    const currentOrders = getOrders();
+    if (stableOrdersSignature(currentOrders) === stableOrdersSignature(nextOrders)) {
+      updateElapsedLabels();
+      updateAlarm();
+      return false;
+    }
+
+    setOrders(nextOrders);
+    renderOrders();
+    renderKitchen();
+    return true;
+  }
+
   if (db?.isReady()) {
     try {
       const orders = await db.fetchOrders();
-      const nextSnapshot = JSON.stringify(orders || []);
-      const currentSnapshot = JSON.stringify(getOrders());
-      if (nextSnapshot !== currentSnapshot) {
-        setOrders(orders);
-        renderAll();
-      } else {
-        updateCounters();
-        updateAlarm();
-      }
+      await applyOrdersIfChanged(Array.isArray(orders) ? orders : []);
     } catch (error) {
       console.warn("No se pudieron sincronizar pedidos desde Supabase:", error);
     }
@@ -541,15 +548,7 @@ async function syncOrdersFromBackend() {
   try {
     const data = await backendRequest("/api/orders");
     const orders = (data?.orders || []).map(orderFromBackend).filter(Boolean);
-    const nextSnapshot = JSON.stringify(orders);
-    const currentSnapshot = JSON.stringify(getOrders());
-    if (nextSnapshot !== currentSnapshot) {
-      setOrders(orders);
-      renderAll();
-    } else {
-      updateCounters();
-      updateAlarm();
-    }
+    await applyOrdersIfChanged(orders);
   } catch (error) {
     console.warn("No se pudieron sincronizar pedidos desde el backend:", error);
   }
@@ -1318,28 +1317,35 @@ function orderElapsedLabel(order) {
 }
 
 function prepareOrderCardExpansion(orders) {
-  const currentIds = new Set(
-    orders.map((order) => String(order.id))
-  );
+  const currentIds = new Set(orders.map((order) => String(order.id)));
 
   /*
-    Al entrar, todas las comandas se muestran completas. Los pedidos que
-    lleguen después también se abren, pero nunca se mueve la pantalla.
+    Todas las comandas se abren completas. No se enfoca, desplaza ni
+    anima automáticamente ninguna tarjeta: en móvil eso interrumpía el
+    gesto del usuario y podía devolver la página hacia arriba.
   */
-  if (!ordersRenderInitialized) {
-    currentIds.forEach((id) => expandedOrderIds.add(id));
-    ordersRenderInitialized = true;
-  } else {
-    orders.forEach((order) => {
-      const id = String(order.id);
-      if (!knownOrderIds.has(id)) expandedOrderIds.add(id);
-    });
-  }
-
+  currentIds.forEach((id) => expandedOrderIds.add(id));
   expandedOrderIds = new Set(
     [...expandedOrderIds].filter((id) => currentIds.has(id))
   );
   knownOrderIds = currentIds;
+  ordersRenderInitialized = true;
+}
+
+function stableOrdersSignature(orders) {
+  try {
+    return JSON.stringify(orders);
+  } catch (_) {
+    return String(Date.now());
+  }
+}
+
+function updateElapsedLabels() {
+  document.querySelectorAll("[data-order-elapsed]").forEach((node) => {
+    const orderId = String(node.getAttribute("data-order-elapsed") || "");
+    const order = getOrders().find((item) => String(item.id) === orderId);
+    if (order) node.textContent = orderElapsedLabel(order);
+  });
 }
 
 function toggleOrderCard(orderId) {
@@ -1362,11 +1368,20 @@ function renderOrders() {
       orderCreatedTimestamp(right) - orderCreatedTimestamp(left)
     );
 
-  prepareOrderCardExpansion(orders);
-  updateCounters();
-
+  const renderSignature = stableOrdersSignature(orders);
   const ordersList = $("#ordersList");
   if (!ordersList) return;
+
+  if (renderSignature === lastOrdersRenderSignature && ordersList.childNodes.length) {
+    updateCounters();
+    updateElapsedLabels();
+    updateAlarm();
+    return;
+  }
+
+  lastOrdersRenderSignature = renderSignature;
+  prepareOrderCardExpansion(orders);
+  updateCounters();
 
   ordersList.innerHTML = orders.length ? orders.map((order) => {
     const orderId = String(order.id);
@@ -1393,7 +1408,7 @@ function renderOrders() {
         </span>
         <span class="order-customer-name">${escapeHtml(order.customer?.name || "Sin nombre")}</span>
         <span class="order-card-meta">
-          <span>${escapeHtml(orderElapsedLabel(order))}</span>
+          <span data-order-elapsed="${escapeHtml(orderId)}">${escapeHtml(orderElapsedLabel(order))}</span>
           <span>${escapeHtml(orderTypeLabel(order.orderType || ((order.items || [])[0] || {}).orderType))}</span>
         </span>
         <span class="order-card-summary">
@@ -1929,12 +1944,15 @@ function init() {
   }, 30000);
 
   setInterval(() => {
-    if (window.FOGON_DB?.isReady() || BACKEND_URL) syncOrdersFromBackend();
-    else {
-      renderOrders();
-      renderKitchen();
+    if (window.FOGON_DB?.isReady() || BACKEND_URL) {
+      syncOrdersFromBackend();
+    } else {
+      updateElapsedLabels();
+      updateAlarm();
     }
-  }, 2500);
+  }, 5000);
+
+  setInterval(updateElapsedLabels, 30000);
 
   setInterval(() => {
     if (window.FOGON_DB?.isReady() || BACKEND_URL) syncAvailabilityFromBackend();
