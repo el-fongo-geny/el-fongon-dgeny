@@ -2099,22 +2099,24 @@ body.light-mode .availability-group h3 {
 
 
 /* =========================================================
-   V52 · Comandas completas y desplazamiento móvil estable
+   V51 · Pedidos como tarjetas verticales desplegables
    ========================================================= */
 body.admin-body #ordersTab .admin-card.wide {
-  overflow: visible;
+  overflow: hidden;
 }
 
 body.admin-body .orders-list {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  gap: 14px;
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
   width: 100%;
   margin-top: 14px;
-  padding: 0 0 24px;
-  overflow: visible;
-  scroll-snap-type: none;
-  overscroll-behavior: auto;
+  padding: 2px 2px 16px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scroll-snap-type: x proximity;
+  overscroll-behavior-x: contain;
+  -webkit-overflow-scrolling: touch;
 }
 
 body.admin-body .orders-list > .empty-state {
@@ -2122,33 +2124,41 @@ body.admin-body .orders-list > .empty-state {
 }
 
 body.admin-body .order-card {
-  width: 100%;
-  max-width: none;
-  max-height: none;
-  overflow: visible;
+  flex: 0 0 clamp(280px, 31vw, 340px);
+  width: clamp(280px, 31vw, 340px);
+  max-height: calc(100svh - 250px);
+  overflow: hidden;
   padding: 0;
+  scroll-snap-align: start;
   border-radius: 16px;
   background: var(--surface);
   color: var(--ink);
   box-shadow: var(--soft-shadow);
-  transition: border-color 180ms ease, box-shadow 180ms ease;
+  transition:
+    border-color 180ms ease,
+    box-shadow 180ms ease,
+    transform 180ms ease;
 }
 
 body.admin-body .order-card-toggle {
   display: grid;
   gap: 7px;
   width: 100%;
-  min-height: 0;
+  min-height: 148px;
   border: 0;
-  padding: 14px 16px;
+  padding: 14px;
   background: color-mix(in srgb, var(--surface) 90%, var(--bg));
   color: var(--ink);
   text-align: left;
-  touch-action: manipulation;
 }
 
 body.admin-body .order-card.is-new .order-card-toggle {
-  background: linear-gradient(180deg, color-mix(in srgb, var(--accent) 20%, var(--surface)), var(--surface));
+  background:
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--accent) 20%, var(--surface)),
+      var(--surface)
+    );
 }
 
 body.admin-body .order-card-topline,
@@ -2160,42 +2170,234 @@ body.admin-body .order-card-summary {
   gap: 10px;
 }
 
-body.admin-body .order-number { font-size: 1.05rem; font-weight: 950; letter-spacing: .01em; }
-body.admin-body .order-customer-name { font-size: 1.3rem; font-weight: 950; line-height: 1.1; overflow-wrap: anywhere; }
+body.admin-body .order-number {
+  font-size: 1.05rem;
+  font-weight: 950;
+  letter-spacing: .01em;
+}
+
+body.admin-body .order-customer-name {
+  overflow: hidden;
+  font-size: 1.3rem;
+  font-weight: 950;
+  line-height: 1.05;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 body.admin-body .order-card-meta,
-body.admin-body .order-card-summary { color: var(--muted); font-size: .82rem; font-weight: 800; }
-body.admin-body .order-card-summary { margin-top: 4px; border-top: 1px solid var(--line); padding-top: 9px; }
-body.admin-body .order-chevron { display: inline-block; font-size: 1.2rem; transition: transform 180ms ease; }
-body.admin-body .order-card.is-expanded .order-chevron { transform: rotate(180deg); }
+body.admin-body .order-card-summary {
+  color: var(--muted);
+  font-size: .8rem;
+  font-weight: 800;
+}
+
+body.admin-body .order-card-summary {
+  margin-top: 4px;
+  border-top: 1px solid var(--line);
+  padding-top: 9px;
+}
+
+body.admin-body .order-chevron {
+  display: inline-block;
+  font-size: 1.2rem;
+  transition: transform 180ms ease;
+}
+
+body.admin-body .order-card.is-expanded .order-chevron {
+  transform: rotate(180deg);
+}
 
 body.admin-body .order-card-body {
-  max-height: none;
-  overflow: visible;
+  max-height: calc(100svh - 405px);
+  overflow-y: auto;
   border-top: 1px solid var(--line);
-  padding: 14px 16px 18px;
-  -webkit-overflow-scrolling: auto;
+  padding: 13px;
+  -webkit-overflow-scrolling: touch;
 }
-body.admin-body .order-card-body[hidden] { display: none !important; }
-body.admin-body .order-contact { display: grid; gap: 4px; margin-bottom: 12px; }
-body.admin-body .order-contact p { margin: 0; }
-body.admin-body .order-card .order-item-line { border: 1px solid var(--line); border-radius: 12px; padding: 11px; background: color-mix(in srgb, var(--surface) 84%, var(--bg)); }
-body.admin-body .order-card .order-actions-row { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-top: 12px; }
-body.admin-body .order-card .order-actions-row button { width: 100%; min-height: 52px; touch-action: manipulation; }
-body.admin-body .order-card .accept-order { min-height: 54px; touch-action: manipulation; }
+
+body.admin-body .order-card-body[hidden] {
+  display: none !important;
+}
+
+body.admin-body .order-contact {
+  display: grid;
+  gap: 3px;
+  margin-bottom: 10px;
+}
+
+body.admin-body .order-contact p {
+  margin: 0;
+}
+
+body.admin-body .order-card .order-item-line {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 10px;
+  background: color-mix(in srgb, var(--surface) 84%, var(--bg));
+}
+
+body.admin-body .order-card .order-actions-row {
+  display: grid;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+body.admin-body .order-card .order-actions-row button {
+  width: 100%;
+}
+
+body.admin-body .order-card-arrived {
+  animation: fogon-order-arrived 1.7s ease both;
+}
+
+@keyframes fogon-order-arrived {
+  0% {
+    transform: translateY(-8px) scale(.98);
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 70%, transparent);
+  }
+  35% {
+    transform: translateY(0) scale(1.015);
+    box-shadow: 0 0 0 7px color-mix(in srgb, var(--accent) 22%, transparent);
+  }
+  100% {
+    transform: translateY(0) scale(1);
+    box-shadow: var(--soft-shadow);
+  }
+}
 
 @media (max-width: 720px) {
-  body.admin-body .admin-panel { padding-left: 10px; padding-right: 10px; }
-  body.admin-body #ordersTab .admin-card.wide { padding: 12px; }
-  body.admin-body .orders-list { display: grid; overflow: visible; padding-bottom: calc(32px + env(safe-area-inset-bottom)); }
-  body.admin-body .order-card { width: 100%; max-height: none; overflow: visible; }
-  body.admin-body .order-card-body { max-height: none; overflow: visible; padding: 13px; }
-  body.admin-body .order-card .order-actions-row { grid-template-columns: 1fr; }
-  body.admin-body .order-card .order-actions-row button,
-  body.admin-body .order-card .accept-order { position: relative; z-index: 2; }
+  body.admin-body .order-card {
+    flex-basis: min(86vw, 330px);
+    width: min(86vw, 330px);
+  }
+
+  body.admin-body .order-card-body {
+    max-height: calc(100svh - 360px);
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
   body.admin-body .order-card,
-  body.admin-body .order-chevron { transition: none; }
+  body.admin-body .order-chevron {
+    transition: none;
+  }
+
+  body.admin-body .order-card-arrived {
+    animation: none;
+  }
 }
 
+
+/* =========================================================
+   V53 · COMANDAS ESTABLES EN MÓVIL
+   Una única superficie de scroll: la página. Sin carril horizontal,
+   sin scroll interno, sin snap y sin animaciones que alteren el gesto.
+   ========================================================= */
+body.admin-body {
+  overflow-x: hidden !important;
+  overflow-y: auto !important;
+  overscroll-behavior-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+body.admin-body #adminPanel,
+body.admin-body #ordersTab,
+body.admin-body #ordersTab .admin-card.wide {
+  height: auto !important;
+  max-height: none !important;
+  overflow: visible !important;
+}
+
+body.admin-body .orders-list {
+  display: grid !important;
+  grid-template-columns: 1fr !important;
+  align-items: stretch !important;
+  gap: 16px !important;
+  width: 100% !important;
+  margin-top: 14px !important;
+  padding: 0 0 max(40px, env(safe-area-inset-bottom)) !important;
+  overflow: visible !important;
+  scroll-snap-type: none !important;
+  overscroll-behavior: auto !important;
+  touch-action: pan-y !important;
+  -webkit-overflow-scrolling: auto !important;
+}
+
+body.admin-body .order-card {
+  display: block !important;
+  position: relative !important;
+  flex: none !important;
+  width: 100% !important;
+  min-width: 0 !important;
+  max-width: none !important;
+  height: auto !important;
+  min-height: 0 !important;
+  max-height: none !important;
+  overflow: visible !important;
+  scroll-snap-align: none !important;
+  transform: none !important;
+  animation: none !important;
+  contain: none !important;
+  touch-action: pan-y !important;
+}
+
+body.admin-body .order-card-toggle {
+  position: relative !important;
+  min-height: 0 !important;
+  touch-action: manipulation !important;
+}
+
+body.admin-body .order-card-body {
+  display: block;
+  position: static !important;
+  height: auto !important;
+  min-height: 0 !important;
+  max-height: none !important;
+  overflow: visible !important;
+  overscroll-behavior: auto !important;
+  -webkit-overflow-scrolling: auto !important;
+  touch-action: pan-y !important;
+}
+
+body.admin-body .order-card-body[hidden] {
+  display: none !important;
+}
+
+body.admin-body .order-actions-row {
+  position: relative !important;
+  z-index: 2 !important;
+  padding-bottom: max(8px, env(safe-area-inset-bottom)) !important;
+}
+
+body.admin-body .order-actions-row button,
+body.admin-body .accept-order {
+  position: relative !important;
+  z-index: 3 !important;
+  min-height: 54px !important;
+  touch-action: manipulation !important;
+  pointer-events: auto !important;
+}
+
+@media (max-width: 720px) {
+  body.admin-body .admin-panel {
+    width: 100% !important;
+    max-width: none !important;
+    padding: 12px !important;
+  }
+
+  body.admin-body .admin-card.wide {
+    padding: 12px !important;
+  }
+
+  body.admin-body .order-card,
+  body.admin-body .order-card-body {
+    width: 100% !important;
+    max-height: none !important;
+    overflow: visible !important;
+  }
+
+  body.admin-body .order-card-toggle {
+    padding: 14px 12px !important;
+  }
+}
