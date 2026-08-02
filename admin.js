@@ -76,7 +76,7 @@ function showLoginRuntimeError(error) {
   console.error("Error del administrador:", error);
 }
 
-window.FOGON_ADMIN_BUILD = "52-full-order-cards";
+window.FOGON_ADMIN_BUILD = "52-mobile-scroll-stable";
 
 
 const STORAGE_ORDERS = "fogon_orders";
@@ -522,8 +522,15 @@ async function syncOrdersFromBackend() {
   if (db?.isReady()) {
     try {
       const orders = await db.fetchOrders();
-      setOrders(orders);
-      renderAll();
+      const nextSnapshot = JSON.stringify(orders || []);
+      const currentSnapshot = JSON.stringify(getOrders());
+      if (nextSnapshot !== currentSnapshot) {
+        setOrders(orders);
+        renderAll();
+      } else {
+        updateCounters();
+        updateAlarm();
+      }
     } catch (error) {
       console.warn("No se pudieron sincronizar pedidos desde Supabase:", error);
     }
@@ -534,8 +541,15 @@ async function syncOrdersFromBackend() {
   try {
     const data = await backendRequest("/api/orders");
     const orders = (data?.orders || []).map(orderFromBackend).filter(Boolean);
-    setOrders(orders);
-    renderAll();
+    const nextSnapshot = JSON.stringify(orders);
+    const currentSnapshot = JSON.stringify(getOrders());
+    if (nextSnapshot !== currentSnapshot) {
+      setOrders(orders);
+      renderAll();
+    } else {
+      updateCounters();
+      updateAlarm();
+    }
   } catch (error) {
     console.warn("No se pudieron sincronizar pedidos desde el backend:", error);
   }
@@ -1308,15 +1322,24 @@ function prepareOrderCardExpansion(orders) {
     orders.map((order) => String(order.id))
   );
 
-  // Todas las comandas se abren completas al entrar y los pedidos nuevos
-  // también aparecen desplegados, sin mover automáticamente la pantalla.
-  currentIds.forEach((id) => expandedOrderIds.add(id));
+  /*
+    Al entrar, todas las comandas se muestran completas. Los pedidos que
+    lleguen después también se abren, pero nunca se mueve la pantalla.
+  */
+  if (!ordersRenderInitialized) {
+    currentIds.forEach((id) => expandedOrderIds.add(id));
+    ordersRenderInitialized = true;
+  } else {
+    orders.forEach((order) => {
+      const id = String(order.id);
+      if (!knownOrderIds.has(id)) expandedOrderIds.add(id);
+    });
+  }
 
   expandedOrderIds = new Set(
     [...expandedOrderIds].filter((id) => currentIds.has(id))
   );
   knownOrderIds = currentIds;
-  ordersRenderInitialized = true;
 }
 
 function toggleOrderCard(orderId) {
