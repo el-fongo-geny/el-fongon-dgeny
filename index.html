@@ -171,6 +171,12 @@
     text-decoration: underline;
   }
 
+  /* Los pasos del checkout deben ser mutuamente excluyentes.
+     El atributo hidden debe ganar incluso frente a display:grid. */
+  #paymentModal [hidden] {
+    display: none !important;
+  }
+
   .order-thanks-step {
     display: grid;
     gap: 14px;
@@ -358,6 +364,6 @@
   <script src="supabase-client.js?v=30-order-fix"></script>
   <script src="backend-config.js?v=18-mobile-fixed"></script>
   <script src="menu-data.js?v=60-public-catalog"></script>
-  <script src="app.js?v=63-checkout-order-fixed"></script>
+  <script src="app.js?v=63-checkout-steps-hidden-fix"></script>
 </body>
 </html>
