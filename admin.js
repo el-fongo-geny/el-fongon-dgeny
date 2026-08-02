@@ -1,236 +1,132 @@
-(() => {
-"use strict";
+const state = {
+  lang: localStorage.getItem("fogon_lang") || "",
+  category: Array.isArray(CATEGORIES) && CATEGORIES.length ? CATEGORIES[0].id : "",
+  cart: [],
+  currentProduct: null,
+  pendingOrder: null,
+  orderType: "",
+  theme: localStorage.getItem("fogon_theme") || "light",
+  cartFabCompact: false
+};
 
-const $ = (selector) => document.querySelector(selector);
-const $$ = (selector) => Array.from(document.querySelectorAll(selector));
-
-const money = (value) => `$${Number(value || 0).toFixed(2)}`;
-
-const fallbackStorage = new Map();
-
-function safeLocalGet(key) {
-  try {
-    const value = window.localStorage.getItem(key);
-
-    if (value !== null) {
-      fallbackStorage.set(key, value);
-    }
-
-    return value;
-  } catch (error) {
-    console.warn("localStorage bloqueado; usando memoria temporal:", error);
-
-    return fallbackStorage.has(key)
-      ? fallbackStorage.get(key)
-      : null;
-  }
-}
-
-function safeLocalSet(key, value) {
-  const cleanValue = String(value);
-  fallbackStorage.set(key, cleanValue);
-
-  try {
-    window.localStorage.setItem(key, cleanValue);
-    return true;
-  } catch (error) {
-    console.warn(
-      "No se pudo escribir en localStorage; se conserva en memoria:",
-      error
-    );
-
-    return false;
-  }
-}
-
-function safeLocalRemove(key) {
-  fallbackStorage.delete(key);
-
-  try {
-    window.localStorage.removeItem(key);
-  } catch (error) {
-    console.warn("No se pudo borrar localStorage:", error);
-  }
-}
-
-function safeSessionRemove(key) {
-  try {
-    window.sessionStorage.removeItem(key);
-  } catch (error) {
-    console.warn("sessionStorage bloqueado:", error);
-  }
-}
-
-function showLoginRuntimeError(error) {
-  const message =
-    error?.message ||
-    String(error || "Error desconocido");
-
-  const errorBox = document.querySelector("#pinError");
-
-  if (errorBox) {
-    errorBox.hidden = false;
-    errorBox.textContent = `Error del panel: ${message}`;
-  }
-
-  console.error("Error del administrador:", error);
-}
-
-window.FOGON_ADMIN_BUILD = "52-full-order-cards";
-
+let lastScrollY = window.scrollY || 0;
+let scrollRevealLockUntil = 0;
 
 const STORAGE_ORDERS = "fogon_orders";
-const STORAGE_AVAILABILITY = "fogon_availability";
-const STORAGE_KITCHEN_HIDDEN = "fogon_kitchen_hidden";
-const STORAGE_ADMIN_THEME = "fogon_admin_theme";
-const STORAGE_KITCHEN_SELECTED = "fogon_kitchen_selected";
-const STORAGE_ADMIN_TRUSTED_SESSION = "fogon_admin_trusted_session_v1";
-const ADMIN_TRUSTED_SESSION_MS = 8 * 60 * 60 * 1000;
-/* El PIN no está escrito en el código público. */
-let adminPinInMemory = "";
-
-/*
-  menu-data.js no se carga en esta página porque contiene la aplicación
-  completa del menú público y colisiona con admin.js. Los nombres de
-  productos para Disponibilidad se cargan después desde admin-catalog.
-*/
-let adminCatalogMenuItems = [];
+const STORAGE_ORDER_COUNTER = "fogon_order_counter";
 const BACKEND_URL = (window.FOGON_BACKEND_URL || "").replace(/\/$/, "");
 const ORDER_MODE_MANUAL_KEY = "system:orders-manual";
 const ORDER_MODE_OPEN_KEY = "system:orders-open";
+const WEEKLY_CLOSED_DAY_KEY = "system:weekly-closed-day";
+let orderSubmissionInProgress = false;
+let checkoutPhase = "closed";
+const CALIFORNIA_TIME_ZONE = "America/Los_Angeles";
+const ORDER_OPEN_MINUTES = 11 * 60;
+const ORDER_CLOSE_MINUTES = 20 * 60 + 30;
 
-const INVENTORY_ITEMS = [
-  "Pollo guisar", "Pollo pica pollo", "Alitas", "Bistec", "Chuleta", "Orejita",
-  "Patica", "Trompa", "Tilapia", "Chillo", "Camarones", "Res", "Cerdo",
-  "Chicharron", "Pechuga de Pollo", "Salami", "Bacon", "Longaniza", "Pinguilin",
-  "Rabito", "Platano verde", "Platano maduro", "Pepino", "Tomate", "Lechuga",
-  "Repollo", "Papa", "Papas fritas", "Queso mexicano", "Queso dominicano",
-  "Queso rayado", "Arroz", "Habichuela", "Gandules con coco", "Guandules",
-  "Yuca", "Ketchup", "Mayonesa", "Yautia", "Envase para llevar con division",
-  "Envase para llevar sin division", "Jamon", "Huevo", "Tocino", "Cebolla",
-  "Pimientos", "Chabola", "Tamarindo", "Guanabana", "Aguacate", "Bacalao",
-  "Limon", "Zapatero", "Lechoza", "Envase para Habichuela",
-  "Envase de mayo-kepchut", "Vaso de jugo", "Envase de niño", "Envase de set",
-  "Leche condensada", "Leche evaporada", "Plato de plastico para comer",
-  "Cucharas desechables", "Envase redondo", "Hielo", "Envase de sancocho",
-  "Envase para salsa pequeño", "Envase para salsa mediano", "Cafe dominicano",
-  "Guante", "Servilleta", "Sorvete", "Vaso para cafe", "Sal", "Azucar",
-  "Vinagre", "Sopita", "Aceite", "Aceite de oliva"
-].map((name, index) => ({
-  id: `inventory:${index + 1}:${name.toLowerCase()
-    .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
-    .replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "")}`,
-  es: name,
-  en: name
-}));
+function uniqueCartLineId(productId) {
+  if (window.crypto?.randomUUID) return `${productId}-${window.crypto.randomUUID()}`;
+  return `${productId}-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+}
 
-function getOrderMode() {
+function californiaMinutesNow(date = new Date()) {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: CALIFORNIA_TIME_ZONE,
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23"
+  }).formatToParts(date);
+  const hour = Number(parts.find((part) => part.type === "hour")?.value || 0);
+  const minute = Number(parts.find((part) => part.type === "minute")?.value || 0);
+  return hour * 60 + minute;
+}
+
+function californiaWeekdayNow(date = new Date()) {
+  const shortDay = new Intl.DateTimeFormat("en-US", {
+    timeZone: CALIFORNIA_TIME_ZONE,
+    weekday: "short"
+  }).format(date);
+  return ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].indexOf(shortDay);
+}
+
+function currentOrderingState() {
   const availability = getAvailability();
   const manual = availability[ORDER_MODE_MANUAL_KEY] === true;
-  const open = availability[ORDER_MODE_OPEN_KEY] === true;
-  return manual ? (open ? "open" : "closed") : "auto";
-}
+  const forcedOpen = availability[ORDER_MODE_OPEN_KEY] === true;
+  const configuredClosedDay = Number(availability[WEEKLY_CLOSED_DAY_KEY]);
+  const weeklyClosed =
+    Number.isInteger(configuredClosedDay) &&
+    configuredClosedDay >= 0 &&
+    configuredClosedDay <= 6 &&
+    californiaWeekdayNow() === configuredClosedDay;
 
-function renderOrderModeButton() {
-  const button = $("#orderModeBtn");
-  if (!button) return;
-  const mode = getOrderMode();
-  const labels = {
-    auto: "Pedidos: AUTOMATICO (11:00-20:30)",
-    open: "Pedidos: ABIERTO",
-    closed: "Pedidos: CERRADO"
+  const automaticOpen =
+    !weeklyClosed &&
+    californiaMinutesNow() >= ORDER_OPEN_MINUTES &&
+    californiaMinutesNow() < ORDER_CLOSE_MINUTES;
+
+  return {
+    mode: weeklyClosed ? "weekly-closed" : manual ? (forcedOpen ? "open" : "closed") : "auto",
+    open: weeklyClosed ? false : (manual ? forcedOpen : automaticOpen),
+    weeklyClosed
   };
-  button.textContent = labels[mode];
-  button.dataset.mode = mode;
-  button.classList.toggle("is-open", mode === "open");
-  button.classList.toggle("is-closed", mode === "closed");
 }
 
-async function setOrderMode(mode) {
-  if (mode === "auto") {
-    await setAvailability(ORDER_MODE_MANUAL_KEY, false);
-    await setAvailability(ORDER_MODE_OPEN_KEY, false);
-  } else {
-    await setAvailability(ORDER_MODE_OPEN_KEY, mode === "open");
-    await setAvailability(ORDER_MODE_MANUAL_KEY, true);
+function orderingClosedMessage() {
+  const status = currentOrderingState();
+  if (status.weeklyClosed) {
+    return state.lang === "en"
+      ? "Online ordering is closed today for the restaurant's weekly closing day."
+      : "Los pedidos en línea están cerrados hoy por el día semanal de cierre del local.";
   }
-  renderOrderModeButton();
+  return state.lang === "en"
+    ? "Online ordering is currently closed. Regular ordering hours are 11:00 AM to 8:30 PM, California time."
+    : "Los pedidos en línea están cerrados ahora mismo. El horario habitual es de 11:00 a. m. a 8:30 p. m., hora de California.";
 }
 
-async function cycleOrderMode() {
-  const mode = getOrderMode();
-  const next = mode === "auto" ? "open" : mode === "open" ? "closed" : "auto";
-  await setOrderMode(next);
-}
-
-let availabilityQuery = "";
-let alarmTimer = null;
-let audioCtx = null;
-let soundUnlocked = false;
-let soundConfirmationPlayed = false;
-let lastSoundUnlockAttemptAt = 0;
-let lastNewOrderSignature = "";
-let ordersRenderInitialized = false;
-let knownOrderIds = new Set();
-let expandedOrderIds = new Set();
-
-function applyAdminTheme() {
-  const theme = safeLocalGet(STORAGE_ADMIN_THEME) || "dark";
-  const isDark = theme === "dark";
-  document.body.classList.toggle("dark-mode", isDark);
-  document.body.classList.toggle("light-mode", !isDark);
-  const btn = $("#adminThemeToggleBtn");
-  if (btn) btn.textContent = isDark ? "Modo claro" : "Modo oscuro";
-}
-
-function toggleAdminTheme() {
-  const isDark = document.body.classList.contains("dark-mode");
-  safeLocalSet(STORAGE_ADMIN_THEME, isDark ? "light" : "dark");
-  applyAdminTheme();
-}
-
-function safeParse(key, fallback) {
-  try {
-    return JSON.parse(safeLocalGet(key) || JSON.stringify(fallback));
-  } catch (_) {
-    return fallback;
+function updateOrderingUi() {
+  const status = currentOrderingState();
+  const submit = document.querySelector('#checkoutForm button[type="submit"]');
+  if (submit) {
+    submit.disabled = !status.open;
+    submit.setAttribute("aria-disabled", String(!status.open));
+    submit.title = status.open ? "" : orderingClosedMessage();
+  }
+  const notice = document.getElementById("orderingStatusNotice");
+  if (notice) {
+    notice.hidden = status.open;
+    notice.textContent = orderingClosedMessage();
   }
 }
 
-function getOrders() {
-  return safeParse(STORAGE_ORDERS, []);
-}
+const $ = (selector) => document.querySelector(selector);
+const $$ = (selector) => Array.from(document.querySelectorAll(selector));
+const money = (value) => `$${Number(value || 0).toFixed(2)}`;
+const text = (key) => UI_TEXT[state.lang || "es"][key] || key;
+const itemName = (item) => item[state.lang] || item.es;
+const itemDescription = (item) => item.description?.[state.lang] || item.description?.es || "";
+let lastAvailabilitySnapshot = localStorage.getItem("fogon_availability") || "{}";
 
-function setOrders(orders) {
-  safeLocalSet(STORAGE_ORDERS, JSON.stringify(orders));
-}
+let publicCatalogSnapshot = "";
 
-function saveOrders(orders) {
-  setOrders(orders);
-  renderAll();
-}
-
-
-function getSupabaseFunctionConfig() {
+function publicCatalogFunctionConfig() {
   const cfg = window.FOGON_SUPABASE || {};
   const supabaseUrl = String(cfg.url || "").replace(/\/$/, "");
   const anonKey = String(cfg.anonKey || "").trim();
-  if (!supabaseUrl || !anonKey) throw new Error("Faltan la URL o la anon key de Supabase en supabase-config.js.");
+
+  if (!supabaseUrl || !anonKey) {
+    throw new Error("Faltan la URL o la anon key de Supabase.");
+  }
+
   return { supabaseUrl, anonKey };
 }
 
-
-function buildEdgeFunctionHeaders(anonKey) {
+function publicCatalogHeaders(anonKey) {
   const headers = {
     "Content-Type": "application/json",
     "apikey": anonKey
   };
 
-  /*
-    Las claves legacy anon son JWT y pueden enviarse como Bearer.
-    Las claves nuevas sb_publishable_ no son JWT y NO deben enviarse
-    dentro de Authorization.
-  */
   const looksLikeJwt =
     anonKey.startsWith("eyJ") &&
     anonKey.split(".").length === 3;
@@ -242,50 +138,220 @@ function buildEdgeFunctionHeaders(anonKey) {
   return headers;
 }
 
-function adminLoginErrorMessage(error) {
-  const status = Number(error?.status || 0);
-  const payload = error?.payload || {};
-  const code = String(payload?.error || "").trim();
-  const detail = String(payload?.detail || error?.message || error || "").trim();
-
-  if (status === 401 && code === "invalid_admin_pin") {
-    return "PIN incorrecto. Confirma que coincide exactamente con el Secret ADMIN_PIN.";
-  }
-
-  if (code === "missing_admin_pin_secret") {
-    return "Falta el Secret ADMIN_PIN dentro de Supabase.";
-  }
-
-  if (status === 404) {
-    return "La función admin-auth no existe o todavía no está desplegada.";
-  }
-
-  if (/invalid jwt/i.test(detail)) {
-    return "Supabase está bloqueando la función por JWT. Desactiva Verify JWT en admin-auth.";
-  }
-
-  if (/missing authorization header/i.test(detail)) {
-    return "Verify JWT sigue activado en admin-auth. Debe estar desactivado.";
-  }
-
-  if (/failed to fetch|networkerror|load failed/i.test(detail)) {
-    return "El navegador no pudo conectar con admin-auth. Revisa la URL de Supabase, el despliegue y CORS.";
-  }
-
-  return detail || "No se pudo validar el acceso.";
+function rowHas(object, key) {
+  return Object.prototype.hasOwnProperty.call(object || {}, key);
 }
 
-async function callAdminAuth(adminPin) {
-  const { supabaseUrl, anonKey } = getSupabaseFunctionConfig();
+function rowBoolean(row, key, fallback = true) {
+  if (!rowHas(row, key) || row[key] == null) return fallback;
+  return row[key] !== false;
+}
 
-  const response = await fetch(`${supabaseUrl}/functions/v1/admin-auth`, {
-    method: "POST",
+function rowNumber(row, keys, fallback = 0) {
+  for (const key of keys) {
+    if (!rowHas(row, key)) continue;
+    const value = Number(row[key]);
+    if (Number.isFinite(value)) return value;
+  }
+  return Number(fallback || 0);
+}
+
+function rowText(row, keys, fallback = "") {
+  for (const key of keys) {
+    if (!rowHas(row, key)) continue;
+    const value = row[key];
+    if (value == null) return "";
+    return String(value);
+  }
+  return String(fallback || "");
+}
+
+function normalizeCatalogArray(value) {
+  return Array.isArray(value) ? value : [];
+}
+
+function catalogSortValue(row) {
+  return rowNumber(row, ["sort_order", "sortOrder"], 0);
+}
+
+function mapCatalogOption(row) {
+  return {
+    id: String(row.id || ""),
+    es: rowText(row, ["name_es", "es"], String(row.id || "")),
+    en: rowText(row, ["name_en", "en"], rowText(row, ["name_es", "es"], String(row.id || ""))),
+    price: rowNumber(row, ["price_delta", "price", "additional_price", "base_price"], 0),
+    sortOrder: catalogSortValue(row)
+  };
+}
+
+function mapCatalogExtra(row) {
+  return {
+    id: String(row.id || ""),
+    es: rowText(row, ["name_es", "es"], String(row.id || "")),
+    en: rowText(row, ["name_en", "en"], rowText(row, ["name_es", "es"], String(row.id || ""))),
+    price: rowNumber(row, ["price", "price_delta", "additional_price", "base_price"], 0),
+    sortOrder: catalogSortValue(row)
+  };
+}
+
+function mapCatalogRemovable(row) {
+  return {
+    id: String(row.id || ""),
+    es: rowText(row, ["name_es", "es"], String(row.id || "")),
+    en: rowText(row, ["name_en", "en"], rowText(row, ["name_es", "es"], String(row.id || ""))),
+    sortOrder: catalogSortValue(row)
+  };
+}
+
+function buildMenuFromPublicCatalog(catalog) {
+  const categoryRows = normalizeCatalogArray(catalog?.categories)
+    .filter((row) => row && row.id && rowBoolean(row, "active", true))
+    .sort((a, b) => catalogSortValue(a) - catalogSortValue(b));
+
+  const productRows = normalizeCatalogArray(catalog?.products)
+    .filter((row) => row && row.id && rowBoolean(row, "active", true) && rowBoolean(row, "visible", true));
+
+  if (!categoryRows.length || !productRows.length) {
+    throw new Error("Supabase devolvió un catálogo vacío.");
+  }
+
+  const fallbackProducts = new Map(
+    normalizeCatalogArray(MENU_ITEMS).map((item) => [String(item.id), item])
+  );
+
+  const groupRows = normalizeCatalogArray(catalog?.optionGroups)
+    .filter((row) => row && row.id && row.product_id && rowBoolean(row, "active", true));
+
+  const optionRows = normalizeCatalogArray(catalog?.options)
+    .filter((row) => row && row.id && row.option_group_id && rowBoolean(row, "active", true));
+
+  const extraRows = normalizeCatalogArray(catalog?.extras)
+    .filter((row) => row && row.id && rowBoolean(row, "active", true));
+
+  const productExtraRows = normalizeCatalogArray(catalog?.productExtras)
+    .filter((row) => row && row.product_id && row.extra_id);
+
+  const removableRows = normalizeCatalogArray(catalog?.removables)
+    .filter((row) => row && row.id && rowBoolean(row, "active", true));
+
+  const productRemovableRows = normalizeCatalogArray(catalog?.productRemovables)
+    .filter((row) => row && row.product_id && row.removable_id);
+
+  const optionsByGroup = new Map();
+  optionRows.forEach((row) => {
+    const groupId = String(row.option_group_id);
+    if (!optionsByGroup.has(groupId)) optionsByGroup.set(groupId, []);
+    optionsByGroup.get(groupId).push(row);
+  });
+
+  const groupsByProduct = new Map();
+  groupRows.forEach((row) => {
+    const productId = String(row.product_id);
+    if (!groupsByProduct.has(productId)) groupsByProduct.set(productId, []);
+    groupsByProduct.get(productId).push(row);
+  });
+
+  const extrasById = new Map(extraRows.map((row) => [String(row.id), row]));
+  const removablesById = new Map(removableRows.map((row) => [String(row.id), row]));
+
+  const categoryOrder = new Map(
+    categoryRows.map((row, index) => [String(row.id), index])
+  );
+
+  const categories = categoryRows.map((row) => ({
+    id: String(row.id),
+    es: rowText(row, ["name_es", "es"], String(row.id)),
+    en: rowText(row, ["name_en", "en"], rowText(row, ["name_es", "es"], String(row.id)))
+  }));
+
+  const products = productRows
+    .map((row) => {
+      const productId = String(row.id);
+      const fallback = fallbackProducts.get(productId) || {};
+
+      const databaseGroups = (groupsByProduct.get(productId) || [])
+        .sort((a, b) => catalogSortValue(a) - catalogSortValue(b))
+        .map((groupRow) => {
+          const groupId = String(groupRow.id);
+          const options = (optionsByGroup.get(groupId) || [])
+            .sort((a, b) => catalogSortValue(a) - catalogSortValue(b))
+            .map(mapCatalogOption);
+
+          return {
+            id: groupId,
+            es: rowText(groupRow, ["name_es", "es"], groupId),
+            en: rowText(groupRow, ["name_en", "en"], rowText(groupRow, ["name_es", "es"], groupId)),
+            required: rowBoolean(groupRow, "required", false),
+            type: /multi|checkbox/i.test(rowText(groupRow, ["type", "selection_type"], "single"))
+              ? "multi"
+              : "single",
+            options
+          };
+        });
+
+      const databaseExtras = productExtraRows
+        .filter((link) => String(link.product_id) === productId)
+        .sort((a, b) => catalogSortValue(a) - catalogSortValue(b))
+        .map((link) => extrasById.get(String(link.extra_id)))
+        .filter(Boolean)
+        .map(mapCatalogExtra);
+
+      const databaseRemovables = productRemovableRows
+        .filter((link) => String(link.product_id) === productId)
+        .sort((a, b) => catalogSortValue(a) - catalogSortValue(b))
+        .map((link) => removablesById.get(String(link.removable_id)))
+        .filter(Boolean)
+        .map(mapCatalogRemovable);
+
+      const image = rowHas(row, "image_url")
+        ? String(row.image_url || "")
+        : String(fallback.image || "");
+
+      return {
+        id: productId,
+        category: String(row.category_id || fallback.category || ""),
+        es: rowText(row, ["name_es", "es"], fallback.es || productId),
+        en: rowText(row, ["name_en", "en"], fallback.en || fallback.es || productId),
+        description: {
+          es: rowText(row, ["description_es"], fallback.description?.es || ""),
+          en: rowText(row, ["description_en"], fallback.description?.en || fallback.description?.es || "")
+        },
+        price: rowNumber(row, ["base_price", "price"], fallback.price || 0),
+        image,
+        taxable: rowHas(row, "taxable") ? row.taxable !== false : fallback.taxable !== false,
+        optionGroups: databaseGroups.length ? databaseGroups : normalizeCatalogArray(fallback.optionGroups),
+        extras: databaseExtras.length ? databaseExtras : normalizeCatalogArray(fallback.extras),
+        removables: databaseRemovables.length ? databaseRemovables : normalizeCatalogArray(fallback.removables),
+        sortOrder: catalogSortValue(row)
+      };
+    })
+    .filter((item) => item.category && categoryOrder.has(item.category))
+    .sort((a, b) => {
+      const categoryDifference =
+        Number(categoryOrder.get(a.category) || 0) -
+        Number(categoryOrder.get(b.category) || 0);
+      return categoryDifference || Number(a.sortOrder || 0) - Number(b.sortOrder || 0);
+    });
+
+  if (!products.length) {
+    throw new Error("Supabase no devolvió productos públicos utilizables.");
+  }
+
+  CATEGORIES.splice(0, CATEGORIES.length, ...categories);
+  MENU_ITEMS.splice(0, MENU_ITEMS.length, ...products);
+
+  if (!CATEGORIES.some((category) => category.id === state.category)) {
+    state.category = CATEGORIES[0]?.id || "";
+  }
+}
+
+async function fetchPublicCatalog() {
+  const { supabaseUrl, anonKey } = publicCatalogFunctionConfig();
+  const response = await fetch(`${supabaseUrl}/functions/v1/public-catalog`, {
+    method: "GET",
     mode: "cors",
     cache: "no-store",
-    headers: buildEdgeFunctionHeaders(anonKey),
-    body: JSON.stringify({
-      adminPin: String(adminPin || "").trim()
-    })
+    headers: publicCatalogHeaders(anonKey)
   });
 
   const rawText = await response.text();
@@ -297,248 +363,162 @@ async function callAdminAuth(adminPin) {
     result = { detail: rawText };
   }
 
-  if (!response.ok || !result?.ok) {
-    const message = [
+  if (!response.ok || !result?.ok || !result?.catalog) {
+    const reason = [
       `HTTP ${response.status}`,
       result?.error,
       result?.detail
     ].filter(Boolean).join(" · ");
-
-    const error = new Error(message || "No se pudo validar el acceso.");
-    error.status = response.status;
-    error.payload = result;
-    throw error;
+    throw new Error(reason || "No se pudo cargar el catálogo público.");
   }
 
-  return result;
+  return result.catalog;
 }
 
-async function callAdminCatalog(action, adminPin, extraBody = {}) {
-  const { supabaseUrl, anonKey } = getSupabaseFunctionConfig();
-  const response = await fetch(`${supabaseUrl}/functions/v1/admin-catalog`, {
-    method: "POST",
-    mode: "cors",
-    cache: "no-store",
-    headers: buildEdgeFunctionHeaders(anonKey),
-    body: JSON.stringify({ action, adminPin, ...extraBody })
-  });
-  const rawText = await response.text();
-  let result = {};
-  try { result = rawText ? JSON.parse(rawText) : {}; } catch (_) { result = { detail: rawText }; }
-  if (!response.ok || !result?.ok) {
-    const message = [`HTTP ${response.status}`, result?.error, result?.detail].filter(Boolean).join(" · ");
-    const error = new Error(message || "Supabase rechazó la solicitud.");
-    error.status = response.status;
-    throw error;
-  }
-  return result;
-}
-
-
-async function loadAdminCatalogMenuItems() {
+async function loadPublicCatalog({ render = false, force = false } = {}) {
   try {
-    const result = await callAdminCatalog(
-      "list_catalog",
-      getAdminPinOrThrow()
-    );
+    const catalog = await fetchPublicCatalog();
+    const nextSnapshot = JSON.stringify(catalog);
 
-    const products = Array.isArray(result?.catalog?.products)
-      ? result.catalog.products
-      : [];
+    if (!force && nextSnapshot === publicCatalogSnapshot) {
+      return false;
+    }
 
-    adminCatalogMenuItems = products
-      .filter((product) => product && product.id)
-      .map((product) => ({
-        id: String(product.id),
-        es: String(product.name_es || product.name_en || product.id),
-        en: String(product.name_en || product.name_es || product.id)
-      }));
+    buildMenuFromPublicCatalog(catalog);
+    publicCatalogSnapshot = nextSnapshot;
 
-    renderAvailability();
-    return adminCatalogMenuItems;
+    if (render) {
+      renderCategories();
+      renderMenu();
+      renderCart();
+    }
+
+    return true;
   } catch (error) {
-    /*
-      El catálogo es secundario. Su fallo nunca debe cerrar ni impedir
-      abrir Pedidos y Cocina.
-    */
     console.warn(
-      "No se pudieron cargar productos desde admin-catalog:",
+      "No se pudo cargar el catálogo público desde Supabase. Se mantiene menu-data.js como respaldo:",
       error
     );
-
-    adminCatalogMenuItems = [];
-    renderAvailability();
-    return [];
+    return false;
   }
 }
 
-async function validateAdminPin(pin) {
-  const cleanPin = String(pin || "").trim();
 
-  if (!cleanPin) {
-    throw new Error("Escribe el PIN.");
-  }
-
-  /*
-    El panel diario se autentica con una función independiente.
-    No depende del catálogo ni de sus tablas para poder abrir.
-  */
-  await callAdminAuth(cleanPin);
-
-  return cleanPin;
-}
-
-function getAdminPinOrThrow() {
-  if (!adminPinInMemory) {
-    throw new Error(
-      "La sesión terminó. Introduce nuevamente el PIN del panel."
-    );
-  }
-
-  return adminPinInMemory;
-}
-
-function readTrustedAdminSession() {
-  let session = null;
-
+function getAvailability() {
   try {
-    session = JSON.parse(
-      safeLocalGet(STORAGE_ADMIN_TRUSTED_SESSION) || "null"
-    );
+    return JSON.parse(localStorage.getItem("fogon_availability") || "{}");
   } catch (_) {
-    session = null;
-  }
-
-  const pin = String(session?.pin || "").trim();
-  const expiresAt = Number(session?.expiresAt || 0);
-
-  if (!pin || !Number.isFinite(expiresAt) || expiresAt <= Date.now()) {
-    safeLocalRemove(STORAGE_ADMIN_TRUSTED_SESSION);
-    return null;
-  }
-
-  return {
-    pin,
-    expiresAt,
-    createdAt: Number(session?.createdAt || 0)
-  };
-}
-
-function saveTrustedAdminSession(pin) {
-  const createdAt = Date.now();
-  const expiresAt = createdAt + ADMIN_TRUSTED_SESSION_MS;
-
-  safeLocalSet(
-    STORAGE_ADMIN_TRUSTED_SESSION,
-    JSON.stringify({
-      pin: String(pin || "").trim(),
-      createdAt,
-      expiresAt
-    })
-  );
-
-  return expiresAt;
-}
-
-function clearAdminSession({ forgetTrustedDevice = true } = {}) {
-  adminPinInMemory = "";
-  safeSessionRemove("fogon_admin_unlocked");
-
-  if (forgetTrustedDevice) {
-    safeLocalRemove(STORAGE_ADMIN_TRUSTED_SESSION);
+    return {};
   }
 }
 
-function showLoginPanel(message = "") {
-  const login = $("#adminLogin");
-  const panel = $("#adminPanel");
-  const input = $("#pinInput");
-  const error = $("#pinError");
-
-  if (panel) {
-    panel.hidden = true;
-    panel.style.display = "none";
-  }
-
-  if (login) {
-    login.hidden = false;
-    login.style.display = "";
-  }
-
-  if (error) {
-    error.hidden = !message;
-    error.textContent = message;
-  }
-
-  if (input) {
-    input.disabled = false;
-    input.value = "";
-    setTimeout(() => input.focus(), 0);
-  }
+function hasOwn(object, key) {
+  return Object.prototype.hasOwnProperty.call(object || {}, key);
 }
 
-function logoutAdmin(message = "") {
-  stopAlarm();
-  clearAdminSession({ forgetTrustedDevice: true });
-  showLoginPanel(
-    message || "Sesión cerrada. Introduce el PIN para volver a entrar."
-  );
+function availabilityValue(key, legacyKey = null) {
+  const availability = getAvailability();
+  if (hasOwn(availability, key)) return availability[key] !== false;
+  if (legacyKey && hasOwn(availability, legacyKey)) return availability[legacyKey] !== false;
+  return true;
 }
 
-async function backendRequest(path, options = {}) {
-  if (!BACKEND_URL) return null;
-  const response = await fetch(`${BACKEND_URL}${path}`, {
-    headers: { "Content-Type": "application/json", ...(options.headers || {}) },
-    ...options
+
+const INVENTORY_DEPENDENCY_BY_OPTION_ID = {
+  "pollo-guisado": "inventory:1:pollo-guisar",
+  "pollo": "inventory:1:pollo-guisar",
+  "pollo-frito": "inventory:2:pollo-pica-pollo",
+  "res-guisada": "inventory:12:res",
+  "res": "inventory:12:res",
+  "carne": "inventory:12:res",
+  "bistec": "inventory:4:bistec",
+  "puerco-guisado": "inventory:13:cerdo",
+  "cerdo": "inventory:13:cerdo",
+  "chuleta-plancha": "inventory:5:chuleta",
+  "pechuga-plancha": "inventory:15:pechuga-de-pollo",
+  "camaron": "inventory:11:camarones",
+  "camarones": "inventory:11:camarones",
+  "chicharron": "inventory:14:chicharron",
+  "tilapia": "inventory:9:tilapia",
+  "chillo": "inventory:10:chillo",
+  "papas-fritas": "inventory:28:papas-fritas",
+  "platanos-maduros": "inventory:22:platano-maduro",
+  "platanos-fritos": "inventory:22:platano-maduro",
+  "tostones": "inventory:21:platano-verde",
+  "salami": "inventory:16:salami",
+  "bacon": "inventory:17:bacon",
+  "tocino": "inventory:44:tocino",
+  "longaniza": "inventory:18:longaniza",
+  "jamon": "inventory:42:jamon",
+  "huevo": "inventory:43:huevo",
+  "aguacate-extra": "inventory:50:aguacate",
+  "queso": "inventory:30:queso-dominicano",
+  "jamon-queso": "inventory:42:jamon"
+};
+
+function inventoryDependencyAvailable(optionId) {
+  const key = INVENTORY_DEPENDENCY_BY_OPTION_ID[String(optionId || "")];
+  return !key || availabilityValue(key);
+}
+
+function showAddedToCartNotice() {
+  let notice = document.getElementById("addedToCartNotice");
+  if (!notice) {
+    notice = document.createElement("div");
+    notice.id = "addedToCartNotice";
+    notice.className = "added-to-cart-notice";
+    notice.setAttribute("role", "status");
+    notice.setAttribute("aria-live", "polite");
+    document.body.appendChild(notice);
+  }
+  notice.textContent = text("addedToCart");
+  notice.classList.add("is-visible");
+  clearTimeout(showAddedToCartNotice.timer);
+  showAddedToCartNotice.timer = setTimeout(() => {
+    notice.classList.remove("is-visible");
+  }, 1500);
+}
+
+function productAvailabilityKey(itemOrId) {
+  const id = typeof itemOrId === "string" ? itemOrId : itemOrId?.id;
+  return `product:${id}`;
+}
+
+function optionAvailabilityKey(group, option) {
+  return `option:${group.id}:${option.id}`;
+}
+
+function extraAvailabilityKey(extra) {
+  return `extra:${extra.id}`;
+}
+
+function removableAvailabilityKey(remove) {
+  return `remove:${remove.id}`;
+}
+
+function isProductAvailable(item) {
+  if (!item) return false;
+  const productEnabled = availabilityValue(productAvailabilityKey(item), item.id);
+  if (!productEnabled) return false;
+
+  return (item.optionGroups || []).every((group) => {
+    if (!group.required) return true;
+    return (group.options || []).some((option) => availabilityValue(optionAvailabilityKey(group, option)));
   });
-  if (!response.ok) throw new Error(`Backend error ${response.status}`);
-  if (response.status === 204) return null;
-  return response.json();
 }
 
-function orderFromBackend(row) {
-  if (!row) return null;
-  return {
-    ...(row.raw || {}),
-    id: String(row.id),
-    createdAt: row.created_at || row.createdAt || row.raw?.createdAt || new Date().toISOString(),
-    customer: row.customer || row.raw?.customer || {},
-    items: row.items || row.raw?.items || [],
-    totals: row.totals || row.raw?.totals || {},
-    paymentMethod: row.payment_method || row.raw?.paymentMethod || "",
-    orderType: row.order_type || row.raw?.orderType || (Array.isArray(row.items) && row.items[0]?.orderType) || "",
-    status: row.status || row.raw?.status || "new",
-    language: row.language || row.raw?.language || "es",
-    acceptedAt: row.accepted_at || row.raw?.acceptedAt || null,
-    readyAt: row.ready_at || row.raw?.readyAt || null,
-    cloverOrderId: row.clover_order_id || row.raw?.cloverOrderId || null,
-    whatsappSent: Boolean(row.whatsapp_sent || row.raw?.whatsappSent)
-  };
+function isOptionAvailable(group, option) {
+  return availabilityValue(optionAvailabilityKey(group, option)) &&
+    inventoryDependencyAvailable(option?.id);
 }
 
-async function syncOrdersFromBackend() {
-  const db = window.FOGON_DB;
+function isExtraAvailable(extra) {
+  return availabilityValue(extraAvailabilityKey(extra)) &&
+    inventoryDependencyAvailable(extra?.id);
+}
 
-  if (db?.isReady()) {
-    try {
-      const orders = await db.fetchOrders();
-      setOrders(orders);
-      renderAll();
-    } catch (error) {
-      console.warn("No se pudieron sincronizar pedidos desde Supabase:", error);
-    }
-    return;
-  }
-
-  if (!BACKEND_URL) return;
-  try {
-    const data = await backendRequest("/api/orders");
-    const orders = (data?.orders || []).map(orderFromBackend).filter(Boolean);
-    setOrders(orders);
-    renderAll();
-  } catch (error) {
-    console.warn("No se pudieron sincronizar pedidos desde el backend:", error);
-  }
+function isRemovableAvailable(remove) {
+  return availabilityValue(removableAvailabilityKey(remove));
 }
 
 async function syncAvailabilityFromBackend() {
@@ -547,1388 +527,778 @@ async function syncAvailabilityFromBackend() {
   if (db?.isReady()) {
     try {
       const availability = await db.fetchAvailability();
-      safeLocalSet(STORAGE_AVAILABILITY, JSON.stringify(availability));
-      renderAvailability();
-      renderOrderModeButton();
+      localStorage.setItem("fogon_availability", JSON.stringify(availability));
+      refreshAvailabilityIfChanged(true);
     } catch (error) {
-      console.warn("No se pudo sincronizar disponibilidad desde Supabase:", error);
+      console.warn("No se pudo actualizar disponibilidad desde Supabase:", error);
     }
     return;
   }
 
   if (!BACKEND_URL) return;
   try {
-    const data = await backendRequest("/api/availability");
+    const response = await fetch(`${BACKEND_URL}/api/availability`);
+    if (!response.ok) throw new Error(`Backend error ${response.status}`);
+    const data = await response.json();
     if (data?.availability) {
-      safeLocalSet(STORAGE_AVAILABILITY, JSON.stringify(data.availability));
-      renderAvailability();
+      localStorage.setItem("fogon_availability", JSON.stringify(data.availability));
+      refreshAvailabilityIfChanged(true);
     }
   } catch (error) {
-    console.warn("No se pudo sincronizar disponibilidad desde el backend:", error);
+    console.warn("No se pudo actualizar disponibilidad desde el backend:", error);
   }
 }
 
-async function updateOrderStatusBackend(orderId, status, extra = {}) {
-  const db = window.FOGON_DB;
+function refreshAvailabilityIfChanged(force = false) {
+  const nextSnapshot = localStorage.getItem("fogon_availability") || "{}";
+  if (!force && nextSnapshot === lastAvailabilitySnapshot) return;
+  lastAvailabilitySnapshot = nextSnapshot;
+  renderMenu();
+  updateOrderingUi();
+}
 
-  if (db?.isReady()) {
-    await db.updateOrderStatus(orderId, status, extra);
-    return;
-  }
+function setLanguage(lang) {
+  state.lang = lang;
+  localStorage.setItem("fogon_lang", lang);
+  $("#languageGate").classList.add("hidden");
+  document.documentElement.lang = lang;
+  applyText();
+  renderCategories();
+  renderMenu();
+  renderCart();
+  syncAvailabilityFromBackend();
+}
 
-  if (!BACKEND_URL) return;
-  await backendRequest(`/api/orders/${encodeURIComponent(orderId)}`, {
-    method: "PATCH",
-    body: JSON.stringify({ status, ...extra })
+function applyText() {
+  $$("[data-i18n]").forEach((node) => {
+    node.textContent = text(node.dataset.i18n);
   });
-}
-
-async function deleteOrderBackend(orderId) {
-  const db = window.FOGON_DB;
-
-  if (db?.isReady()) {
-    await db.deleteOrder(orderId);
-    return;
-  }
-
-  if (!BACKEND_URL) return;
-  await backendRequest(`/api/orders/${encodeURIComponent(orderId)}`, { method: "DELETE" });
-}
-
-function getAvailability() {
-  return safeParse(STORAGE_AVAILABILITY, {});
-}
-
-async function setAvailability(itemId, available) {
-  const availability = getAvailability();
-  availability[itemId] = available;
-  safeLocalSet(STORAGE_AVAILABILITY, JSON.stringify(availability));
-  renderAvailability();
-
-  const db = window.FOGON_DB;
-  if (db?.isReady()) {
-    try {
-      await db.setAvailability(itemId, available);
-    } catch (error) {
-      console.warn("No se pudo guardar disponibilidad en Supabase:", error);
-    }
-    return;
-  }
-
-  if (BACKEND_URL) {
-    try {
-      await backendRequest(`/api/availability/${encodeURIComponent(itemId)}`, {
-        method: "PUT",
-        body: JSON.stringify({ available })
-      });
-    } catch (error) {
-      console.warn("No se pudo guardar disponibilidad en el backend:", error);
-    }
-  }
-}
-
-function getKitchenHiddenIds() {
-  return safeParse(STORAGE_KITCHEN_HIDDEN, []);
-}
-
-function setKitchenHiddenIds(ids) {
-  safeLocalSet(STORAGE_KITCHEN_HIDDEN, JSON.stringify(Array.from(new Set(ids))));
-}
-
-function getSelectedKitchenOrderId() {
-  return String(safeLocalGet(STORAGE_KITCHEN_SELECTED) || "");
-}
-
-function setSelectedKitchenOrderId(orderId) {
-  safeLocalSet(STORAGE_KITCHEN_SELECTED, String(orderId || ""));
-}
-
-function hideKitchenOrder(orderId) {
-  const ids = getKitchenHiddenIds();
-  setKitchenHiddenIds([...ids, orderId]);
-  if (getSelectedKitchenOrderId() === String(orderId)) setSelectedKitchenOrderId("");
-  renderKitchen();
-  updateCounters();
-}
-
-function cleanKitchenHiddenIds(existingOrders) {
-  const existingIds = new Set(existingOrders.map((order) => order.id));
-  const cleaned = getKitchenHiddenIds().filter((id) => existingIds.has(id));
-  setKitchenHiddenIds(cleaned);
-}
-
-function newOrders(orders = getOrders()) {
-  return orders.filter((order) => order.status === "new" || !order.status);
-}
-
-function kitchenOrders(orders = getOrders()) {
-  const hidden = new Set(getKitchenHiddenIds());
-  return orders.filter((order) => !hidden.has(order.id));
-}
-
-function setSoundBanner(message = "", forceVisible = null) {
-  const banner = $("#soundBanner");
-  if (!banner) return;
-
-  const text =
-    banner.querySelector("#soundBannerText") ||
-    banner.querySelector("p");
-
-  if (message && text) {
-    text.innerHTML = message;
-  }
-
-  banner.hidden =
-    forceVisible === null
-      ? soundUnlocked
-      : !Boolean(forceVisible);
-}
-
-function ensureAudioContext() {
-  const AudioContextClass =
-    window.AudioContext ||
-    window.webkitAudioContext;
-
-  if (!AudioContextClass) {
-    soundUnlocked = false;
-    setSoundBanner(
-      "<strong>Sonido no disponible</strong><br>Este navegador no permite Web Audio.",
-      true
-    );
-    return null;
-  }
-
-  if (!audioCtx || audioCtx.state === "closed") {
-    audioCtx = new AudioContextClass();
-
-    audioCtx.addEventListener?.("statechange", () => {
-      refreshSoundState();
-    });
-
-    if (!audioCtx.addEventListener) {
-      audioCtx.onstatechange = refreshSoundState;
-    }
-  }
-
-  return audioCtx;
-}
-
-function refreshSoundState() {
-  soundUnlocked =
-    Boolean(audioCtx) &&
-    audioCtx.state === "running";
-
-  if (soundUnlocked) {
-    setSoundBanner("", false);
-    return true;
-  }
-
-  const state = audioCtx?.state || "sin iniciar";
-
-  setSoundBanner(
-    "<strong>Toca para activar el sonido</strong><br>" +
-    `Estado actual: ${escapeHtml(state)}. ` +
-    "Pulsa “Activar y probar sonido” una vez después de abrir o recargar el panel.",
-    true
-  );
-
-  return false;
-}
-
-function playTonePattern(testOnly = false) {
-  if (!audioCtx || audioCtx.state !== "running") {
-    return false;
-  }
-
-  try {
-    const now = audioCtx.currentTime;
-    const master = audioCtx.createGain();
-
-    master.gain.setValueAtTime(0.0001, now);
-    master.gain.exponentialRampToValueAtTime(
-      testOnly ? 0.34 : 0.68,
-      now + 0.02
-    );
-    master.gain.exponentialRampToValueAtTime(
-      0.0001,
-      now + (testOnly ? 0.34 : 0.82)
-    );
-
-    master.connect(audioCtx.destination);
-
-    const notes = testOnly
-      ? [{ offset: 0, frequency: 880, duration: 0.2 }]
-      : [
-          { offset: 0, frequency: 940, duration: 0.16 },
-          { offset: 0.2, frequency: 720, duration: 0.16 },
-          { offset: 0.4, frequency: 940, duration: 0.2 }
-        ];
-
-    notes.forEach((note) => {
-      const oscillator = audioCtx.createOscillator();
-      oscillator.type = "sine";
-      oscillator.frequency.setValueAtTime(
-        note.frequency,
-        now + note.offset
-      );
-      oscillator.connect(master);
-      oscillator.start(now + note.offset);
-      oscillator.stop(
-        now + note.offset + note.duration
-      );
-    });
-
-    return true;
-  } catch (error) {
-    console.warn("No se pudo reproducir el sonido:", error);
-    soundUnlocked = false;
-    refreshSoundState();
-    return false;
-  }
-}
-
-async function unlockSound({
-  playTest = false,
-  announce = false
-} = {}) {
-  const now = Date.now();
-
-  if (
-    now - lastSoundUnlockAttemptAt < 350 &&
-    audioCtx?.state !== "running"
-  ) {
-    return false;
-  }
-
-  lastSoundUnlockAttemptAt = now;
-
-  try {
-    const context = ensureAudioContext();
-    if (!context) return false;
-
-    if (
-      context.state === "suspended" ||
-      context.state === "interrupted"
-    ) {
-      await context.resume();
-    }
-
-    soundUnlocked = context.state === "running";
-
-    if (!soundUnlocked) {
-      refreshSoundState();
-      return false;
-    }
-
-    if (playTest && !soundConfirmationPlayed) {
-      playTonePattern(true);
-      soundConfirmationPlayed = true;
-    }
-
-    if (announce) {
-      setSoundBanner(
-        "<strong>Sonido activado</strong><br>" +
-        "La alarma está preparada y sonará con cada pedido nuevo.",
-        true
-      );
-
-      setTimeout(() => {
-        if (audioCtx?.state === "running") {
-          setSoundBanner("", false);
-        }
-      }, 1800);
-    } else {
-      setSoundBanner("", false);
-    }
-
-    return true;
-  } catch (error) {
-    console.warn("Safari bloqueó el sonido:", error);
-    soundUnlocked = false;
-    refreshSoundState();
-    return false;
-  }
-}
-
-async function beep() {
-  if (!audioCtx || audioCtx.state !== "running") {
-    const unlocked = await unlockSound({
-      playTest: false,
-      announce: false
-    });
-
-    if (!unlocked) {
-      return false;
-    }
-  }
-
-  return playTonePattern(false);
-}
-
-function startAlarm() {
-  if (alarmTimer) return;
-
-  if (!refreshSoundState()) {
-    setSoundBanner(
-      "<strong>Hay un pedido pendiente, pero el sonido está bloqueado</strong><br>" +
-      "Pulsa “Activar y probar sonido” para iniciar la alarma.",
-      true
-    );
-  }
-
-  void beep();
-
-  alarmTimer = setInterval(() => {
-    if (newOrders().length) {
-      void beep();
-    } else {
-      stopAlarm();
-    }
-  }, 1200);
-}
-
-function stopAlarm() {
-  if (alarmTimer) {
-    clearInterval(alarmTimer);
-  }
-
-  alarmTimer = null;
-}
-
-function updateAlarm() {
-  const pending = newOrders();
-  const signature = pending
-    .map((order) => order.id)
-    .join("|");
-
-  if (pending.length) {
-    if (signature !== lastNewOrderSignature) {
-      void beep();
-    }
-
-    startAlarm();
-  } else {
-    stopAlarm();
-  }
-
-  lastNewOrderSignature = signature;
-}
-
-async function acceptOrder(orderId) {
-  const acceptedAt = new Date().toISOString();
-  const orders = getOrders().map((order) => (
-    order.id === orderId
-      ? { ...order, status: "accepted", acceptedAt }
-      : order
-  ));
-  saveOrders(orders);
-  try {
-    await updateOrderStatusBackend(orderId, "accepted", { acceptedAt });
-    await syncOrdersFromBackend();
-  } catch (error) {
-    console.warn("No se pudo actualizar pedido en Supabase:", error);
-  }
-}
-
-async function markReady(orderId) {
-  const readyAt = new Date().toISOString();
-  const orders = getOrders().map((order) => (
-    order.id === orderId
-      ? { ...order, status: "ready", readyAt }
-      : order
-  ));
-  saveOrders(orders);
-  try {
-    await updateOrderStatusBackend(orderId, "ready", { readyAt });
-    await syncOrdersFromBackend();
-  } catch (error) {
-    console.warn("No se pudo marcar listo en Supabase:", error);
-  }
-}
-
-async function removeOrderEverywhere(orderId) {
-  if (!confirm(`¿Marcar ${orderId} como entregado y quitarlo para todos?`)) return;
-  const orders = getOrders().filter((order) => order.id !== orderId);
-  setOrders(orders);
-  const hidden = getKitchenHiddenIds().filter((id) => id !== orderId);
-  setKitchenHiddenIds(hidden);
-  renderAll();
-  try {
-    await deleteOrderBackend(orderId);
-    await syncOrdersFromBackend();
-  } catch (error) {
-    console.warn("No se pudo quitar el pedido en Supabase:", error);
-  }
-}
-
-function escapeHtml(value) {
-  return String(value == null ? "" : value)
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#039;");
-}
-
-async function edgeFunctionErrorDetails(error) {
-  const parts = [];
-  if (error && error.message) parts.push(error.message);
-
-  const response = error && error.context;
-  if (response) {
-    if (response.status) parts.push(`HTTP ${response.status}`);
-    try {
-      const readable = typeof response.clone === "function" ? response.clone() : response;
-      const payload = await readable.json();
-      if (payload?.error) parts.push(payload.error);
-      if (payload?.detail) parts.push(payload.detail);
-      if (!payload?.error && !payload?.detail) parts.push(JSON.stringify(payload));
-    } catch (_) {
-      try {
-        const readable = typeof response.clone === "function" ? response.clone() : response;
-        const body = await readable.text();
-        if (body) parts.push(body);
-      } catch (_) {
-        // La respuesta no tenia un cuerpo legible.
-      }
-    }
-  }
-
-  return Array.from(new Set(parts.filter(Boolean))).join(" · ") || "Error desconocido";
-}
-
-
-async function sendReadyNotification(orderId) {
-  const orders = getOrders();
-  const order = orders.find(
-    (candidate) => String(candidate.id) === String(orderId)
-  );
-
-  if (!order) {
-    alert("No se encontró el pedido.");
-    return;
-  }
-
-  const cfg = window.FOGON_SUPABASE || {};
-  const supabaseUrl = String(cfg.url || "").replace(/\/$/, "");
-  const anonKey = String(cfg.anonKey || "").trim();
-
-  if (!supabaseUrl || !anonKey) {
-    alert("Faltan la URL o la anon key de Supabase en supabase-config.js.");
-    return;
-  }
-
-  const endpoint =
-    `${supabaseUrl}/functions/v1/send-whatsapp-order-ready`;
-
-  try {
-    const response = await fetch(endpoint, {
-      method: "POST",
-      mode: "cors",
-      cache: "no-store",
-      headers: buildEdgeFunctionHeaders(anonKey),
-      body: JSON.stringify({
-        orderId: order.databaseId || order.id,
-        publicId: Number(order.id) || null,
-        adminPin: getAdminPinOrThrow()
-      })
-    });
-
-    const rawText = await response.text();
-    let result = {};
-
-    try {
-      result = rawText ? JSON.parse(rawText) : {};
-    } catch (_) {
-      result = { detail: rawText };
-    }
-
-    if (!response.ok || !result?.ok) {
-      const reason = [
-        `HTTP ${response.status}`,
-        result?.error,
-        result?.detail,
-        result?.result?.error?.message
-      ].filter(Boolean).join(" · ");
-
-      throw new Error(
-        reason || "WhatsApp no confirmó el envío."
-      );
-    }
-
-    const updatedOrders = getOrders().map((candidate) => (
-      String(candidate.id) === String(orderId)
-        ? {
-            ...candidate,
-            status: "ready",
-            readyAt: result.readyAt || new Date().toISOString(),
-            whatsappSent: true
-          }
-        : candidate
-    ));
-
-    saveOrders(updatedOrders);
-    await syncOrdersFromBackend();
-
-    if (result.alreadySent) {
-      alert(
-        `El pedido ${order.id} ya tenía el WhatsApp enviado. ` +
-        "No se envió un duplicado."
-      );
-      return;
-    }
-
-    alert(
-      `Pedido ${order.id} marcado como listo. ` +
-      "WhatsApp enviado correctamente."
-    );
-  } catch (whatsappError) {
-    console.error("Falló el envío por WhatsApp:", whatsappError);
-
-    alert(
-      `No se pudo enviar el WhatsApp al cliente.
-
-` +
-      `${whatsappError?.message || whatsappError}`
-    );
-  }
-}
-
-
-async function sendDailyMissingReport() {
-  const button = $("#sendDailyMissingBtn");
-  if (button?.disabled) return;
-  try {
-    button.disabled = true;
-    button.textContent = "Enviando faltantes…";
-    const { supabaseUrl, anonKey } = getSupabaseFunctionConfig();
-    const response = await fetch(`${supabaseUrl}/functions/v1/send-daily-missing`, {
-      method: "POST",
-      mode: "cors",
-      cache: "no-store",
-      headers: buildEdgeFunctionHeaders(anonKey),
-      body: JSON.stringify({ action: "send_now", adminPin: getAdminPinOrThrow() })
-    });
-    const raw = await response.text();
-    let result = {};
-    try { result = raw ? JSON.parse(raw) : {}; } catch (_) { result = { detail: raw }; }
-    if (!response.ok || !result?.ok) {
-      throw new Error([`HTTP ${response.status}`, result?.error, result?.detail].filter(Boolean).join(" · "));
-    }
-    alert(`Faltantes enviados a +1 650-722-4407. ${Number(result.count || 0)} elemento(s).`);
-  } catch (error) {
-    console.error(error);
-    alert(`No se pudieron enviar los faltantes.\n\n${error?.message || error}`);
-  } finally {
-    if (button) {
-      button.disabled = false;
-      button.textContent = "Enviar faltantes del día por WhatsApp";
-    }
-  }
-}
-
-let kitchenSwipe = null;
-
-function selectKitchenCard(card) {
-  const id = String(card?.dataset?.kitchenOrderId || "");
-  if (!id) return;
-  setSelectedKitchenOrderId(id);
-  $$(".kitchen-order-card").forEach((item) => {
-    item.classList.toggle("kitchen-selected", String(item.dataset.kitchenOrderId) === id);
+  $$(".lang-switch button").forEach((button) => {
+    button.classList.toggle("active", button.dataset.setLang === state.lang);
   });
+  updateThemeButton();
 }
 
-function startKitchenSwipe(card, x, y) {
-  if (!card?.classList.contains("kitchen-selected")) return;
-  kitchenSwipe = { card, startX: x, startY: y, dx: 0, horizontal: false };
+function applyTheme() {
+  document.body.classList.toggle("dark-mode", state.theme === "dark");
+  localStorage.setItem("fogon_theme", state.theme);
+  updateThemeButton();
 }
 
-function moveKitchenSwipe(x, y) {
-  if (!kitchenSwipe) return;
-  const dx = x - kitchenSwipe.startX;
-  const dy = y - kitchenSwipe.startY;
-  if (!kitchenSwipe.horizontal) {
-    if (Math.abs(dx) < 10 && Math.abs(dy) < 10) return;
-    if (Math.abs(dy) >= Math.abs(dx) || dx >= 0) {
-      kitchenSwipe = null;
-      return;
-    }
-    kitchenSwipe.horizontal = true;
-    kitchenSwipe.card.classList.add("kitchen-dragging");
-  }
-  kitchenSwipe.dx = Math.min(0, dx);
-  kitchenSwipe.card.style.transform = `translate3d(${Math.max(-180, kitchenSwipe.dx)}px,0,0)`;
+function updateThemeButton() {
+  const button = $("#themeToggleBtn");
+  if (!button) return;
+  const isDark = state.theme === "dark";
+  button.textContent = isDark ? text("lightMode") : text("darkMode");
+  button.setAttribute("aria-pressed", String(isDark));
 }
 
-function finishKitchenSwipe() {
-  if (!kitchenSwipe) return;
-  const { card, dx, horizontal } = kitchenSwipe;
-  kitchenSwipe = null;
-  card.classList.remove("kitchen-dragging");
-  if (horizontal && dx <= -90) {
-    const id = String(card.dataset.kitchenOrderId || "");
-    card.classList.add("kitchen-closing");
-    setTimeout(() => hideKitchenOrder(id), 190);
-    return;
-  }
-  card.style.transform = "";
+function toggleTheme() {
+  state.theme = state.theme === "dark" ? "light" : "dark";
+  applyTheme();
 }
 
-function initKitchenGesturesAndMissingButton() {
-  const style = document.createElement("style");
-  style.textContent = `
-    .kitchen-order-card{touch-action:pan-y;user-select:none;-webkit-user-select:none;transition:transform 180ms ease,opacity 180ms ease,box-shadow 180ms ease;will-change:transform,opacity}
-    .kitchen-order-card.kitchen-selected{outline:4px solid rgba(255,174,0,.95);box-shadow:0 0 0 7px rgba(255,174,0,.18)}
-    .kitchen-order-card.kitchen-dragging{transition:none}
-    .kitchen-order-card.kitchen-closing{transform:translate3d(-120%,80px,0) rotate(-7deg)!important;opacity:0}
-    .kitchen-swipe-hint{display:none;margin:10px 0;font-weight:800}
-    .kitchen-order-card.kitchen-selected .kitchen-swipe-hint{display:block}
-  `;
-  document.head.appendChild(style);
-
-  document.addEventListener("click", (event) => {
-    const missing = event.target.closest("#sendDailyMissingBtn");
-    if (missing) {
-      event.preventDefault();
-      sendDailyMissingReport();
-      return;
-    }
-    const card = event.target.closest(".kitchen-order-card");
-    if (card && !event.target.closest("button,a,input,select,textarea")) selectKitchenCard(card);
-  });
-
-  document.addEventListener("pointerdown", (event) => {
-    const card = event.target.closest(".kitchen-order-card");
-    if (card) startKitchenSwipe(card, event.clientX, event.clientY);
-  });
-  document.addEventListener("pointermove", (event) => moveKitchenSwipe(event.clientX, event.clientY));
-  document.addEventListener("pointerup", finishKitchenSwipe);
-  document.addEventListener("pointercancel", finishKitchenSwipe);
-
-  document.addEventListener("touchstart", (event) => {
-    const card = event.target.closest(".kitchen-order-card");
-    const touch = event.touches?.[0];
-    if (card && touch) startKitchenSwipe(card, touch.clientX, touch.clientY);
-  }, { passive: true });
-  document.addEventListener("touchmove", (event) => {
-    const touch = event.touches?.[0];
-    if (!touch) return;
-    moveKitchenSwipe(touch.clientX, touch.clientY);
-    if (kitchenSwipe?.horizontal) event.preventDefault();
-  }, { passive: false });
-  document.addEventListener("touchend", finishKitchenSwipe);
-  document.addEventListener("touchcancel", finishKitchenSwipe);
+function renderCategories() {
+  const tabs = $("#categoryTabs");
+  tabs.innerHTML = CATEGORIES.map((category) => `
+    <button class="${category.id === state.category ? "active" : ""}" data-category="${category.id}">
+      ${category[state.lang] || category.es}
+    </button>
+  `).join("");
 }
 
-function orderTypeLabel(type) {
-  if (type === "dine-in") return "Para aquí";
-  if (type === "takeout") return "Para llevar";
-  return "No indicado";
-}
-
-function paymentLabel(method) {
-  if (method === "card") return "Tarjeta en ventanilla";
-  if (method === "cash") return "Efectivo en ventanilla";
-  return "No indicado";
-}
-
-function statusLabel(order) {
-  const status = order.status || "new";
-  if (status === "ready") return "Listo";
-  if (status === "accepted") return "Aceptado";
-  return "Nuevo";
-}
-
-function statusClass(order) {
-  const status = order.status || "new";
-  if (status === "ready") return "ready";
-  if (status === "accepted") return "accepted";
-  return "new";
-}
-
-function itemDetailsHtml(item, compact = false) {
-  const itemNameEs = item.nameEs || item.name || "";
+function productCardHtml(item, imageIndex) {
+  const unavailable = !isProductAvailable(item);
+  const priorityImage = imageIndex < 6;
   return `
-    <div class="order-item-line">
-      <strong>${escapeHtml(item.quantity)}x ${escapeHtml(itemNameEs)}</strong>
-      ${(item.selections || []).map((selection) => `<p>${escapeHtml(selection.groupEs || selection.group)}: ${escapeHtml(selection.nameEs || selection.name)}</p>`).join("")}
-      ${(item.extras || []).map((extra) => `<p>Extra: ${escapeHtml(extra.nameEs || extra.name)} +${money(extra.price)}</p>`).join("")}
-      ${(item.removables || []).map((remove) => `<p>${escapeHtml(typeof remove === "string" ? remove : (remove.nameEs || remove.name))}</p>`).join("")}
-      ${item.notes ? `<p><strong>Nota:</strong> ${escapeHtml(item.notes)}</p>` : ""}
-      ${compact ? "" : `<p class="item-price">${money((item.lineTotal || 0) * (item.quantity || 1))}</p>`}
-    </div>
+    <article class="product-card ${unavailable ? "is-unavailable" : ""}">
+      <button class="product-trigger" data-product-id="${item.id}" ${unavailable ? "disabled" : ""}>
+        <div class="product-image">
+          ${item.image ? `<img src="${item.image}" alt="${itemName(item)}" loading="${priorityImage ? "eager" : "lazy"}" fetchpriority="${priorityImage ? "high" : "auto"}" decoding="async" width="640" height="557" onerror="this.closest('.product-image').classList.add('missing-image'); this.remove();">` : ""}
+        </div>
+        <div class="product-info">
+          <div>
+            <h2>${itemName(item)}</h2>
+            <p>${itemDescription(item)}</p>
+          </div>
+          <div class="price-row">
+            <strong>${money(item.price)}</strong>
+            ${unavailable ? `<span>${text("unavailable")}</span>` : ""}
+          </div>
+        </div>
+      </button>
+    </article>
   `;
 }
 
-function updateCounters() {
-  const orders = getOrders();
-  const kitchen = kitchenOrders(orders);
-  const pending = newOrders(orders);
-
-  const orderCount = $("#orderCount");
-  const pendingCount = $("#pendingCount");
-  const kitchenCount = $("#kitchenCount");
-  const kitchenVisibleCount = $("#kitchenVisibleCount");
-
-  if (orderCount) orderCount.textContent = orders.length;
-  if (pendingCount) pendingCount.textContent = pending.length;
-  if (kitchenCount) kitchenCount.textContent = kitchen.length;
-  if (kitchenVisibleCount) kitchenVisibleCount.textContent = kitchen.length;
-}
-
-
-function orderCreatedTimestamp(order) {
-  const value = Date.parse(order?.createdAt || "");
-  return Number.isFinite(value) ? value : 0;
-}
-
-function orderElapsedLabel(order) {
-  const createdAt = orderCreatedTimestamp(order);
-  if (!createdAt) return "";
-
-  const elapsedMinutes = Math.max(
-    0,
-    Math.floor((Date.now() - createdAt) / 60000)
-  );
-
-  if (elapsedMinutes < 1) return "Ahora";
-  if (elapsedMinutes === 1) return "Hace 1 min";
-  if (elapsedMinutes < 60) return `Hace ${elapsedMinutes} min`;
-
-  const hours = Math.floor(elapsedMinutes / 60);
-  const minutes = elapsedMinutes % 60;
-
-  return minutes
-    ? `Hace ${hours} h ${minutes} min`
-    : `Hace ${hours} h`;
-}
-
-function prepareOrderCardExpansion(orders) {
-  const currentIds = new Set(
-    orders.map((order) => String(order.id))
-  );
-
-  // Todas las comandas se abren completas al entrar y los pedidos nuevos
-  // también aparecen desplegados, sin mover automáticamente la pantalla.
-  currentIds.forEach((id) => expandedOrderIds.add(id));
-
-  expandedOrderIds = new Set(
-    [...expandedOrderIds].filter((id) => currentIds.has(id))
-  );
-  knownOrderIds = currentIds;
-  ordersRenderInitialized = true;
-}
-
-function toggleOrderCard(orderId) {
-  const cleanId = String(orderId || "");
-  if (!cleanId) return;
-
-  if (expandedOrderIds.has(cleanId)) {
-    expandedOrderIds.delete(cleanId);
-  } else {
-    expandedOrderIds.add(cleanId);
-  }
-
-  renderOrders();
-}
-
-function renderOrders() {
-  const orders = getOrders()
-    .slice()
-    .sort((left, right) =>
-      orderCreatedTimestamp(right) - orderCreatedTimestamp(left)
-    );
-
-  prepareOrderCardExpansion(orders);
-  updateCounters();
-
-  const ordersList = $("#ordersList");
-  if (!ordersList) return;
-
-  ordersList.innerHTML = orders.length ? orders.map((order) => {
-    const orderId = String(order.id);
-    const isNew = order.status === "new" || !order.status;
-    const isReady = order.status === "ready";
-    const expanded = expandedOrderIds.has(orderId);
-    const panelId = `order-body-${orderId.replace(/[^a-zA-Z0-9_-]/g, "-")}`;
-
+function renderMenu() {
+  const grid = $("#menuGrid");
+  let imageIndex = 0;
+  grid.innerHTML = CATEGORIES.map((category) => {
+    const items = MENU_ITEMS.filter((item) => item.category === category.id && item.visible !== false);
+    if (!items.length) return "";
     return `
-    <article
-      class="order-card ${isNew ? "is-new" : "is-accepted"} ${expanded ? "is-expanded" : "is-collapsed"}"
-      data-order-card="${escapeHtml(orderId)}"
-    >
-      <button
-        class="order-card-toggle"
-        data-toggle-order="${escapeHtml(orderId)}"
-        type="button"
-        aria-expanded="${expanded ? "true" : "false"}"
-        aria-controls="${escapeHtml(panelId)}"
-      >
-        <span class="order-card-topline">
-          <span class="order-number">#${escapeHtml(orderId)}</span>
-          <span class="order-status ${statusClass(order)}">${statusLabel(order)}</span>
-        </span>
-        <span class="order-customer-name">${escapeHtml(order.customer?.name || "Sin nombre")}</span>
-        <span class="order-card-meta">
-          <span>${escapeHtml(orderElapsedLabel(order))}</span>
-          <span>${escapeHtml(orderTypeLabel(order.orderType || ((order.items || [])[0] || {}).orderType))}</span>
-        </span>
-        <span class="order-card-summary">
-          ${(order.items || []).length} artículo${(order.items || []).length === 1 ? "" : "s"}
-          <span class="order-chevron" aria-hidden="true">⌄</span>
-        </span>
-      </button>
-
-      <div id="${escapeHtml(panelId)}" class="order-card-body" ${expanded ? "" : "hidden"}>
-        <div class="order-contact">
-          <p><strong>Teléfono:</strong> ${escapeHtml(order.customer?.phone || "Sin teléfono")}</p>
-          <p><strong>Pago:</strong> ${escapeHtml(paymentLabel(order.paymentMethod))}</p>
-          <p><strong>Entrada:</strong> ${escapeHtml(new Date(order.createdAt).toLocaleString())}</p>
+      <section class="category-section" id="cat-${category.id}" data-category-section="${category.id}">
+        <div class="category-title">
+          <h2>${category[state.lang] || category.es}</h2>
+          <span>${items.length}</span>
         </div>
-
-        <div class="order-items">
-          ${(order.items || []).map((item) => itemDetailsHtml(item)).join("")}
+        <div class="category-products">
+          ${items.map((item) => productCardHtml(item, imageIndex++)).join("")}
         </div>
-
-        <div class="order-total">
-          <span>Total</span>
-          <strong>${money(order.totals?.total)}</strong>
-        </div>
-
-        ${isNew
-          ? `<button class="primary-btn full accept-order" data-accept-order="${escapeHtml(orderId)}" type="button">Aceptar pedido y parar sonido</button>`
-          : `<p class="accepted-note">${isReady ? "Pedido listo" : "Pedido aceptado"}${order.acceptedAt ? ` · ${new Date(order.acceptedAt).toLocaleTimeString()}` : ""}</p>`}
-
-        <div class="order-actions-row">
-          ${!isNew ? `<button class="secondary-btn" data-ready-order="${escapeHtml(orderId)}" type="button">Pedido listo / Enviar WhatsApp</button>` : ""}
-          <button class="secondary-btn danger-btn" data-deliver-order="${escapeHtml(orderId)}" type="button">Entregado / quitar para todos</button>
-        </div>
-      </div>
-    </article>`;
-  }).join("") : `<p class="empty-state">No hay pedidos todavía.</p>`;
-
-  updateAlarm();
-}
-
-function renderKitchen() {
-  const orders = getOrders();
-  cleanKitchenHiddenIds(orders);
-  const visibleOrders = kitchenOrders(orders);
-  updateCounters();
-
-  const kitchenList = $("#kitchenList");
-  if (!kitchenList) return;
-
-  kitchenList.innerHTML = visibleOrders.length ? visibleOrders.map((order) => `
-    <article class="kitchen-order-card ${getSelectedKitchenOrderId() === String(order.id) ? "kitchen-selected" : ""}" data-kitchen-order-id="${escapeHtml(order.id)}">
-      <div class="kitchen-order-head">
-        <strong>${escapeHtml(order.id)}</strong>
-        <span>${statusLabel(order)}</span>
-      </div>
-      <div class="kitchen-items">
-        ${(order.items || []).map((item) => itemDetailsHtml(item, true)).join("")}
-      </div>
-      <p class="kitchen-swipe-hint">Toca para preparar · desliza a la izquierda para retirar de Cocina</p>
-      <button class="secondary-btn full" data-kitchen-done="${escapeHtml(order.id)}" type="button">Terminado en cocina</button>
-    </article>
-  `).join("") : `<p class="empty-state">No hay comandas pendientes para cocina.</p>`;
-}
-
-function renderAvailability() {
-  const availability = getAvailability();
-  const query = availabilityQuery.trim().toLowerCase();
-  const menuSource = Array.isArray(adminCatalogMenuItems)
-    ? adminCatalogMenuItems
-    : [];
-
-  const menuItems = menuSource.map((item) => ({
-    id: item.id,
-    es: item.es,
-    en: item.en,
-    group: "Productos del menu"
-  }));
-  const inventoryItems = INVENTORY_ITEMS.map((item) => ({
-    ...item,
-    group: "Inventario interno"
-  }));
-  const items = [...menuItems, ...inventoryItems].filter((item) => {
-    const haystack = `${item.es} ${item.en} ${item.group}`.toLowerCase();
-    return haystack.includes(query);
-  });
-  const availabilityList = $("#availabilityList");
-  if (!availabilityList) return;
-
-  const groups = ["Productos del menu", "Inventario interno"];
-  availabilityList.innerHTML = groups.map((group) => {
-    const groupItems = items.filter((item) => item.group === group);
-    if (!groupItems.length) return "";
-    return `
-      <section class="availability-group">
-        <h3>${escapeHtml(group)}</h3>
-        ${groupItems.map((item) => {
-          const available = availability[item.id] !== false;
-          return `
-            <label class="availability-row">
-              <span>${escapeHtml(item.es)}${item.en !== item.es ? `<small>${escapeHtml(item.en)}</small>` : ""}</span>
-              <input type="checkbox" data-availability="${escapeHtml(item.id)}" ${available ? "checked" : ""}>
-            </label>
-          `;
-        }).join("")}
       </section>
     `;
   }).join("");
-
-  renderOrderModeButton();
+  setupCategoryObserver();
 }
 
-function renderAll() {
-  renderOrders();
-  renderKitchen();
-  renderAvailability();
+let categoryObserver = null;
+function setupCategoryObserver() {
+  if (categoryObserver) categoryObserver.disconnect();
+  const sections = Array.from(document.querySelectorAll("[data-category-section]"));
+  if (!("IntersectionObserver" in window) || !sections.length) return;
+  categoryObserver = new IntersectionObserver((entries) => {
+    const visible = entries
+      .filter((entry) => entry.isIntersecting)
+      .sort((a, b) => b.intersectionRatio - a.intersectionRatio)[0];
+    if (!visible) return;
+    const nextCategory = visible.target.dataset.categorySection;
+    if (nextCategory && nextCategory !== state.category) {
+      state.category = nextCategory;
+      document.querySelectorAll("[data-category]").forEach((button) => {
+        button.classList.toggle("active", button.dataset.category === nextCategory);
+      });
+    }
+  }, { root: null, rootMargin: "-72px 0px -68% 0px", threshold: [0.12, 0.25, 0.5] });
+  sections.forEach((section) => categoryObserver.observe(section));
 }
 
-function switchTab(tabName) {
-  $$("[data-admin-tab]").forEach((button) => {
-    button.classList.toggle("active", button.dataset.adminTab === tabName);
+function scrollToCategory(categoryId) {
+  state.category = categoryId;
+  scrollRevealLockUntil = Date.now() + 900;
+  document.body.classList.remove("is-scrolling-down");
+  document.body.classList.add("is-scrolling-up");
+  renderCategories();
+  const section = document.getElementById(`cat-${categoryId}`);
+  if (section) section.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+function optionLabel(option) {
+  const price = Number(option.price || 0);
+  const suffix = price === 0 ? "" : ` (${price > 0 ? "+" : ""}${money(price)})`;
+  return `${option[state.lang] || option.es}${suffix}`;
+}
+
+function openProduct(itemId) {
+  const item = MENU_ITEMS.find((product) => product.id === itemId);
+  if (!item || !isProductAvailable(item)) return;
+
+  state.currentProduct = item;
+  const modal = $("#productModal");
+  const groups = (item.optionGroups || []).map((group) => ({
+    ...group,
+    options: (group.options || []).filter((option) => isOptionAvailable(group, option))
+  })).filter((group) => group.options.length || group.required);
+  const extras = (item.extras || []).filter((extra) => isExtraAvailable(extra));
+  const removables = (item.removables || []).filter((remove) => isRemovableAvailable(remove));
+
+  modal.innerHTML = `
+    <div class="modal-sheet">
+      <button class="icon-btn modal-close" type="button" aria-label="Cerrar">×</button>
+      <div class="modal-hero">
+        <div class="product-image large">
+          ${item.image ? `<img src="${item.image}" alt="${itemName(item)}" onerror="this.closest('.product-image').classList.add('missing-image'); this.remove();">` : ""}
+        </div>
+        <div>
+          <h2>${itemName(item)}</h2>
+          <p>${itemDescription(item)}</p>
+          <strong>${money(item.price)}</strong>
+        </div>
+      </div>
+      <form id="productForm" class="product-form">
+        ${groups.map((group) => `
+          <fieldset>
+            <legend>${group[state.lang] || group.es} <span>${group.required ? text("required") : text("optional")}</span></legend>
+            ${group.options.length ? group.options.map((option) => `
+              <label class="choice-row">
+                <input type="${group.type === "multi" ? "checkbox" : "radio"}" name="${group.id}" value="${option.id}" ${group.required ? "required" : ""}>
+                <span>${optionLabel(option)}</span>
+              </label>
+            `).join("") : `<p class="choice-empty">${state.lang === "en" ? "Not available right now." : "No disponible por ahora."}</p>`}
+          </fieldset>
+        `).join("")}
+        ${extras.length ? `
+          <fieldset>
+            <legend>Extras <span>${text("optional")}</span></legend>
+            ${extras.map((extra) => `
+              <label class="choice-row">
+                <input type="checkbox" name="extras" value="${extra.id}">
+                <span>${optionLabel(extra)}</span>
+              </label>
+            `).join("")}
+          </fieldset>
+        ` : ""}
+        ${removables.length ? `
+          <fieldset>
+            <legend>${state.lang === "en" ? "Remove ingredients" : "Quitar ingredientes"} <span>${text("optional")}</span></legend>
+            ${removables.map((remove) => `
+              <label class="choice-row">
+                <input type="checkbox" name="removables" value="${remove.id}">
+                <span>${remove[state.lang] || remove.es}</span>
+              </label>
+            `).join("")}
+          </fieldset>
+        ` : ""}
+        <label class="notes-label">
+          <span>${text("notes")}</span>
+          <textarea name="notes" rows="3"></textarea>
+        </label>
+        <button class="primary-btn full sticky-add" type="submit">${text("addToCart")} · ${money(item.price)}</button>
+      </form>
+    </div>
+  `;
+  $("#modalBackdrop").hidden = false;
+  modal.setAttribute("aria-hidden", "false");
+  document.body.classList.add("modal-open");
+}
+
+function closeProduct() {
+  $("#productModal").setAttribute("aria-hidden", "true");
+  $("#modalBackdrop").hidden = true;
+  document.body.classList.remove("modal-open");
+  state.currentProduct = null;
+}
+
+function findOption(group, optionId) {
+  return group.options.find((option) => option.id === optionId);
+}
+
+function buildCartItem(form) {
+  const item = state.currentProduct;
+  let lineTotal = Number(item.price);
+  const selections = [];
+
+  (item.optionGroups || []).forEach((group) => {
+    const checked = Array.from(form.querySelectorAll(`[name="${group.id}"]:checked`));
+    checked.forEach((input) => {
+      const option = findOption(group, input.value);
+      if (!option) return;
+      lineTotal += Number(option.price || 0);
+      selections.push({
+        group: group[state.lang] || group.es,
+        name: option[state.lang] || option.es,
+        groupEs: group.es,
+        nameEs: option.es,
+        price: Number(option.price || 0)
+      });
+    });
   });
 
-  $$("[data-admin-panel]").forEach((panel) => {
-    const active = panel.dataset.adminPanel === tabName;
-    panel.classList.toggle("active", active);
-    panel.hidden = !active;
+  const extras = [];
+  Array.from(form.querySelectorAll(`[name="extras"]:checked`)).forEach((input) => {
+    const extra = (item.extras || []).find((candidate) => candidate.id === input.value);
+    if (!extra) return;
+    lineTotal += Number(extra.price || 0);
+    extras.push({
+      name: extra[state.lang] || extra.es,
+      nameEs: extra.es,
+      price: Number(extra.price || 0)
+    });
   });
+
+  const removables = [];
+  Array.from(form.querySelectorAll(`[name="removables"]:checked`)).forEach((input) => {
+    const remove = (item.removables || []).find((candidate) => candidate.id === input.value);
+    if (remove) {
+      removables.push({
+        name: remove[state.lang] || remove.es,
+        nameEs: remove.es
+      });
+    }
+  });
+
+  return {
+    id: uniqueCartLineId(item.id),
+    productId: item.id,
+    name: itemName(item),
+    nameEs: item.es,
+    nameEn: item.en,
+    basePrice: Number(item.price),
+    taxable: false,
+    taxRate: 0,
+    selections,
+    extras,
+    removables,
+    notes: form.notes.value.trim(),
+    quantity: 1,
+    lineTotal
+  };
 }
 
+function addToCart(cartItem) {
+  state.cart.push(cartItem);
 
-function showAdminPanel() {
-  const login = $("#adminLogin");
-  const panel = $("#adminPanel");
+  // Cierra el producto inmediatamente después de agregarlo.
+  // Así, incluso si una actualización visual falla, el modal no queda abierto.
+  closeProduct();
 
-  if (login) {
-    login.hidden = true;
-    login.style.display = "none";
+  renderCart();
+  showAddedToCartNotice();
+}
+
+function getTotals() {
+  const subtotal = state.cart.reduce((sum, item) => sum + item.lineTotal * item.quantity, 0);
+  const tax = 0;
+  return { subtotal, tax, total: subtotal };
+}
+
+function renderCart() {
+  const cartQty = state.cart.reduce((sum, item) => sum + item.quantity, 0);
+  $("#cartCount").textContent = cartQty;
+  const cartFab = $("#cartFab");
+  if (cartFab) cartFab.setAttribute("aria-label", `${text("cart")}: ${cartQty}`);
+  const container = $("#cartItems");
+  if (!state.cart.length) {
+    container.innerHTML = `<p class="empty-state">${text("emptyCart")}</p>`;
+  } else {
+    container.innerHTML = state.cart.map((item) => `
+      <div class="cart-item">
+        <div>
+          <strong>${item.quantity}x ${item.name}</strong>
+          ${item.selections.map((selection) => `<p>${selection.group}: ${selection.name}</p>`).join("")}
+          ${item.extras.map((extra) => `<p>Extra: ${extra.name} +${money(extra.price)}</p>`).join("")}
+          ${item.removables.map((remove) => `<p>${typeof remove === "string" ? remove : remove.name}</p>`).join("")}
+          ${item.notes ? `<p>${item.notes}</p>` : ""}
+        </div>
+        <div>
+          <strong>${money(item.lineTotal * item.quantity)}</strong>
+          <button class="text-btn cart-remove-btn" data-remove-cart="${item.id}" type="button" aria-label="${text("remove")} ${item.name}">${text("remove")}</button>
+        </div>
+      </div>
+    `).join("");
+  }
+  const totals = getTotals();
+
+  const subtotalValue = $("#subtotalValue");
+  const taxValue = $("#taxValue");
+  const totalValue = $("#totalValue");
+
+  if (subtotalValue) subtotalValue.textContent = money(totals.subtotal);
+  if (taxValue) taxValue.textContent = money(totals.tax);
+  if (totalValue) totalValue.textContent = money(totals.total);
+}
+
+function updateCartFabCompact(forceExpanded = false) {
+  const fab = $("#cartFab");
+  if (!fab) return;
+  if (forceExpanded) state.cartFabCompact = false;
+  fab.classList.toggle("is-compact", state.cartFabCompact);
+}
+
+function handlePageScroll() {
+  const currentY = window.scrollY || 0;
+  const delta = currentY - lastScrollY;
+  const locked = Date.now() < scrollRevealLockUntil;
+
+  if (currentY < 70 || locked || delta < -6) {
+    document.body.classList.remove("is-scrolling-down");
+    document.body.classList.add("is-scrolling-up");
+    state.cartFabCompact = false;
+  } else if (delta > 5) {
+    document.body.classList.add("is-scrolling-down");
+    document.body.classList.remove("is-scrolling-up");
+    state.cartFabCompact = true;
   }
 
-  if (panel) {
-    panel.hidden = false;
-    panel.style.display = "";
+  lastScrollY = currentY;
+  updateCartFabCompact();
+}
+
+function openCart() {
+  state.cartFabCompact = false;
+  updateCartFabCompact(true);
+  document.body.classList.add("cart-open");
+  $("#cartPanel").setAttribute("aria-hidden", "false");
+}
+
+function closeCart() {
+  document.body.classList.remove("cart-open");
+  $("#cartPanel").setAttribute("aria-hidden", "true");
+}
+
+function getExistingOrderIds() {
+  try {
+    return new Set(JSON.parse(localStorage.getItem(STORAGE_ORDERS) || "[]").map((order) => String(order.id)));
+  } catch (_) {
+    return new Set();
+  }
+}
+
+function nextSimpleOrderId() {
+  const used = getExistingOrderIds();
+  let next = Number(localStorage.getItem(STORAGE_ORDER_COUNTER) || "1");
+  if (!Number.isFinite(next) || next < 1 || next > 999) next = 1;
+
+  for (let attempt = 0; attempt < 999; attempt += 1) {
+    const candidate = String(next);
+    next = next >= 999 ? 1 : next + 1;
+    localStorage.setItem(STORAGE_ORDER_COUNTER, String(next));
+    if (!used.has(candidate)) return candidate;
   }
 
-  /*
-    La interfaz ya está abierta. Pedidos, sonido y disponibilidad
-    se inicializan después y no pueden volver a bloquear el acceso.
-  */
-  setTimeout(() => {
+  return String(Math.floor(Math.random() * 999) + 1);
+}
+
+function setCheckoutPhase(phase) {
+  checkoutPhase = phase;
+
+  const orderTypeStep = $("#orderTypeStep");
+  const paymentMethodStep = $("#paymentMethodStep");
+  const orderThanksStep = $("#orderThanksStep");
+
+  if (orderTypeStep) orderTypeStep.hidden = phase !== "order-type";
+  if (paymentMethodStep) paymentMethodStep.hidden = phase !== "payment";
+  if (orderThanksStep) orderThanksStep.hidden = phase !== "thanks";
+}
+
+function openPayment(order) {
+  state.pendingOrder = order;
+  state.orderType = "";
+  setCheckoutPhase("order-type");
+  $("#paymentModal").setAttribute("aria-hidden", "false");
+}
+
+function showOrderThanks(orderNumber, activeOrderCount = 0) {
+  setCheckoutPhase("thanks");
+
+  const isEnglish = state.lang === "en";
+  const title = $("#orderThanksTitle");
+  const message = $("#orderThanksMessage");
+  const number = $("#orderThanksNumber");
+  const delay = $("#orderThanksDelay");
+  const closeButton = $("#closeOrderThanksBtn");
+
+  if (title) {
+    title.textContent = isEnglish
+      ? "Thank you for your order"
+      : "Gracias por tu pedido";
+  }
+
+  if (message) {
+    message.textContent = isEnglish
+      ? "We will notify you on WhatsApp when your order is ready."
+      : "Te informaremos por WhatsApp cuando tu pedido esté listo.";
+  }
+
+  if (number) {
+    number.textContent = orderNumber
+      ? (isEnglish ? `Order #${orderNumber}` : `Pedido #${orderNumber}`)
+      : "";
+    number.hidden = !orderNumber;
+  }
+
+  if (delay) {
+    delay.hidden = activeOrderCount <= 3;
+    delay.textContent = isEnglish
+      ? "We currently have several orders in preparation, so your order may take a little longer."
+      : "Tenemos varios pedidos en preparación, por lo que tu pedido puede tardar un poco más.";
+  }
+
+  if (closeButton) {
+    closeButton.textContent = isEnglish ? "Close" : "Cerrar";
+  }
+
+  state.pendingOrder = null;
+  state.orderType = "";
+}
+
+function closePayment() {
+  $("#paymentModal").setAttribute("aria-hidden", "true");
+  setCheckoutPhase("closed");
+  state.pendingOrder = null;
+  state.orderType = "";
+}
+
+async function postOrderToBackend(order) {
+  if (!BACKEND_URL) return { ok: false, skipped: true };
+  const response = await fetch(`${BACKEND_URL}/api/orders`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(order)
+  });
+  if (!response.ok) throw new Error(`Backend error ${response.status}`);
+  return response.json();
+}
+
+async function countActiveOrders() {
+  const db = window.FOGON_DB;
+  if (db && db.isReady && db.isReady()) {
     try {
-      refreshSoundState();
-      renderAll();
-
-      if (newOrders().length) {
-        startAlarm();
-      }
+      const orders = await db.fetchOrders();
+      return orders.filter((order) => order.status === "new" || order.status === "accepted" || !order.status).length;
     } catch (error) {
-      console.error(
-        "Una sección secundaria no pudo iniciarse:",
-        error
-      );
-
-      const banner = $("#soundBanner");
-
-      if (banner) {
-        banner.hidden = false;
-        banner.innerHTML = `
-          <p>
-            <strong>El panel abrió correctamente.</strong><br>
-            Una sección secundaria produjo este error:
-            ${escapeHtml(error?.message || error)}
-          </p>
-        `;
-      }
+      console.warn("No se pudo comprobar la carga actual de pedidos:", error);
     }
-
-    Promise.resolve(syncOrdersFromBackend()).catch((error) => {
-      console.warn("No se pudieron cargar los pedidos:", error);
-    });
-
-    Promise.resolve(syncAvailabilityFromBackend()).catch((error) => {
-      console.warn("No se pudo cargar la disponibilidad:", error);
-    });
-
-    Promise.resolve(loadAdminCatalogMenuItems()).catch((error) => {
-      console.warn("No se pudo cargar el catálogo administrativo:", error);
-    });
-  }, 0);
-}
-
-function initLogin() {
-  const form = $("#pinForm");
-  const input = $("#pinInput");
-  const loginButton = $("#loginButton");
-  const error = $("#pinError");
-
-  if (!form || !input || !loginButton) {
-    showLoginRuntimeError(
-      new Error("Faltan elementos del formulario de acceso.")
-    );
-    return;
-  }
-
-  let loginRunning = false;
-
-  function setLoginBusy(busy, label = "Entrar") {
-    loginRunning = Boolean(busy);
-    input.disabled = Boolean(busy);
-    loginButton.disabled = Boolean(busy);
-    loginButton.textContent = busy ? label : "Entrar";
-  }
-
-  async function tryLogin(event) {
-    if (event) {
-      event.preventDefault();
-      event.stopPropagation();
-    }
-
-    if (loginRunning) return false;
-
-    /*
-      Este intento ocurre dentro del gesto del botón.
-      iPad/Safari necesita ese gesto para permitir audio.
-    */
-    void unlockSound({
-      playTest: false,
-      announce: false
-    });
-
-    const value = String(input.value || "").trim();
-
-    if (error) {
-      error.hidden = true;
-      error.textContent = "";
-    }
-
-    setLoginBusy(true, "Comprobando…");
-
-    try {
-      const validatedPin =
-        await validateAdminPin(value);
-
-      adminPinInMemory = validatedPin;
-      saveTrustedAdminSession(validatedPin);
-      input.value = "";
-
-      showAdminPanel();
-
-      /*
-        Si el gesto inicial consiguió abrir AudioContext,
-        confirma con un sonido corto.
-      */
-      if (audioCtx?.state === "running") {
-        playTonePattern(true);
-        soundConfirmationPlayed = true;
-      } else {
-        refreshSoundState();
-      }
-
-      return true;
-    } catch (loginError) {
-      console.error("Acceso rechazado:", loginError);
-      clearAdminSession({ forgetTrustedDevice: true });
-
-      if (error) {
-        error.hidden = false;
-        error.textContent =
-          adminLoginErrorMessage(loginError);
-      }
-
-      input.focus();
-      input.select();
-      return false;
-    } finally {
-      setLoginBusy(false);
-    }
-  }
-
-  async function restoreTrustedSession() {
-    const storedSession =
-      readTrustedAdminSession();
-
-    if (!storedSession) {
-      input.focus();
-      return false;
-    }
-
-    if (error) {
-      error.hidden = true;
-      error.textContent = "";
-    }
-
-    setLoginBusy(true, "Restaurando sesión…");
-
-    try {
-      /*
-        El PIN guardado se vuelve a validar en admin-auth.
-        Así, cambiar ADMIN_PIN en Supabase invalida el dispositivo.
-      */
-      const validatedPin =
-        await validateAdminPin(storedSession.pin);
-
-      adminPinInMemory = validatedPin;
-      showAdminPanel();
-      refreshSoundState();
-      return true;
-    } catch (restoreError) {
-      console.warn(
-        "No se pudo restaurar la sesión de 8 horas:",
-        restoreError
-      );
-
-      clearAdminSession({ forgetTrustedDevice: true });
-
-      if (error) {
-        error.hidden = false;
-        error.textContent =
-          "La sesión guardada terminó o ya no es válida. Introduce el PIN.";
-      }
-
-      return false;
-    } finally {
-      setLoginBusy(false);
-      if (!adminPinInMemory) input.focus();
-    }
-  }
-
-  loginButton.addEventListener("click", tryLogin);
-  form.addEventListener("submit", tryLogin);
-
-  input.addEventListener("keydown", (event) => {
-    if (event.key === "Enter") {
-      tryLogin(event);
-    }
-  });
-
-  void restoreTrustedSession();
-}
-
-function init() {
-  /*
-    El acceso se conecta antes que cualquier preferencia o sección.
-  */
-  try {
-    initKitchenGesturesAndMissingButton();
-    initLogin();
-  } catch (error) {
-    showLoginRuntimeError(error);
-    return;
   }
 
   try {
-    applyAdminTheme();
-  } catch (error) {
-    console.warn("No se pudo aplicar el tema:", error);
-    document.body.classList.add("dark-mode");
+    const orders = JSON.parse(localStorage.getItem(STORAGE_ORDERS) || "[]");
+    return orders.filter((order) => order.status === "new" || order.status === "accepted" || !order.status).length;
+  } catch (_) {
+    return 0;
   }
+}
 
-  /*
-    No cerramos la sesión al recargar ni al cerrar la pestaña.
-    El dispositivo permanece validado durante un máximo de 8 horas.
-  */
+async function saveOrder(paymentMethod) {
+  if (!state.pendingOrder || orderSubmissionInProgress) return;
 
-  const activateSoundFromGesture = () => {
-    void unlockSound({
-      playTest: !soundConfirmationPlayed,
-      announce: !soundUnlocked
-    }).then((unlocked) => {
-      if (unlocked && newOrders().length) {
-        startAlarm();
-      }
-    });
-  };
+  orderSubmissionInProgress = true;
 
-  document.addEventListener(
-    "pointerdown",
-    activateSoundFromGesture,
-    { passive: true }
+  const paymentButtons = Array.from(
+    document.querySelectorAll("[data-payment]")
   );
 
-  document.addEventListener(
-    "touchend",
-    activateSoundFromGesture,
-    { passive: true }
-  );
-
-  document.addEventListener(
-    "keydown",
-    activateSoundFromGesture
-  );
-
-  const recoverAfterForeground = () => {
-    if (document.hidden) return;
-
-    refreshSoundState();
-    void syncOrdersFromBackend();
-    updateAlarm();
-  };
-
-  document.addEventListener(
-    "visibilitychange",
-    recoverAfterForeground
-  );
-
-  window.addEventListener(
-    "pageshow",
-    recoverAfterForeground
-  );
-
-  window.addEventListener(
-    "focus",
-    recoverAfterForeground
-  );
-
-  refreshSoundState();
-
-  const orderModeBtn = $("#orderModeBtn");
-  if (orderModeBtn) orderModeBtn.addEventListener("click", cycleOrderMode);
-
-  const adminThemeBtn = $("#adminThemeToggleBtn");
-  if (adminThemeBtn) adminThemeBtn.addEventListener("click", toggleAdminTheme);
-
-  const clearOrdersBtn = $("#clearOrdersBtn");
-  if (clearOrdersBtn) {
-    clearOrdersBtn.addEventListener("click", async () => {
-      if (confirm("¿Limpiar todos los pedidos? Esto también borra las comandas de cocina.")) {
-        safeLocalSet(STORAGE_ORDERS, "[]");
-        safeLocalSet(STORAGE_KITCHEN_HIDDEN, "[]");
-        renderAll();
-
-        if (window.FOGON_DB?.isReady()) {
-          try {
-            await window.FOGON_DB.clearOrders();
-            await syncOrdersFromBackend();
-          } catch (error) {
-            console.warn("No se pudieron limpiar los pedidos en Supabase:", error);
-          }
-        }
-      }
-    });
-  }
-
-  const logoutButton = $("#adminLogoutBtn");
-  if (logoutButton) {
-    logoutButton.addEventListener("click", () => {
-      logoutAdmin();
-    });
-  }
-
-  const soundBtn = $("#enableSoundBtn");
-  if (soundBtn) {
-    soundBtn.addEventListener("click", async (event) => {
-      event.preventDefault();
-      event.stopPropagation();
-
-      soundBtn.disabled = true;
-      soundBtn.textContent = "Activando…";
-
-      try {
-        const unlocked = await unlockSound({
-          playTest: true,
-          announce: true
-        });
-
-        if (unlocked && newOrders().length) {
-          startAlarm();
-        }
-      } finally {
-        soundBtn.disabled = false;
-        soundBtn.textContent =
-          soundUnlocked
-            ? "Probar sonido"
-            : "Activar y probar sonido";
-      }
-    });
-  }
-
-  const availabilitySearch = $("#availabilitySearch");
-  if (availabilitySearch) {
-    availabilitySearch.addEventListener("input", (event) => {
-      availabilityQuery = event.target.value;
-      renderAvailability();
-    });
-  }
-
-  document.addEventListener("change", (event) => {
-    const input = event.target.closest("[data-availability]");
-    if (input) setAvailability(input.dataset.availability, input.checked);
+  paymentButtons.forEach((button) => {
+    button.disabled = true;
+    button.setAttribute("aria-disabled", "true");
   });
 
-  document.addEventListener("click", (event) => {
-    const tabButton = event.target.closest("[data-admin-tab]");
-    if (tabButton) switchTab(tabButton.dataset.adminTab);
-
-    const toggleButton = event.target.closest("[data-toggle-order]");
-    if (toggleButton) {
-      toggleOrderCard(toggleButton.dataset.toggleOrder);
+  try {
+    if (!currentOrderingState().open) {
+      closePayment();
+      alert(orderingClosedMessage());
+      updateOrderingUi();
       return;
     }
 
-    const acceptButton = event.target.closest("[data-accept-order]");
-    if (acceptButton) acceptOrder(acceptButton.dataset.acceptOrder);
+    const originalPendingId = state.pendingOrder.id;
 
-    const readyButton = event.target.closest("[data-ready-order]");
-    if (readyButton) sendReadyNotification(readyButton.dataset.readyOrder);
+    let order = {
+      ...state.pendingOrder,
+      paymentMethod,
+      orderType: state.orderType,
+      status: "new"
+    };
 
-    const kitchenDoneButton = event.target.closest("[data-kitchen-done]");
-    if (kitchenDoneButton) hideKitchenOrder(kitchenDoneButton.dataset.kitchenDone);
+    order.items = (order.items || []).map((item, index) => (
+      index === 0
+        ? { ...item, orderType: state.orderType }
+        : item
+    ));
 
-    const deliverButton = event.target.closest("[data-deliver-order]");
-    if (deliverButton) removeOrderEverywhere(deliverButton.dataset.deliverOrder);
-  });
+    const db = window.FOGON_DB;
 
-  window.addEventListener("storage", (event) => {
-    if (event.key === STORAGE_ORDERS || event.key === STORAGE_KITCHEN_HIDDEN || event.key === null) renderAll();
-    if (event.key === STORAGE_AVAILABILITY || event.key === null) { renderAvailability(); renderOrderModeButton(); }
-  });
-
-  if (window.FOGON_DB?.isReady()) {
-    window.FOGON_DB.subscribeOrders(() => syncOrdersFromBackend());
-    window.FOGON_DB.subscribeAvailability(() => syncAvailabilityFromBackend());
-  }
-
-  setInterval(() => {
-    if (!adminPinInMemory) return;
-
-    const session = readTrustedAdminSession();
-
-    if (!session) {
-      logoutAdmin(
-        "Han pasado 8 horas. Introduce nuevamente el PIN del panel."
+    if (db?.isReady()) {
+      order = await db.createOrder(order);
+      order.orderType = state.orderType;
+    } else if (BACKEND_URL) {
+      const result = await postOrderToBackend(order);
+      if (result?.orderId) order.backendOrderId = result.orderId;
+    } else {
+      throw new Error(
+        state.lang === "en"
+          ? "The ordering service is temporarily unavailable. Please try again."
+          : "El servicio de pedidos no está disponible ahora mismo. Inténtalo otra vez."
       );
     }
-  }, 30000);
 
-  setInterval(() => {
-    if (window.FOGON_DB?.isReady() || BACKEND_URL) syncOrdersFromBackend();
-    else {
-      renderOrders();
-      renderKitchen();
-    }
-  }, 2500);
+    const orders = JSON.parse(
+      localStorage.getItem(STORAGE_ORDERS) || "[]"
+    );
 
-  setInterval(() => {
-    if (window.FOGON_DB?.isReady() || BACKEND_URL) syncAvailabilityFromBackend();
-  }, 6000);
+    orders.unshift(order);
+    localStorage.setItem(STORAGE_ORDERS, JSON.stringify(orders));
+
+    const activeOrderCount = await countActiveOrders();
+
+    state.cart = [];
+
+    const customerName = $("#customerName");
+    const customerPhone = $("#customerPhone");
+
+    if (customerName) customerName.value = "";
+    if (customerPhone) customerPhone.value = "";
+
+    renderCart();
+    closeCart();
+
+    const displayOrderNumber =
+      order.publicId ||
+      order.public_id ||
+      order.id ||
+      originalPendingId ||
+      "";
+
+    showOrderThanks(displayOrderNumber, activeOrderCount);
+  } catch (error) {
+    console.error("No se pudo guardar el pedido:", error);
+
+    alert(
+      error?.message ||
+      (
+        state.lang === "en"
+          ? "The order could not be sent. Please try again."
+          : "No se pudo enviar el pedido. Inténtalo otra vez."
+      )
+    );
+  } finally {
+    orderSubmissionInProgress = false;
+
+    paymentButtons.forEach((button) => {
+      button.disabled = false;
+      button.removeAttribute("aria-disabled");
+    });
+  }
 }
-window.addEventListener("error", (event) => {
-  if (event?.error) {
-    showLoginRuntimeError(event.error);
+
+function initEvents() {
+  document.addEventListener("click", (event) => {
+    const langButton = event.target.closest("[data-set-lang]");
+    if (langButton) setLanguage(langButton.dataset.setLang);
+
+    if (event.target.closest("#themeToggleBtn")) toggleTheme();
+
+    const categoryButton = event.target.closest("[data-category]");
+    if (categoryButton) {
+      scrollToCategory(categoryButton.dataset.category);
+    }
+
+    const productButton = event.target.closest("[data-product-id]");
+    if (productButton) openProduct(productButton.dataset.productId);
+
+    if (event.target.closest(".modal-close") || event.target === $("#modalBackdrop")) closeProduct();
+    if (event.target.closest("#cartFab")) {
+      if (document.body.classList.contains("cart-open")) {
+        closeCart();
+      } else {
+        openCart();
+      }
+    }
+    if (event.target.closest("#closeCartBtn")) closeCart();
+
+    const removeButton = event.target.closest("[data-remove-cart]");
+    if (removeButton) {
+      event.preventDefault();
+      event.stopPropagation();
+      const lineId = String(removeButton.dataset.removeCart || "");
+      state.cart = state.cart.filter((item) => String(item.id) !== lineId);
+      renderCart();
+      return;
+    }
+
+    const orderTypeButton = event.target.closest("[data-order-type]");
+    if (orderTypeButton && state.pendingOrder && checkoutPhase === "order-type") {
+      state.orderType = orderTypeButton.dataset.orderType;
+      setCheckoutPhase("payment");
+      return;
+    }
+
+    const paymentButton = event.target.closest("[data-payment]");
+    if (
+      paymentButton &&
+      state.pendingOrder &&
+      state.orderType &&
+      checkoutPhase === "payment" &&
+      !orderSubmissionInProgress
+    ) {
+      saveOrder(paymentButton.dataset.payment);
+      return;
+    }
+
+    if (event.target.closest("#closeOrderThanksBtn")) {
+      closePayment();
+    }
+  });
+
+  document.addEventListener("submit", (event) => {
+    if (event.target.id === "productForm") {
+      event.preventDefault();
+      if (!event.target.checkValidity()) {
+        alert(text("chooseRequired"));
+        return;
+      }
+      addToCart(buildCartItem(event.target));
+    }
+
+    if (event.target.id === "checkoutForm") {
+      event.preventDefault();
+      if (!currentOrderingState().open) {
+        alert(orderingClosedMessage());
+        updateOrderingUi();
+        return;
+      }
+      if (!event.target.checkValidity()) {
+        event.target.reportValidity();
+        return;
+      }
+      if (!state.cart.length) return;
+      const totals = getTotals();
+      openPayment({
+        id: nextSimpleOrderId(),
+        createdAt: new Date().toISOString(),
+        customer: {
+          name: $("#customerName").value.trim(),
+          phone: $("#customerPhone").value.trim()
+        },
+        items: state.cart,
+        totals,
+        language: state.lang
+      });
+    }
+  });
+}
+
+async function init() {
+  applyTheme();
+  initEvents();
+  window.addEventListener("storage", (event) => {
+    if (event.key === "fogon_availability" || event.key === null) refreshAvailabilityIfChanged(true);
+  });
+  setInterval(refreshAvailabilityIfChanged, 1000);
+  await loadPublicCatalog({ render: false, force: true });
+  syncAvailabilityFromBackend();
+  if (window.FOGON_DB?.isReady()) {
+    window.FOGON_DB.subscribeAvailability(() => syncAvailabilityFromBackend());
+    setInterval(syncAvailabilityFromBackend, 6000);
   }
-});
-
-window.addEventListener("unhandledrejection", (event) => {
-  if (event?.reason) {
-    showLoginRuntimeError(event.reason);
+  if (state.lang) {
+    $("#languageGate").classList.add("hidden");
+    document.documentElement.lang = state.lang;
   }
+  applyText();
+  renderCategories();
+  renderMenu();
+  renderCart();
+  updateOrderingUi();
+  setInterval(updateOrderingUi, 30000);
+
+  setInterval(() => {
+    loadPublicCatalog({ render: true }).catch((error) => {
+      console.warn("No se pudo refrescar el catálogo público:", error);
+    });
+  }, 60000);
+
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible") {
+      loadPublicCatalog({ render: true }).catch((error) => {
+        console.warn("No se pudo refrescar el catálogo al volver a la página:", error);
+      });
+    }
+  });
+
+  let scrollTicking = false;
+  window.addEventListener("scroll", () => {
+    if (scrollTicking) return;
+    scrollTicking = true;
+    window.requestAnimationFrame(() => {
+      handlePageScroll();
+      scrollTicking = false;
+    });
+  }, { passive: true });
+
+  handlePageScroll();
+}
+
+init().catch((error) => {
+  console.error("No se pudo iniciar el menú:", error);
 });
-
-init();
-
-})();
