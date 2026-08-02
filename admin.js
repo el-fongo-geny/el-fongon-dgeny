@@ -76,7 +76,7 @@ function showLoginRuntimeError(error) {
   console.error("Error del administrador:", error);
 }
 
-window.FOGON_ADMIN_BUILD = "51-vertical-order-cards";
+window.FOGON_ADMIN_BUILD = "52-full-order-cards";
 
 
 const STORAGE_ORDERS = "fogon_orders";
@@ -173,7 +173,6 @@ let lastNewOrderSignature = "";
 let ordersRenderInitialized = false;
 let knownOrderIds = new Set();
 let expandedOrderIds = new Set();
-let pendingOrderFocusId = "";
 
 function applyAdminTheme() {
   const theme = safeLocalGet(STORAGE_ADMIN_THEME) || "dark";
@@ -1309,67 +1308,15 @@ function prepareOrderCardExpansion(orders) {
     orders.map((order) => String(order.id))
   );
 
-  if (!ordersRenderInitialized) {
-    const firstPending =
-      orders.find((order) => order.status === "new" || !order.status) ||
-      orders[0];
-
-    if (firstPending) {
-      expandedOrderIds.add(String(firstPending.id));
-    }
-
-    ordersRenderInitialized = true;
-  } else {
-    const newlyArrived = orders
-      .filter((order) => !knownOrderIds.has(String(order.id)))
-      .sort((left, right) =>
-        orderCreatedTimestamp(right) - orderCreatedTimestamp(left)
-      );
-
-    if (newlyArrived.length) {
-      const newest = newlyArrived[0];
-      const newestId = String(newest.id);
-
-      expandedOrderIds.add(newestId);
-      pendingOrderFocusId = newestId;
-    }
-  }
+  // Todas las comandas se abren completas al entrar y los pedidos nuevos
+  // también aparecen desplegados, sin mover automáticamente la pantalla.
+  currentIds.forEach((id) => expandedOrderIds.add(id));
 
   expandedOrderIds = new Set(
     [...expandedOrderIds].filter((id) => currentIds.has(id))
   );
   knownOrderIds = currentIds;
-}
-
-function focusNewOrderCard() {
-  if (!pendingOrderFocusId) return;
-
-  const orderId = pendingOrderFocusId;
-  pendingOrderFocusId = "";
-
-  window.requestAnimationFrame(() => {
-    const card = Array.from(
-      document.querySelectorAll("[data-order-card]")
-    ).find((candidate) => candidate.dataset.orderCard === orderId);
-
-    if (!card) return;
-
-    card.classList.add("order-card-arrived");
-
-    try {
-      card.scrollIntoView({
-        behavior: "smooth",
-        block: "nearest",
-        inline: "start"
-      });
-    } catch (_) {
-      card.scrollIntoView();
-    }
-
-    window.setTimeout(() => {
-      card.classList.remove("order-card-arrived");
-    }, 1800);
-  });
+  ordersRenderInitialized = true;
 }
 
 function toggleOrderCard(orderId) {
@@ -1460,7 +1407,6 @@ function renderOrders() {
     </article>`;
   }).join("") : `<p class="empty-state">No hay pedidos todavía.</p>`;
 
-  focusNewOrderCard();
   updateAlarm();
 }
 
