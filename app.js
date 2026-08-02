@@ -19,6 +19,7 @@ const ORDER_MODE_MANUAL_KEY = "system:orders-manual";
 const ORDER_MODE_OPEN_KEY = "system:orders-open";
 const WEEKLY_CLOSED_DAY_KEY = "system:weekly-closed-day";
 let orderSubmissionInProgress = false;
+let checkoutPhase = "closed";
 const CALIFORNIA_TIME_ZONE = "America/Los_Angeles";
 const ORDER_OPEN_MINUTES = 11 * 60;
 const ORDER_CLOSE_MINUTES = 20 * 60 + 30;
@@ -948,29 +949,27 @@ function nextSimpleOrderId() {
   return String(Math.floor(Math.random() * 999) + 1);
 }
 
-function openPayment(order) {
-  state.pendingOrder = order;
-  state.orderType = "";
+function setCheckoutPhase(phase) {
+  checkoutPhase = phase;
 
   const orderTypeStep = $("#orderTypeStep");
   const paymentMethodStep = $("#paymentMethodStep");
   const orderThanksStep = $("#orderThanksStep");
 
-  if (orderTypeStep) orderTypeStep.hidden = false;
-  if (paymentMethodStep) paymentMethodStep.hidden = true;
-  if (orderThanksStep) orderThanksStep.hidden = true;
+  if (orderTypeStep) orderTypeStep.hidden = phase !== "order-type";
+  if (paymentMethodStep) paymentMethodStep.hidden = phase !== "payment";
+  if (orderThanksStep) orderThanksStep.hidden = phase !== "thanks";
+}
 
+function openPayment(order) {
+  state.pendingOrder = order;
+  state.orderType = "";
+  setCheckoutPhase("order-type");
   $("#paymentModal").setAttribute("aria-hidden", "false");
 }
 
 function showOrderThanks(orderNumber, activeOrderCount = 0) {
-  const orderTypeStep = $("#orderTypeStep");
-  const paymentMethodStep = $("#paymentMethodStep");
-  const orderThanksStep = $("#orderThanksStep");
-
-  if (orderTypeStep) orderTypeStep.hidden = true;
-  if (paymentMethodStep) paymentMethodStep.hidden = true;
-  if (orderThanksStep) orderThanksStep.hidden = false;
+  setCheckoutPhase("thanks");
 
   const isEnglish = state.lang === "en";
   const title = $("#orderThanksTitle");
@@ -1009,22 +1008,13 @@ function showOrderThanks(orderNumber, activeOrderCount = 0) {
     closeButton.textContent = isEnglish ? "Close" : "Cerrar";
   }
 
-  // Impide volver a enviar el mismo pedido desde esta ventana.
   state.pendingOrder = null;
   state.orderType = "";
 }
 
 function closePayment() {
   $("#paymentModal").setAttribute("aria-hidden", "true");
-
-  const orderTypeStep = $("#orderTypeStep");
-  const paymentMethodStep = $("#paymentMethodStep");
-  const orderThanksStep = $("#orderThanksStep");
-
-  if (orderTypeStep) orderTypeStep.hidden = false;
-  if (paymentMethodStep) paymentMethodStep.hidden = true;
-  if (orderThanksStep) orderThanksStep.hidden = true;
-
+  setCheckoutPhase("closed");
   state.pendingOrder = null;
   state.orderType = "";
 }
@@ -1197,15 +1187,22 @@ function initEvents() {
     }
 
     const orderTypeButton = event.target.closest("[data-order-type]");
-    if (orderTypeButton && state.pendingOrder) {
+    if (orderTypeButton && state.pendingOrder && checkoutPhase === "order-type") {
       state.orderType = orderTypeButton.dataset.orderType;
-      $("#orderTypeStep").hidden = true;
-      $("#paymentMethodStep").hidden = false;
+      setCheckoutPhase("payment");
+      return;
     }
 
     const paymentButton = event.target.closest("[data-payment]");
-    if (paymentButton && state.pendingOrder && state.orderType) {
+    if (
+      paymentButton &&
+      state.pendingOrder &&
+      state.orderType &&
+      checkoutPhase === "payment" &&
+      !orderSubmissionInProgress
+    ) {
       saveOrder(paymentButton.dataset.payment);
+      return;
     }
 
     if (event.target.closest("#closeOrderThanksBtn")) {
