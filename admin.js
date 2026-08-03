@@ -76,7 +76,7 @@ function showLoginRuntimeError(error) {
   console.error("Error del administrador:", error);
 }
 
-window.FOGON_ADMIN_BUILD = "53-mobile-stable-orders";
+window.FOGON_ADMIN_BUILD = "54-fullscreen-static-orders";
 
 
 const STORAGE_ORDERS = "fogon_orders";
@@ -172,7 +172,6 @@ let lastSoundUnlockAttemptAt = 0;
 let lastNewOrderSignature = "";
 let ordersRenderInitialized = false;
 let knownOrderIds = new Set();
-let expandedOrderIds = new Set();
 let lastOrdersRenderSignature = "";
 
 function applyAdminTheme() {
@@ -1316,20 +1315,33 @@ function orderElapsedLabel(order) {
     : `Hace ${hours} h`;
 }
 
-function prepareOrderCardExpansion(orders) {
-  const currentIds = new Set(orders.map((order) => String(order.id)));
+function captureOrderViewportAnchor() {
+  const cards = Array.from(document.querySelectorAll("#ordersList [data-order-card]"));
+  const viewportTop = 0;
+  const anchor = cards.find((card) => card.getBoundingClientRect().bottom > viewportTop + 8);
 
-  /*
-    Todas las comandas se abren completas. No se enfoca, desplaza ni
-    anima automáticamente ninguna tarjeta: en móvil eso interrumpía el
-    gesto del usuario y podía devolver la página hacia arriba.
-  */
-  currentIds.forEach((id) => expandedOrderIds.add(id));
-  expandedOrderIds = new Set(
-    [...expandedOrderIds].filter((id) => currentIds.has(id))
-  );
-  knownOrderIds = currentIds;
-  ordersRenderInitialized = true;
+  if (!anchor) {
+    return { orderId: "", top: 0, scrollY: window.pageYOffset || document.documentElement.scrollTop || 0 };
+  }
+
+  return {
+    orderId: String(anchor.getAttribute("data-order-card") || ""),
+    top: anchor.getBoundingClientRect().top,
+    scrollY: window.pageYOffset || document.documentElement.scrollTop || 0
+  };
+}
+
+function restoreOrderViewportAnchor(anchor) {
+  if (!anchor || !anchor.orderId) return;
+
+  const card = Array.from(document.querySelectorAll("#ordersList [data-order-card]"))
+    .find((item) => String(item.getAttribute("data-order-card") || "") === anchor.orderId);
+  if (!card) return;
+
+  const delta = card.getBoundingClientRect().top - anchor.top;
+  if (Math.abs(delta) > 1) {
+    window.scrollBy(0, delta);
+  }
 }
 
 function stableOrdersSignature(orders) {
@@ -1346,19 +1358,6 @@ function updateElapsedLabels() {
     const order = getOrders().find((item) => String(item.id) === orderId);
     if (order) node.textContent = orderElapsedLabel(order);
   });
-}
-
-function toggleOrderCard(orderId) {
-  const cleanId = String(orderId || "");
-  if (!cleanId) return;
-
-  if (expandedOrderIds.has(cleanId)) {
-    expandedOrderIds.delete(cleanId);
-  } else {
-    expandedOrderIds.add(cleanId);
-  }
-
-  renderOrders();
 }
 
 function renderOrders() {
@@ -1379,29 +1378,22 @@ function renderOrders() {
     return;
   }
 
+  const viewportAnchor = captureOrderViewportAnchor();
   lastOrdersRenderSignature = renderSignature;
-  prepareOrderCardExpansion(orders);
+  knownOrderIds = new Set(orders.map((order) => String(order.id)));
+  ordersRenderInitialized = true;
   updateCounters();
 
   ordersList.innerHTML = orders.length ? orders.map((order) => {
     const orderId = String(order.id);
     const isNew = order.status === "new" || !order.status;
     const isReady = order.status === "ready";
-    const expanded = expandedOrderIds.has(orderId);
-    const panelId = `order-body-${orderId.replace(/[^a-zA-Z0-9_-]/g, "-")}`;
-
     return `
     <article
-      class="order-card ${isNew ? "is-new" : "is-accepted"} ${expanded ? "is-expanded" : "is-collapsed"}"
+      class="order-card ${isNew ? "is-new" : "is-accepted"} is-expanded"
       data-order-card="${escapeHtml(orderId)}"
     >
-      <button
-        class="order-card-toggle"
-        data-toggle-order="${escapeHtml(orderId)}"
-        type="button"
-        aria-expanded="${expanded ? "true" : "false"}"
-        aria-controls="${escapeHtml(panelId)}"
-      >
+      <header class="order-card-toggle order-card-static-header">
         <span class="order-card-topline">
           <span class="order-number">#${escapeHtml(orderId)}</span>
           <span class="order-status ${statusClass(order)}">${statusLabel(order)}</span>
@@ -1445,6 +1437,7 @@ function renderOrders() {
     </article>`;
   }).join("") : `<p class="empty-state">No hay pedidos todavía.</p>`;
 
+  restoreOrderViewportAnchor(viewportAnchor);
   updateAlarm();
 }
 
@@ -1901,12 +1894,6 @@ function init() {
   document.addEventListener("click", (event) => {
     const tabButton = event.target.closest("[data-admin-tab]");
     if (tabButton) switchTab(tabButton.dataset.adminTab);
-
-    const toggleButton = event.target.closest("[data-toggle-order]");
-    if (toggleButton) {
-      toggleOrderCard(toggleButton.dataset.toggleOrder);
-      return;
-    }
 
     const acceptButton = event.target.closest("[data-accept-order]");
     if (acceptButton) acceptOrder(acceptButton.dataset.acceptOrder);
