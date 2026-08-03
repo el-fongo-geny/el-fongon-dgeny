@@ -1315,35 +1315,6 @@ function orderElapsedLabel(order) {
     : `Hace ${hours} h`;
 }
 
-function captureOrderViewportAnchor() {
-  const cards = Array.from(document.querySelectorAll("#ordersList [data-order-card]"));
-  const viewportTop = 0;
-  const anchor = cards.find((card) => card.getBoundingClientRect().bottom > viewportTop + 8);
-
-  if (!anchor) {
-    return { orderId: "", top: 0, scrollY: window.pageYOffset || document.documentElement.scrollTop || 0 };
-  }
-
-  return {
-    orderId: String(anchor.getAttribute("data-order-card") || ""),
-    top: anchor.getBoundingClientRect().top,
-    scrollY: window.pageYOffset || document.documentElement.scrollTop || 0
-  };
-}
-
-function restoreOrderViewportAnchor(anchor) {
-  if (!anchor || !anchor.orderId) return;
-
-  const card = Array.from(document.querySelectorAll("#ordersList [data-order-card]"))
-    .find((item) => String(item.getAttribute("data-order-card") || "") === anchor.orderId);
-  if (!card) return;
-
-  const delta = card.getBoundingClientRect().top - anchor.top;
-  if (Math.abs(delta) > 1) {
-    window.scrollBy(0, delta);
-  }
-}
-
 function stableOrdersSignature(orders) {
   try {
     return JSON.stringify(orders);
@@ -1378,7 +1349,6 @@ function renderOrders() {
     return;
   }
 
-  const viewportAnchor = captureOrderViewportAnchor();
   lastOrdersRenderSignature = renderSignature;
   knownOrderIds = new Set(orders.map((order) => String(order.id)));
   ordersRenderInitialized = true;
@@ -1407,9 +1377,9 @@ function renderOrders() {
           ${(order.items || []).length} artículo${(order.items || []).length === 1 ? "" : "s"}
           <span class="order-chevron" aria-hidden="true">⌄</span>
         </span>
-      </button>
+      </header>
 
-      <div id="${escapeHtml(panelId)}" class="order-card-body" ${expanded ? "" : "hidden"}>
+      <div class="order-card-body">
         <div class="order-contact">
           <p><strong>Teléfono:</strong> ${escapeHtml(order.customer?.phone || "Sin teléfono")}</p>
           <p><strong>Pago:</strong> ${escapeHtml(paymentLabel(order.paymentMethod))}</p>
@@ -1437,7 +1407,6 @@ function renderOrders() {
     </article>`;
   }).join("") : `<p class="empty-state">No hay pedidos todavía.</p>`;
 
-  restoreOrderViewportAnchor(viewportAnchor);
   updateAlarm();
 }
 
