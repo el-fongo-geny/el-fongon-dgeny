@@ -2401,3 +2401,160 @@ body.admin-body .accept-order {
     padding: 14px 12px !important;
   }
 }
+
+
+/* =========================================================
+   V54 · COMANDAS COMPLETAS, ESTÁTICAS Y A PANTALLA COMPLETA
+   No modifica estados, Supabase, sonido, WhatsApp ni cocina.
+   ========================================================= */
+html.admin-orders-page,
+body.admin-body {
+  scroll-behavior: auto !important;
+  overflow-anchor: none !important;
+}
+
+body.admin-body #adminPanel {
+  width: 100% !important;
+  max-width: none !important;
+  margin: 0 !important;
+  padding: clamp(10px, 2vw, 24px) !important;
+  overflow: visible !important;
+}
+
+body.admin-body #ordersTab,
+body.admin-body #ordersTab > .admin-card.wide {
+  width: 100% !important;
+  max-width: none !important;
+  height: auto !important;
+  max-height: none !important;
+  margin: 0 !important;
+  overflow: visible !important;
+}
+
+body.admin-body #ordersTab > .admin-card.wide {
+  padding: clamp(10px, 1.6vw, 20px) !important;
+}
+
+body.admin-body .orders-list {
+  display: block !important;
+  width: 100% !important;
+  max-width: none !important;
+  margin: 14px 0 0 !important;
+  padding: 0 0 max(48px, env(safe-area-inset-bottom)) !important;
+  overflow: visible !important;
+  scroll-snap-type: none !important;
+  scroll-behavior: auto !important;
+  overscroll-behavior: auto !important;
+  touch-action: pan-y !important;
+  overflow-anchor: none !important;
+}
+
+body.admin-body .order-card {
+  display: block !important;
+  width: 100% !important;
+  min-width: 100% !important;
+  max-width: none !important;
+  height: auto !important;
+  min-height: 0 !important;
+  max-height: none !important;
+  margin: 0 0 18px !important;
+  overflow: visible !important;
+  scroll-snap-align: none !important;
+  scroll-margin: 0 !important;
+  transform: none !important;
+  transition: none !important;
+  animation: none !important;
+  contain: none !important;
+  touch-action: pan-y !important;
+  overflow-anchor: none !important;
+}
+
+body.admin-body .order-card-static-header,
+body.admin-body .order-card-toggle {
+  display: grid !important;
+  width: 100% !important;
+  min-height: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  padding: 16px !important;
+  background: transparent !important;
+  color: inherit !important;
+  cursor: default !important;
+  text-align: left !important;
+  pointer-events: none !important;
+  touch-action: pan-y !important;
+}
+
+body.admin-body .order-chevron {
+  display: none !important;
+}
+
+body.admin-body .order-card-body,
+body.admin-body .order-card-body[hidden] {
+  display: block !important;
+  position: static !important;
+  width: 100% !important;
+  height: auto !important;
+  min-height: 0 !important;
+  max-height: none !important;
+  border-top: 1px solid var(--line) !important;
+  padding: 16px !important;
+  overflow: visible !important;
+  scroll-behavior: auto !important;
+  overscroll-behavior: auto !important;
+  -webkit-overflow-scrolling: auto !important;
+  touch-action: pan-y !important;
+  overflow-anchor: none !important;
+}
+
+body.admin-body .order-card .order-contact,
+body.admin-body .order-card .order-items,
+body.admin-body .order-card .order-total,
+body.admin-body .order-card .accepted-note,
+body.admin-body .order-card .accept-order,
+body.admin-body .order-card .order-actions-row {
+  width: 100% !important;
+  max-width: none !important;
+}
+
+body.admin-body .order-card .order-actions-row {
+  display: grid !important;
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  gap: 12px !important;
+  padding-bottom: max(10px, env(safe-area-inset-bottom)) !important;
+}
+
+body.admin-body .order-card .order-actions-row button,
+body.admin-body .order-card .accept-order {
+  min-height: 56px !important;
+  pointer-events: auto !important;
+  touch-action: manipulation !important;
+}
+
+@media (max-width: 720px) {
+  body.admin-body #adminPanel {
+    padding: 8px !important;
+  }
+
+  body.admin-body #ordersTab > .admin-card.wide {
+    border-radius: 12px !important;
+    padding: 8px !important;
+  }
+
+  body.admin-body .order-card {
+    width: 100% !important;
+    min-width: 100% !important;
+    margin-bottom: 14px !important;
+    border-radius: 12px !important;
+  }
+
+  body.admin-body .order-card-static-header,
+  body.admin-body .order-card-toggle,
+  body.admin-body .order-card-body {
+    padding: 14px 12px !important;
+  }
+
+  body.admin-body .order-card .order-actions-row {
+    grid-template-columns: 1fr !important;
+  }
+}
