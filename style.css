@@ -2558,3 +2558,53 @@ body.admin-body .order-card .accept-order {
     grid-template-columns: 1fr !important;
   }
 }
+
+
+/* ===== V55: comandas completas, sin desplazamiento automático ===== */
+body.admin-body #ordersTab .admin-card.wide {
+  width: 100%;
+  max-width: none;
+  overflow: visible !important;
+}
+body.admin-body .orders-list {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) !important;
+  width: 100% !important;
+  overflow: visible !important;
+  scroll-snap-type: none !important;
+  overscroll-behavior: auto !important;
+  padding: 0 !important;
+}
+body.admin-body .order-card {
+  display: block !important;
+  width: 100% !important;
+  max-width: none !important;
+  min-width: 0 !important;
+  max-height: none !important;
+  overflow: visible !important;
+  transform: none !important;
+  animation: none !important;
+}
+body.admin-body .order-card-static-header {
+  display: grid !important;
+  width: 100% !important;
+  cursor: default !important;
+}
+body.admin-body .order-card-body {
+  display: block !important;
+  width: 100% !important;
+  max-height: none !important;
+  overflow: visible !important;
+}
+body.admin-body .order-chevron { display: none !important; }
+html, body.admin-body { scroll-behavior: auto !important; }
+@media (max-width: 720px) {
+  body.admin-body .admin-panel {
+    width: 100%;
+    max-width: none;
+    padding-left: 12px;
+    padding-right: 12px;
+  }
+  body.admin-body .order-card { border-radius: 14px; }
+  body.admin-body .order-actions-row { grid-template-columns: 1fr !important; }
+}
