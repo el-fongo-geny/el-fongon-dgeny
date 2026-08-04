@@ -6,7 +6,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#f6f6f3">
   <title>Gestor del menú | El Fogón D' Geny</title>
-  <link rel="stylesheet" href="menu-admin.css?v=77-inventory-business">
+  <link rel="stylesheet" href="menu-admin.css?v=81-california-tax-toggle">
 </head>
 <body>
   <main id="loginScreen" class="login-screen">
@@ -236,6 +236,40 @@
                 <input id="businessMapsUrl" type="url" maxlength="1200">
               </label>
             </div>
+
+            <section class="tax-settings-card" aria-labelledby="taxSettingsTitle">
+              <div class="tax-settings-copy">
+                <p class="eyebrow">Impuestos de venta</p>
+                <h3 id="taxSettingsTitle">Impuestos del pedido web</h3>
+                <p>Actívalos cuando este menú deba calcular el impuesto. Déjalos desactivados cuando Clover vaya a calcularlo al cobrar, para evitar duplicarlo.</p>
+              </div>
+
+              <label class="switch-row tax-master-switch">
+                <span>
+                  <strong>Aplicar impuestos en el menú web</strong>
+                  <small id="taxEnabledStatus">Desactivado</small>
+                </span>
+                <input id="businessTaxEnabled" type="checkbox">
+                <span class="switch-control" aria-hidden="true"></span>
+              </label>
+
+              <div id="taxRateFields" class="tax-rate-fields" hidden>
+                <label class="field">
+                  <span>Tasa de impuesto (%)</span>
+                  <input id="businessTaxRate" type="number" min="0" max="20" step="0.001" inputmode="decimal" value="10.000">
+                  <small>San José: 10.000% desde el 1 de julio de 2026.</small>
+                </label>
+
+                <label class="switch-row">
+                  <span>
+                    <strong>Aplicar solo a productos marcados como gravables</strong>
+                    <small>Respeta el interruptor “Aplicar impuestos” de cada producto.</small>
+                  </span>
+                  <input id="businessTaxOnlyTaxable" type="checkbox" checked>
+                  <span class="switch-control" aria-hidden="true"></span>
+                </label>
+              </div>
+            </section>
 
             <div class="business-settings-actions">
               <button id="resetBusinessSettingsButton" class="button button-secondary" type="button">Restaurar formulario</button>
@@ -491,6 +525,6 @@
   </div>
 
   <script src="supabase-config.js?v=18-mobile-fixed"></script>
-  <script src="menu-admin.js?v=77-inventory-business"></script>
+  <script src="menu-admin.js?v=83-weekly-schedule-editor"></script>
 </body>
 </html>
