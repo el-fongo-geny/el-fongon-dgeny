@@ -3943,3 +3943,48 @@ html {
     padding-bottom: 118px !important;
   }
 }
+
+
+/* ===== V81 · RESUMEN DE IMPUESTOS ===== */
+#taxSummaryRow { display: flex; justify-content: space-between; gap: 16px; }
+#taxSummaryRow[hidden] { display: none !important; }
+
+
+/* ===== V85 · MENÚ SIN ZOOM Y PRODUCTO BLOQUEADO ===== */
+html,
+body {
+  -webkit-text-size-adjust: 100% !important;
+  text-size-adjust: 100% !important;
+  overscroll-behavior: none !important;
+}
+
+body:not(.modal-open) {
+  touch-action: pan-x pan-y !important;
+}
+
+body.modal-open {
+  overflow: hidden !important;
+  overscroll-behavior: none !important;
+  touch-action: none !important;
+}
+
+.product-modal {
+  overscroll-behavior: contain !important;
+  touch-action: pan-y !important;
+}
+
+.product-detail-sheet {
+  overscroll-behavior: contain !important;
+  -webkit-overflow-scrolling: touch !important;
+}
+
+.modal-backdrop {
+  cursor: default !important;
+}
+
+.product-detail-sheet img,
+.product-trigger img,
+.brand-logo {
+  -webkit-user-drag: none !important;
+  user-select: none !important;
+}
