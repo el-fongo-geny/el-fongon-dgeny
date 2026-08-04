@@ -76,7 +76,7 @@ function showLoginRuntimeError(error) {
   console.error("Error del administrador:", error);
 }
 
-window.FOGON_ADMIN_BUILD = "58-clover-payment-queue";
+window.FOGON_ADMIN_BUILD = "68-clover-payment-queue-merged";
 
 
 const STORAGE_ORDERS = "fogon_orders";
