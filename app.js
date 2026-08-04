@@ -1,4 +1,4 @@
-window.FOGON_MENU_BUILD = "77-explicit-order-copy";
+window.FOGON_MENU_BUILD = "80-mobile-menu-fixed-price";
 
 const state = {
   lang: localStorage.getItem("fogon_lang") || "",
@@ -962,8 +962,8 @@ function openProduct(itemId) {
 
         <div class="product-submit-spacer" aria-hidden="true"></div>
         <div class="product-submit-bar">
-          <div>
-            <small>${state.lang === "en" ? "Starting at" : "Desde"}</small>
+          <div class="product-submit-price">
+            <small>${state.lang === "en" ? "Precio" : "Precio"}</small>
             <strong>${money(item.price)}</strong>
           </div>
           <button class="primary-btn product-submit-button" type="submit">
