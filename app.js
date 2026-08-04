@@ -1,4 +1,4 @@
-window.FOGON_MENU_BUILD = "66-ergonomic-ordering-ui";
+window.FOGON_MENU_BUILD = "67-mobile-navigation-fixed";
 
 const state = {
   lang: localStorage.getItem("fogon_lang") || "",
@@ -639,12 +639,17 @@ function renderCategories() {
 
 const loadedImageUrls = new Set();
 
-function escapeAttribute(value) {
+function escapeHtml(value) {
   return String(value == null ? "" : value)
     .replace(/&/g, "&amp;")
-    .replace(/"/g, "&quot;")
     .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;");
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
+
+function escapeAttribute(value) {
+  return escapeHtml(value);
 }
 
 function handleProductImageLoad(image) {
@@ -687,7 +692,7 @@ function productCardHtml(item, imageIndex) {
   const priorityImage = imageIndex < 6;
   return `
     <article class="product-card ${unavailable ? "is-unavailable" : ""}">
-      <button class="product-trigger" data-product-id="${item.id}" ${unavailable ? "disabled" : ""}>
+      <button class="product-trigger" type="button" data-product-id="${escapeAttribute(item.id)}" ${unavailable ? "disabled" : ""}>
         <div class="product-image ${item.image ? "is-loading" : "missing-image"}">
           ${item.image ? `<img src="${escapeAttribute(item.image)}" alt="${escapeAttribute(itemName(item))}" loading="${priorityImage ? "eager" : "lazy"}" fetchpriority="${priorityImage ? "high" : "auto"}" decoding="async" width="640" height="557" onload="handleProductImageLoad(this)" onerror="handleProductImageError(this)">` : ""}
           <span class="product-image-placeholder" aria-hidden="true">
@@ -769,7 +774,7 @@ function optionLabel(option) {
 }
 
 function openProduct(itemId) {
-  const item = MENU_ITEMS.find((product) => product.id === itemId);
+  const item = MENU_ITEMS.find((product) => String(product.id) === String(itemId));
   if (!item || !isProductAvailable(item)) return;
 
   state.currentProduct = item;
@@ -1393,7 +1398,11 @@ function initEvents() {
     }
 
     const productButton = event.target.closest("[data-product-id]");
-    if (productButton) openProduct(productButton.dataset.productId);
+    if (productButton) {
+      event.preventDefault();
+      openProduct(productButton.dataset.productId);
+      return;
+    }
 
     if (event.target.closest(".modal-close") || event.target === $("#modalBackdrop")) closeProduct();
     if (event.target.closest("#cartFab")) {
