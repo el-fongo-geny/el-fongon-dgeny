@@ -76,7 +76,7 @@ function showLoginRuntimeError(error) {
   console.error("Error del administrador:", error);
 }
 
-window.FOGON_ADMIN_BUILD = "75-open-card-no-duplicate";
+window.FOGON_ADMIN_BUILD = "76-compact-actions-stable-layout";
 
 if (!window.CSS) window.CSS = {};
 if (!window.CSS.escape) {
@@ -103,6 +103,8 @@ let adminPinInMemory = "";
 */
 let adminCatalogMenuItems = [];
 let adminCatalogInventoryItems = [];
+let pinnedOrderCardIds = [];
+let pinnedKitchenCardIds = [];
 const BACKEND_URL = (window.FOGON_BACKEND_URL || "").replace(/\/$/, "");
 const ORDER_MODE_MANUAL_KEY = "system:orders-manual";
 const ORDER_MODE_OPEN_KEY = "system:orders-open";
@@ -1946,12 +1948,115 @@ function compactOrderItemHtml(item) {
   `;
 }
 
+
+function preservePinnedCardIds(orders, previousIds = []) {
+  const currentIds = orders.map((order) => String(order.id));
+  const currentSet = new Set(currentIds);
+  const pinned = previousIds.filter((id) => currentSet.has(id));
+
+  currentIds.forEach((id) => {
+    if (!pinned.includes(id)) pinned.push(id);
+  });
+
+  return pinned;
+}
+
+function ordersInPinnedCardOrder(orders) {
+  pinnedOrderCardIds = preservePinnedCardIds(orders, pinnedOrderCardIds);
+  const map = new Map(orders.map((order) => [String(order.id), order]));
+  return pinnedOrderCardIds.map((id) => map.get(id)).filter(Boolean);
+}
+
+function kitchenOrdersInPinnedCardOrder(orders) {
+  pinnedKitchenCardIds = preservePinnedCardIds(orders, pinnedKitchenCardIds);
+  const map = new Map(orders.map((order) => [String(order.id), order]));
+  return pinnedKitchenCardIds.map((id) => map.get(id)).filter(Boolean);
+}
+
+function compactCardActionHtml(order) {
+  const orderId = escapeHtml(order.id);
+  const isNew = order.status === "new" || !order.status;
+  const isReady = order.status === "ready";
+
+  if (isNew) {
+    return `
+      <button class="primary-btn full compact-card-action-btn" data-accept-order="${orderId}" type="button">
+        Aceptar pedido
+      </button>
+    `;
+  }
+
+  if (!isReady) {
+    return `
+      <button class="secondary-btn full compact-card-action-btn compact-ready-btn" data-ready-order="${orderId}" type="button">
+        Pedido listo
+      </button>
+    `;
+  }
+
+  const method = String(order.paymentMethod || "").toLowerCase();
+  const paymentStatus = normalizePaymentStatus(order);
+  const busy = paymentActionLocks.has(String(order.id));
+
+  if (busy) {
+    return `
+      <button class="primary-btn full compact-card-action-btn" type="button" disabled>
+        Procesando…
+      </button>
+    `;
+  }
+
+  if (paymentStatus === "paid") {
+    return `
+      <button class="secondary-btn danger-btn full compact-card-action-btn" data-hide-paid="${orderId}" type="button">
+        Quitar pedido para todos
+      </button>
+    `;
+  }
+
+  if (method === "card") {
+    if (paymentStatus === "processing") {
+      return `
+        <button class="primary-btn full compact-card-action-btn" type="button" disabled>
+          Esperando tarjeta en Clover…
+        </button>
+      `;
+    }
+
+    if (paymentStatus === "review") {
+      return `
+        <button class="secondary-btn full compact-card-action-btn" type="button" disabled>
+          Revisar cobro en Clover
+        </button>
+      `;
+    }
+
+    return `
+      <button class="primary-btn full clover-pay-btn compact-card-action-btn" data-clover-pay="${orderId}" type="button">
+        Cobrar con Clover
+      </button>
+    `;
+  }
+
+  if (method === "cash") {
+    return `
+      <button class="primary-btn full cash-pay-btn compact-card-action-btn" data-cash-pay="${orderId}" type="button">
+        Cobrar en efectivo
+      </button>
+    `;
+  }
+
+  return `
+    <button class="secondary-btn full compact-card-action-btn" type="button" disabled>
+      Método de pago no indicado
+    </button>
+  `;
+}
+
+
 function renderOrders() {
-  const orders = getOrders()
-    .slice()
-    .sort((left, right) =>
-      orderCreatedTimestamp(right) - orderCreatedTimestamp(left)
-    );
+  const sourceOrders = getOrders().slice();
+  const orders = ordersInPinnedCardOrder(sourceOrders);
 
   const renderSignature = stableOrdersSignature(orders);
   const ordersList = $("#ordersList");
@@ -1966,6 +2071,7 @@ function renderOrders() {
 
   lastOrdersRenderSignature = renderSignature;
   knownOrderIds = new Set(orders.map((order) => String(order.id)));
+  pinnedOrderCardIds = pinnedOrderCardIds.filter((id) => knownOrderIds.has(id));
   Array.from(expandedOrderIds).forEach((orderId) => {
     if (!knownOrderIds.has(orderId)) expandedOrderIds.delete(orderId);
   });
@@ -1978,106 +2084,120 @@ function renderOrders() {
     const isReady = order.status === "ready";
     const isExpanded = expandedOrderIds.has(orderId);
     const totalQuantity = orderTotalQuantity(order.items);
+
+    const fullPrimaryAction = isNew
+      ? `
+        <button class="primary-btn full accept-order-btn" data-accept-order="${escapeHtml(orderId)}" type="button">
+          Aceptar pedido
+        </button>
+      `
+      : (!isReady
+        ? `
+          <button class="secondary-btn full ready-order-btn" data-ready-order="${escapeHtml(orderId)}" type="button">
+            Pedido listo
+          </button>
+        `
+        : "");
+
+    const paymentSection = isReady
+      ? `
+        <section class="order-inline-payment" aria-label="Acciones del pedido y cobro">
+          <div class="order-inline-payment-head">
+            <div>
+              <small>${String(order.paymentMethod || "").toLowerCase() === "card" ? "Cobro con tarjeta" : "Cobro en efectivo"}</small>
+              <strong>${money(order.totals?.total)}</strong>
+            </div>
+            <span class="payment-state ${paymentStatusClass(order)}">${escapeHtml(paymentStatusLabel(order))}</span>
+          </div>
+
+          <div class="order-inline-payment-actions">
+            ${paymentActionHtml(order)}
+          </div>
+        </section>
+      `
+      : "";
+
     return `
-    <article
-      class="order-card ${isNew ? "is-new" : "is-accepted"} ${isExpanded ? "is-expanded" : "is-collapsed"}"
-      data-order-card="${escapeHtml(orderId)}"
-    >
-      <button
-        class="order-card-toggle"
-        type="button"
-        data-toggle-order="${escapeHtml(orderId)}"
-        aria-expanded="${isExpanded ? "true" : "false"}"
-        aria-controls="order-body-${escapeHtml(orderId)}"
-      >
-        <span class="order-card-accent" aria-hidden="true"></span>
-        <span class="order-card-topline">
-          <span class="order-number">#${escapeHtml(orderId)}</span>
-          <span class="order-status ${statusClass(order)}">${statusLabel(order)}</span>
-        </span>
-        <span class="order-customer-name">${escapeHtml(order.customer?.name || "Sin nombre")}</span>
-        <span class="order-card-meta">
-          <span data-order-elapsed="${escapeHtml(orderId)}">${escapeHtml(orderElapsedLabel(order))}</span>
-          <span>${escapeHtml(orderTypeLabel(order))}</span>
-        </span>
-        <span class="compact-order-service">
-          <span><strong>Teléfono:</strong> ${escapeHtml(order.customer?.phone || "Sin teléfono")}</span>
-          <span><strong>Pago:</strong> ${escapeHtml(paymentLabel(order.paymentMethod))}</span>
-          <span><strong>Cobro:</strong> ${escapeHtml(paymentStatusLabel(order))}</span>
-          <span><strong>Entrada:</strong> ${escapeHtml(new Date(order.createdAt).toLocaleString())}</span>
-        </span>
-
-        <span class="compact-order-items">
-          ${aggregateOrderItems(order.items).map((item) => compactOrderItemHtml(item)).join("")}
-        </span>
-
-        <span class="compact-order-total">
-          <span>${totalQuantity} artículo${totalQuantity === 1 ? "" : "s"}</span>
-          <strong>Total ${money(order.totals?.total)}</strong>
-        </span>
-
-        <span class="order-card-summary order-card-toggle-hint" aria-hidden="true">
-          <span>${isExpanded ? "Pedido abierto" : "Pulsa la cabecera para abrir"}</span>
-          <span class="order-chevron">⌄</span>
-        </span>
-      </button>
-
-      <div
-        id="order-body-${escapeHtml(orderId)}"
-        class="order-card-body"
-        ${isExpanded ? "" : "hidden"}
+      <article
+        class="order-card ${isNew ? "is-new" : "is-accepted"} ${isExpanded ? "is-expanded" : "is-collapsed"}"
+        data-order-card="${escapeHtml(orderId)}"
       >
         <button
-          class="expanded-order-close"
+          class="order-card-toggle"
           type="button"
           data-toggle-order="${escapeHtml(orderId)}"
-          aria-label="Cerrar pedido"
+          aria-expanded="${isExpanded ? "true" : "false"}"
+          aria-controls="order-body-${escapeHtml(orderId)}"
         >
-          <span>#${escapeHtml(orderId)} · ${escapeHtml(order.customer?.name || "Sin nombre")}</span>
-          <strong>Cerrar pedido ×</strong>
+          <span class="order-card-accent" aria-hidden="true"></span>
+          <span class="order-card-topline">
+            <span class="order-number">#${escapeHtml(orderId)}</span>
+            <span class="order-status ${statusClass(order)}">${statusLabel(order)}</span>
+          </span>
+          <span class="order-customer-name">${escapeHtml(order.customer?.name || "Sin nombre")}</span>
+          <span class="order-card-meta">
+            <span data-order-elapsed="${escapeHtml(orderId)}">${escapeHtml(orderElapsedLabel(order))}</span>
+            <span>${escapeHtml(orderTypeLabel(order))}</span>
+          </span>
+          <span class="compact-order-service">
+            <span><strong>Teléfono:</strong> ${escapeHtml(order.customer?.phone || "Sin teléfono")}</span>
+            <span><strong>Pago:</strong> ${escapeHtml(paymentLabel(order.paymentMethod))}</span>
+            <span><strong>Cobro:</strong> ${escapeHtml(paymentStatusLabel(order))}</span>
+            <span><strong>Entrada:</strong> ${escapeHtml(new Date(order.createdAt).toLocaleString())}</span>
+          </span>
+
+          <span class="compact-order-items">
+            ${aggregateOrderItems(order.items).map((item) => compactOrderItemHtml(item)).join("")}
+          </span>
+
+          <span class="compact-order-total">
+            <span>${totalQuantity} artículo${totalQuantity === 1 ? "" : "s"}</span>
+            <strong>Total ${money(order.totals?.total)}</strong>
+          </span>
         </button>
 
-        <div class="order-contact">
-          <p class="order-fulfillment-type"><strong>Tipo de pedido:</strong> ${escapeHtml(orderTypeLabel(order))}</p>
-          <p><strong>Teléfono:</strong> ${escapeHtml(order.customer?.phone || "Sin teléfono")}</p>
-          <p><strong>Pago:</strong> ${escapeHtml(paymentLabel(order.paymentMethod))}</p>
-          <p><strong>Cobro:</strong> ${escapeHtml(paymentStatusLabel(order))}</p>
-          <p><strong>Entrada:</strong> ${escapeHtml(new Date(order.createdAt).toLocaleString())}</p>
-        </div>
-
-        <div class="order-items">
-          ${aggregateOrderItems(order.items).map((item) => itemDetailsHtml(item)).join("")}
-        </div>
-
-        <div class="order-total">
-          <span>Total</span>
-          <strong>${money(order.totals?.total)}</strong>
-        </div>
-
-        ${isNew
-          ? `<button class="primary-btn full accept-order" data-accept-order="${escapeHtml(orderId)}" type="button">Aceptar pedido y parar sonido</button>`
-          : `<p class="accepted-note">${isReady ? "Pedido listo" : "Pedido aceptado"}${order.acceptedAt ? ` · ${new Date(order.acceptedAt).toLocaleTimeString()}` : ""}</p>`}
-
-        ${!isNew ? `
-          <section class="order-inline-payment" aria-label="Acciones del pedido y cobro">
-            <div class="order-inline-payment-head">
-              <div>
-                <small>${String(order.paymentMethod || "").toLowerCase() === "card" ? "Cobro con tarjeta" : "Cobro en efectivo"}</small>
-                <strong>${money(order.totals?.total)}</strong>
-              </div>
-              <span class="payment-state ${paymentStatusClass(order)}">${escapeHtml(paymentStatusLabel(order))}</span>
-            </div>
-
-            <div class="order-inline-payment-actions">
-              <button class="secondary-btn ready-order-btn" data-ready-order="${escapeHtml(orderId)}" type="button">
-                Pedido listo / Enviar WhatsApp
-              </button>
-              ${paymentActionHtml(order)}
-            </div>
-          </section>
+        ${!isExpanded ? `
+          <div class="compact-order-actions">
+            ${compactCardActionHtml(order)}
+          </div>
         ` : ""}
-      </div>
-    </article>`;
+
+        <div
+          id="order-body-${escapeHtml(orderId)}"
+          class="order-card-body"
+          ${isExpanded ? "" : "hidden"}
+        >
+          <button
+            class="expanded-order-close"
+            type="button"
+            data-toggle-order="${escapeHtml(orderId)}"
+            aria-label="Cerrar pedido"
+          >
+            <span>#${escapeHtml(orderId)} · ${escapeHtml(order.customer?.name || "Sin nombre")}</span>
+            <strong>Cerrar pedido ×</strong>
+          </button>
+
+          <div class="order-contact">
+            <p><strong>Tipo de pedido:</strong> ${escapeHtml(orderTypeLabel(order))}</p>
+            <p><strong>Teléfono:</strong> ${escapeHtml(order.customer?.phone || "Sin teléfono")}</p>
+            <p><strong>Pago:</strong> ${escapeHtml(paymentLabel(order.paymentMethod))}</p>
+            <p><strong>Cobro:</strong> ${escapeHtml(paymentStatusLabel(order))}</p>
+            <p><strong>Entrada:</strong> ${escapeHtml(new Date(order.createdAt).toLocaleString())}</p>
+          </div>
+
+          <div class="order-items">
+            ${aggregateOrderItems(order.items).map((item) => itemDetailsHtml(item)).join("")}
+          </div>
+
+          <div class="order-total">
+            <span>Total</span>
+            <strong>${money(order.totals?.total)}</strong>
+          </div>
+
+          ${fullPrimaryAction}
+          ${paymentSection}
+        </div>
+      </article>`;
   }).join("") : `<p class="empty-state">No hay pedidos todavía.</p>`;
 
   updateAlarm();
@@ -2223,17 +2343,18 @@ function renderPayments() {
   updateCounters();
 }
 
+
 function renderKitchen() {
   const orders = getOrders();
   cleanKitchenHiddenIds(orders);
-  const visibleOrders = kitchenOrders(orders);
+  const visibleOrders = kitchenOrdersInPinnedCardOrder(kitchenOrders(orders));
   updateCounters();
 
   const kitchenList = $("#kitchenList");
   if (!kitchenList) return;
 
   kitchenList.innerHTML = visibleOrders.length ? visibleOrders.map((order) => `
-    <article class="kitchen-order-card ${getSelectedKitchenOrderId() === String(order.id) ? "kitchen-selected" : ""}" data-kitchen-order-id="${escapeHtml(order.id)}">
+    <article class="kitchen-order-card ${getSelectedKitchenOrderId() === String(order.id) ? "selected" : ""}" data-kitchen-order-id="${escapeHtml(order.id)}">
       <div class="kitchen-order-head">
         <div class="kitchen-order-identity">
           <strong>#${escapeHtml(order.id)}</strong>
@@ -2244,55 +2365,13 @@ function renderKitchen() {
       <div class="kitchen-items">
         ${aggregateOrderItems(order.items).map((item) => itemDetailsHtml(item, true)).join("")}
       </div>
-      <p class="kitchen-swipe-hint">Toca para preparar · desliza a la izquierda para retirar de Cocina</p>
-      <button class="secondary-btn full" data-kitchen-done="${escapeHtml(order.id)}" type="button">Terminado en cocina</button>
+      <div class="kitchen-actions">
+        <button class="secondary-btn full" data-kitchen-toggle="${escapeHtml(order.id)}" type="button">
+          ${isKitchenOrderHidden(order.id) ? "Mostrar comanda" : "Quitar de cocina"}
+        </button>
+      </div>
     </article>
-  `).join("") : `<p class="empty-state">No hay comandas pendientes para cocina.</p>`;
-}
-
-function renderAvailability() {
-  const availability = getAvailability();
-  const query = availabilityQuery.trim().toLowerCase();
-  const menuSource = Array.isArray(adminCatalogMenuItems)
-    ? adminCatalogMenuItems
-    : [];
-
-  const menuItems = menuSource.map((item) => ({
-    id: item.id,
-    es: item.es,
-    en: item.en,
-    group: "Productos del menu"
-  }));
-  const inventoryItems = INVENTORY_ITEMS.map((item) => ({
-    ...item,
-    group: "Inventario interno"
-  }));
-  const items = [...menuItems, ...inventoryItems].filter((item) => {
-    const haystack = `${item.es} ${item.en} ${item.group}`.toLowerCase();
-    return haystack.includes(query);
-  });
-  const availabilityList = $("#availabilityList");
-  if (!availabilityList) return;
-
-  const groups = ["Productos del menu", "Inventario interno"];
-  availabilityList.innerHTML = groups.map((group) => {
-    const groupItems = items.filter((item) => item.group === group);
-    if (!groupItems.length) return "";
-    return `
-      <section class="availability-group">
-        <h3>${escapeHtml(group)}</h3>
-        ${groupItems.map((item) => {
-          const available = availability[item.id] !== false;
-          return `
-            <label class="availability-row">
-              <span>${escapeHtml(item.es)}${item.en !== item.es ? `<small>${escapeHtml(item.en)}</small>` : ""}</span>
-              <input type="checkbox" data-availability="${escapeHtml(item.id)}" ${available ? "checked" : ""}>
-            </label>
-          `;
-        }).join("")}
-      </section>
-    `;
-  }).join("");
+  `).join("") : `<p class="empty-state">No hay comandas pendientes.</p>`;
 
   renderOrderModeButton();
 }
