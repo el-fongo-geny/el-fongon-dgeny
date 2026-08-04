@@ -76,7 +76,7 @@ function showLoginRuntimeError(error) {
   console.error("Error del administrador:", error);
 }
 
-window.FOGON_ADMIN_BUILD = "73-complete-collapsed-cards";
+window.FOGON_ADMIN_BUILD = "74-kitchen-order-type-no-minimize-button";
 
 if (!window.CSS) window.CSS = {};
 if (!window.CSS.escape) {
@@ -1859,7 +1859,7 @@ function toggleOrderCard(orderId) {
 
   const body = card?.querySelector(".order-card-body");
   const button = card?.querySelector("[data-toggle-order]");
-  const openLabel = card?.querySelector(".order-card-open-label");
+  const hint = card?.querySelector(".order-card-toggle-hint > span:first-child");
   const isExpanded = expandedOrderIds.has(cleanOrderId);
 
   if (isExpanded) {
@@ -1868,7 +1868,7 @@ function toggleOrderCard(orderId) {
     card?.classList.add("is-collapsed");
     if (body) body.hidden = true;
     if (button) button.setAttribute("aria-expanded", "false");
-    if (openLabel) openLabel.textContent = "Abrir pedido";
+    if (hint) hint.textContent = "Pulsa la cabecera para abrir";
     return;
   }
 
@@ -1877,7 +1877,7 @@ function toggleOrderCard(orderId) {
   card?.classList.add("is-expanded");
   if (body) body.hidden = false;
   if (button) button.setAttribute("aria-expanded", "true");
-  if (openLabel) openLabel.textContent = "Minimizar";
+  if (hint) hint.textContent = "Pedido abierto";
 }
 
 
@@ -1979,9 +1979,9 @@ function renderOrders() {
           <strong>Total ${money(order.totals?.total)}</strong>
         </span>
 
-        <span class="order-card-summary">
-          <span class="order-card-open-label">${isExpanded ? "Minimizar pedido" : "Abrir acciones del pedido"}</span>
-          <span class="order-chevron" aria-hidden="true">⌄</span>
+        <span class="order-card-summary order-card-toggle-hint" aria-hidden="true">
+          <span>${isExpanded ? "Pedido abierto" : "Pulsa la cabecera para abrir"}</span>
+          <span class="order-chevron">⌄</span>
         </span>
       </button>
 
@@ -2188,7 +2188,10 @@ function renderKitchen() {
   kitchenList.innerHTML = visibleOrders.length ? visibleOrders.map((order) => `
     <article class="kitchen-order-card ${getSelectedKitchenOrderId() === String(order.id) ? "kitchen-selected" : ""}" data-kitchen-order-id="${escapeHtml(order.id)}">
       <div class="kitchen-order-head">
-        <strong>${escapeHtml(order.id)}</strong>
+        <div class="kitchen-order-identity">
+          <strong>#${escapeHtml(order.id)}</strong>
+          <span class="kitchen-fulfillment-type">${escapeHtml(orderTypeLabel(order))}</span>
+        </div>
         <span>${statusLabel(order)}</span>
       </div>
       <div class="kitchen-items">
