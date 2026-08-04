@@ -64,6 +64,14 @@
         total: moneyNumber(row.total ?? row.totals?.total ?? row.raw?.totals?.total)
       },
       paymentMethod: row.payment_method || row.raw?.paymentMethod || "",
+      paymentStatus: row.payment_status || row.raw?.paymentStatus || "pending",
+      paymentStartedAt: row.payment_started_at || row.raw?.paymentStartedAt || null,
+      paymentCompletedAt: row.payment_completed_at || row.raw?.paymentCompletedAt || null,
+      paymentError: row.payment_error || row.raw?.paymentError || "",
+      cloverPaymentId: row.clover_payment_id || row.raw?.cloverPaymentId || null,
+      cloverExternalPaymentId: row.clover_external_payment_id || row.raw?.cloverExternalPaymentId || null,
+      hiddenForAll: Boolean(row.hidden_for_all),
+      hiddenAt: row.hidden_at || row.raw?.hiddenAt || null,
       status,
       language: row.language || row.raw?.language || "es",
       acceptedAt: row.accepted_at || (status === "accepted" ? updatedAt : null),
@@ -127,6 +135,7 @@
     const { data, error } = await client
       .from(tables.orders)
       .select("*")
+      .eq("hidden_for_all", false)
       .order("created_at", { ascending: false });
     if (error) throw error;
     return (data || []).map(toOrder).filter(Boolean);
