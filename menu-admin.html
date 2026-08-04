@@ -6,7 +6,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#f6f6f3">
   <title>Gestor del menú | El Fogón D' Geny</title>
-  <link rel="stylesheet" href="menu-admin.css?v=72-availability-business">
+  <link rel="stylesheet" href="menu-admin.css?v=77-inventory-business">
 </head>
 <body>
   <main id="loginScreen" class="login-screen">
@@ -45,7 +45,7 @@
         </button>
         <button class="nav-item" type="button" data-view="availability-items">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 6h14M5 12h14M5 18h14M8 4v4M16 10v4M11 16v4"/></svg>
-          <span>Gestionar disponibilidad</span>
+          <span>Inventario</span>
         </button>
         <button class="nav-item" type="button" data-view="business">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 10h16M6 10v10h12V10M8 10V6h8v4M9 14h6M9 17h4"/></svg>
@@ -143,11 +143,11 @@
         <section class="content-card">
           <div class="section-heading management-heading">
             <div>
-              <p class="eyebrow">Panel de disponibilidad</p>
-              <h2>Artículos e ingredientes</h2>
-              <p>Añade, modifica, ordena o elimina los elementos que aparecen en Disponibilidad.</p>
+              <p class="eyebrow">Inventario</p>
+              <h2>Artículos del inventario</h2>
+              <p>Añade, modifica, ordena o elimina los elementos que aparecen en Inventario.</p>
             </div>
-            <button id="newAvailabilityItemButton" class="button button-primary" type="button">Nuevo elemento</button>
+            <button id="newAvailabilityItemButton" class="button button-primary" type="button">Nuevo artículo</button>
           </div>
 
           <form id="availabilityItemForm" class="management-form" hidden>
@@ -157,21 +157,16 @@
                 <span>Nombre en español *</span>
                 <input id="availabilityItemNameEs" type="text" maxlength="160" required>
               </label>
-              <label class="field">
-                <span>Nombre en inglés</span>
-                <input id="availabilityItemNameEn" type="text" maxlength="160">
-              </label>
-              <label class="field">
-                <span>Grupo</span>
-                <input id="availabilityItemGroup" type="text" maxlength="100" placeholder="Carnes, Vegetales, Envases…">
-              </label>
+              
+              <label class="field"><span>Grupo</span><select id="availabilityItemGroupSelect"></select></label>
+<label id="availabilityNewGroupField" class="field" hidden><span>Nombre del nuevo grupo</span><input id="availabilityItemNewGroup" type="text" maxlength="100" placeholder="Ejemplo: Bebidas"></label>
               <label class="field">
                 <span>Orden</span>
                 <input id="availabilityItemSort" type="number" min="0" step="1" value="0">
               </label>
             </div>
             <label class="switch-row modal-switch">
-              <span><strong>Elemento activo</strong><small>Si está inactivo no aparecerá en Disponibilidad.</small></span>
+              <span><strong>Artículo activo</strong><small>Si está inactivo no aparecerá en Inventario.</small></span>
               <input id="availabilityItemActive" type="checkbox" checked>
               <span class="switch-control" aria-hidden="true"></span>
             </label>
@@ -183,7 +178,7 @@
 
           <label class="search-box management-search" for="availabilityItemSearch">
             <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg>
-            <input id="availabilityItemSearch" type="search" placeholder="Buscar ingrediente o artículo…">
+            <input id="availabilityItemSearch" type="search" placeholder="Buscar artículo del inventario…">
           </label>
 
           <div id="availabilityItemsList" class="management-list"></div>
@@ -496,6 +491,6 @@
   </div>
 
   <script src="supabase-config.js?v=18-mobile-fixed"></script>
-  <script src="menu-admin.js?v=72-availability-business"></script>
+  <script src="menu-admin.js?v=77-inventory-business"></script>
 </body>
 </html>
