@@ -981,3 +981,106 @@ body.admin-body.dark-mode .kitchen-order-head > .kitchen-fulfillment-type {
     text-align: center;
   }
 }
+
+
+/* ===== V84 · MATIZ PREMIUM EN TARJETAS Y BORDES ===== */
+body.admin-body .order-card {
+  border-color: color-mix(in srgb, var(--accent) 26%, var(--line)) !important;
+  box-shadow:
+    0 14px 34px rgba(0, 0, 0, .16),
+    inset 0 1px 0 rgba(255, 255, 255, .035) !important;
+}
+
+body.admin-body .order-card-toggle {
+  background:
+    radial-gradient(
+      circle at 96% 0%,
+      color-mix(in srgb, #7867d9 17%, transparent),
+      transparent 38%
+    ),
+    linear-gradient(
+      145deg,
+      color-mix(in srgb, var(--surface) 82%, #5e2637 18%),
+      color-mix(in srgb, var(--surface) 91%, #243b69 9%)
+    ) !important;
+}
+
+body.admin-body .order-card-accent {
+  height: 8px !important;
+  background:
+    linear-gradient(
+      90deg,
+      #ff6a55 0%,
+      #bf547e 48%,
+      #6b66dc 100%
+    ) !important;
+}
+
+body.admin-body .order-card.is-accepted .order-card-accent {
+  background:
+    linear-gradient(
+      90deg,
+      #34c77b 0%,
+      #36a7bf 50%,
+      #536fe1 100%
+    ) !important;
+}
+
+body.admin-body .compact-order-service,
+body.admin-body .compact-order-total,
+body.admin-body .order-card-body {
+  border-color: color-mix(in srgb, var(--accent) 20%, var(--line)) !important;
+}
+
+body.admin-body .compact-order-item,
+body.admin-body .order-items article,
+body.admin-body .order-inline-payment,
+body.admin-body .payment-order-card,
+body.admin-body .kitchen-order-card {
+  border-color: color-mix(in srgb, var(--accent) 24%, var(--line)) !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, .025),
+    0 7px 20px rgba(0, 0, 0, .08) !important;
+}
+
+body.admin-body .kitchen-order-card {
+  background:
+    linear-gradient(
+      145deg,
+      color-mix(in srgb, var(--surface) 91%, #244963 9%),
+      color-mix(in srgb, var(--surface) 95%, #543047 5%)
+    ) !important;
+}
+
+body.admin-body .compact-order-actions,
+body.admin-body .expanded-workflow-actions {
+  border-color: color-mix(in srgb, var(--accent) 22%, var(--line)) !important;
+}
+
+body.admin-body .kitchen-done-btn {
+  border: 1px solid color-mix(in srgb, #32b978 68%, var(--line)) !important;
+  background:
+    linear-gradient(135deg, #1f7c4b, #2c9a63) !important;
+  color: #fff !important;
+  box-shadow: 0 9px 22px rgba(31, 124, 75, .20) !important;
+}
+
+body.admin-body.light-mode .order-card-toggle {
+  background:
+    radial-gradient(
+      circle at 96% 0%,
+      rgba(107, 102, 220, .12),
+      transparent 38%
+    ),
+    linear-gradient(
+      145deg,
+      color-mix(in srgb, #fff 94%, #ffe0e5 6%),
+      color-mix(in srgb, #fff 96%, #dce6ff 4%)
+    ) !important;
+}
+
+@media (max-width: 720px) {
+  body.admin-body .order-card {
+    border-width: 1px !important;
+  }
+}
