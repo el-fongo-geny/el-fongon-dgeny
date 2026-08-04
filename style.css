@@ -2608,3 +2608,86 @@ html, body.admin-body { scroll-behavior: auto !important; }
   body.admin-body .order-card { border-radius: 14px; }
   body.admin-body .order-actions-row { grid-template-columns: 1fr !important; }
 }
+
+/* V56: el tipo de servicio siempre queda visible dentro de la comanda. */
+body.admin-body .order-fulfillment-type {
+  margin: 0 0 8px;
+  border: 1px solid color-mix(in srgb, var(--accent) 38%, var(--line));
+  border-radius: 12px;
+  padding: 10px 12px;
+  background: color-mix(in srgb, var(--accent) 10%, var(--surface));
+  color: var(--ink) !important;
+  font-size: 1rem;
+}
+
+
+/* ===== V57: selector de cantidad del carrito ===== */
+.cart-item-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 9px;
+  min-width: 112px;
+}
+
+.cart-line-total {
+  white-space: nowrap;
+  font-size: 1rem;
+}
+
+.cart-quantity-control {
+  display: grid;
+  grid-template-columns: 42px minmax(38px, auto) 42px;
+  align-items: center;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface);
+}
+
+.cart-quantity-btn {
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  font-size: 1.35rem;
+  font-weight: 900;
+  line-height: 1;
+  touch-action: manipulation;
+}
+
+.cart-quantity-btn:active {
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+}
+
+.cart-quantity-value {
+  min-width: 38px;
+  padding: 0 4px;
+  color: var(--ink);
+  font-weight: 900;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 560px) {
+  .cart-item {
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: start;
+  }
+
+  .cart-item-actions {
+    min-width: 108px;
+  }
+
+  .cart-quantity-control {
+    grid-template-columns: 40px 36px 40px;
+  }
+
+  .cart-quantity-btn {
+    width: 40px;
+    height: 44px;
+  }
+}
