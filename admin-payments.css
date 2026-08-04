@@ -1,0 +1,293 @@
+/* =========================================================
+   V58 · Cola de cobros Clover y efectivo
+   ========================================================= */
+.payments-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 14px;
+  margin-top: 14px;
+}
+
+.clover-queue-status {
+  margin: 0 0 12px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 12px 14px;
+  background: color-mix(in srgb, var(--surface) 88%, var(--bg));
+  color: var(--ink);
+  font-weight: 850;
+  line-height: 1.4;
+}
+
+.clover-queue-status.is-ready {
+  border-color: color-mix(in srgb, var(--ok) 55%, var(--line));
+  background: color-mix(in srgb, var(--ok) 11%, var(--surface));
+}
+
+.clover-queue-status.is-busy {
+  border-color: color-mix(in srgb, #f0a11a 62%, var(--line));
+  background: color-mix(in srgb, #f0a11a 14%, var(--surface));
+}
+
+.payment-order-card {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  padding: 15px;
+  background: var(--surface);
+  color: var(--ink);
+  box-shadow: var(--soft-shadow);
+}
+
+.payment-order-card.payment-processing {
+  border-color: color-mix(in srgb, #f0a11a 70%, var(--line));
+}
+
+.payment-order-card.payment-review {
+  border-color: color-mix(in srgb, #d94a3a 72%, var(--line));
+}
+
+.payment-order-head,
+.payment-order-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.payment-order-head h3 {
+  margin: 3px 0 0;
+  overflow: hidden;
+  font-size: 1.18rem;
+  line-height: 1.1;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.payment-order-number {
+  color: var(--muted);
+  font-size: .86rem;
+  font-weight: 900;
+}
+
+.payment-state {
+  flex: 0 0 auto;
+  border-radius: 999px;
+  padding: 7px 10px;
+  background: color-mix(in srgb, var(--muted) 16%, var(--surface));
+  color: var(--ink);
+  font-size: .78rem;
+  font-weight: 950;
+  text-align: center;
+}
+
+.payment-state.processing {
+  background: color-mix(in srgb, #f0a11a 22%, var(--surface));
+}
+
+.payment-state.paid {
+  background: color-mix(in srgb, var(--ok) 20%, var(--surface));
+  color: color-mix(in srgb, var(--ok) 85%, var(--ink));
+}
+
+.payment-state.failed,
+.payment-state.cancelled,
+.payment-state.review {
+  background: color-mix(in srgb, var(--accent) 18%, var(--surface));
+  color: color-mix(in srgb, var(--accent) 82%, var(--ink));
+}
+
+.payment-order-summary {
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+  padding: 11px 0;
+}
+
+.payment-order-summary strong {
+  font-size: 1.3rem;
+}
+
+.payment-order-meta,
+.payment-error-text,
+.payment-cash-confirmed {
+  margin: 0;
+  line-height: 1.4;
+}
+
+.payment-order-meta {
+  color: var(--muted);
+  font-size: .9rem;
+  font-weight: 750;
+}
+
+.payment-error-text,
+.payment-review-warning {
+  border-radius: 12px;
+  padding: 10px 12px;
+  background: color-mix(in srgb, var(--accent) 12%, var(--surface));
+  color: color-mix(in srgb, var(--accent) 82%, var(--ink));
+  font-weight: 800;
+  line-height: 1.4;
+}
+
+.payment-cash-confirmed {
+  border-radius: 12px;
+  padding: 10px 12px;
+  background: color-mix(in srgb, var(--ok) 12%, var(--surface));
+  color: color-mix(in srgb, var(--ok) 82%, var(--ink));
+  font-weight: 850;
+}
+
+.payment-action-wrap {
+  margin-top: auto;
+}
+
+.payment-action-wrap button:disabled {
+  cursor: wait;
+  opacity: .68;
+}
+
+@media (max-width: 720px) {
+  .payments-list {
+    grid-template-columns: 1fr;
+  }
+
+  .payment-order-card {
+    padding: 14px 12px;
+  }
+
+  .payment-order-head {
+    align-items: flex-start;
+  }
+}
+
+
+/* V69 · estado de cobro dentro de la propia comanda */
+body.admin-body .order-payment-inline-status {
+  margin: 12px 0 0;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 10px 12px;
+  background: color-mix(in srgb, var(--surface) 88%, var(--bg));
+  color: var(--muted);
+  font-weight: 850;
+}
+
+body.admin-body .order-payment-inline-status.payment-processing {
+  border-color: #d5a83b;
+  background: rgba(213,168,59,.13);
+  color: #f2c96b;
+}
+
+body.admin-body.light-mode .order-payment-inline-status.payment-processing {
+  color: #765300;
+}
+
+body.admin-body .order-payment-inline-status.payment-paid {
+  border-color: #38b36b;
+  background: rgba(56,179,107,.13);
+  color: #75dda0;
+}
+
+body.admin-body.light-mode .order-payment-inline-status.payment-paid {
+  color: #126535;
+}
+
+body.admin-body .order-payment-inline-status.payment-failed,
+body.admin-body .order-payment-inline-status.payment-review {
+  border-color: #ec6759;
+  background: rgba(236,103,89,.13);
+  color: #ff9d92;
+}
+
+body.admin-body.light-mode .order-payment-inline-status.payment-failed,
+body.admin-body.light-mode .order-payment-inline-status.payment-review {
+  color: #8c241b;
+}
+
+
+/* ===== V70 · COBRO DIRECTO DENTRO DE LA COMANDA ===== */
+body.admin-body .order-inline-payment {
+  display: grid;
+  gap: 12px;
+  width: 100%;
+  margin-top: 14px;
+  border: 1px solid color-mix(in srgb, var(--accent) 32%, var(--line));
+  border-radius: 14px;
+  padding: 14px;
+  background: color-mix(in srgb, var(--surface) 91%, var(--accent) 9%);
+}
+
+body.admin-body .order-inline-payment-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+body.admin-body .order-inline-payment-head > div {
+  display: grid;
+  gap: 2px;
+}
+
+body.admin-body .order-inline-payment-head small {
+  color: var(--muted);
+  font-size: .76rem;
+  font-weight: 800;
+}
+
+body.admin-body .order-inline-payment-head strong {
+  font-size: 1.35rem;
+}
+
+body.admin-body .order-inline-payment-actions {
+  display: grid;
+  width: 100%;
+}
+
+body.admin-body .order-inline-payment-actions > button {
+  width: 100%;
+  min-height: 56px;
+  font-size: 1rem;
+  touch-action: manipulation;
+}
+
+body.admin-body .order-inline-payment-actions .clover-pay-btn {
+  border: 0;
+  background: linear-gradient(135deg, #167a3b, #22a85a);
+  color: #fff;
+  box-shadow: 0 10px 24px rgba(22,122,59,.22);
+}
+
+body.admin-body .order-inline-payment-actions .cash-pay-btn {
+  border: 0;
+  background: linear-gradient(135deg, #b87910, #e1a72d);
+  color: #171006;
+  box-shadow: 0 10px 24px rgba(184,121,16,.20);
+}
+
+body.admin-body .order-inline-payment-actions .danger-btn {
+  min-height: 56px;
+}
+
+body.admin-body .order-primary-actions {
+  grid-template-columns: minmax(0, 1fr) !important;
+}
+
+@media (max-width: 720px) {
+  body.admin-body .order-inline-payment {
+    padding: 12px;
+  }
+
+  body.admin-body .order-inline-payment-head {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  body.admin-body .order-inline-payment-head .payment-state {
+    align-self: stretch;
+    text-align: center;
+  }
+}
