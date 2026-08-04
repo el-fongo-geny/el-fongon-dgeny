@@ -1,4 +1,4 @@
-window.FOGON_MENU_BUILD = "65-stable-images-marketing";
+window.FOGON_MENU_BUILD = "66-ergonomic-ordering-ui";
 
 const state = {
   lang: localStorage.getItem("fogon_lang") || "",
@@ -593,16 +593,16 @@ function applyText() {
 
   if (heroSubtitle) {
     heroSubtitle.textContent = state.lang === "en"
-      ? "Add your favorite dishes, review your cart and pick up at the window."
-      : "Añade tus platos favoritos, revisa el carrito y recoge en la ventanilla.";
+      ? "Choose your favorites, customize and pick up at the window."
+      : "Elige tus favoritos, personaliza y recoge en la ventanilla.";
   }
 
-  document.querySelectorAll(".hero-steps span").forEach((step, index) => {
-    const labels = state.lang === "en"
-      ? ["Add", "Review", "Pick up"]
-      : ["Añade", "Revisa", "Recoge"];
-    const number = step.querySelector("strong")?.outerHTML || `<strong>${index + 1}</strong>`;
-    step.innerHTML = `${number} ${labels[index]}`;
+  const trustLabels = state.lang === "en"
+    ? ["Made to order", "Direct ordering", "Easy pickup"]
+    : ["Preparado al momento", "Pedido directo", "Recogida sencilla"];
+
+  document.querySelectorAll(".hero-trust-row span").forEach((step, index) => {
+    step.textContent = trustLabels[index] || "";
   });
 
   updateThemeButton();
@@ -781,66 +781,145 @@ function openProduct(itemId) {
   const extras = (item.extras || []).filter((extra) => isExtraAvailable(extra));
   const removables = (item.removables || []).filter((remove) => isRemovableAvailable(remove));
 
+  const optionGroupHtml = groups.map((group, groupIndex) => `
+    <fieldset class="modifier-group" data-required="${group.required ? "true" : "false"}">
+      <legend>
+        <span class="modifier-title">${escapeHtml(group[state.lang] || group.es)}</span>
+        <span class="modifier-badge ${group.required ? "is-required" : ""}">
+          ${group.required ? text("required") : text("optional")}
+        </span>
+      </legend>
+      <p class="modifier-help">
+        ${group.type === "multi"
+          ? (state.lang === "en" ? "Choose one or more options." : "Puedes elegir una o varias opciones.")
+          : (state.lang === "en" ? "Choose one option." : "Elige una opción.")}
+      </p>
+      <div class="modifier-options">
+        ${group.options.length ? group.options.map((option, optionIndex) => `
+          <label class="modifier-option">
+            <input
+              type="${group.type === "multi" ? "checkbox" : "radio"}"
+              name="${escapeAttribute(group.id)}"
+              value="${escapeAttribute(option.id)}"
+              ${group.required ? "required" : ""}
+            >
+            <span class="modifier-control" aria-hidden="true"></span>
+            <span class="modifier-option-copy">
+              <strong>${escapeHtml(option[state.lang] || option.es)}</strong>
+              ${Number(option.price || 0) !== 0
+                ? `<small>${Number(option.price) > 0 ? "+" : ""}${money(option.price)}</small>`
+                : `<small>${state.lang === "en" ? "Included" : "Incluido"}</small>`}
+            </span>
+          </label>
+        `).join("") : `<p class="choice-empty">${state.lang === "en" ? "Not available right now." : "No disponible por ahora."}</p>`}
+      </div>
+    </fieldset>
+  `).join("");
+
+  const extrasHtml = extras.length ? `
+    <fieldset class="modifier-group">
+      <legend>
+        <span class="modifier-title">${state.lang === "en" ? "Extras" : "Extras"}</span>
+        <span class="modifier-badge">${text("optional")}</span>
+      </legend>
+      <p class="modifier-help">${state.lang === "en" ? "Add something extra to your order." : "Añade algo extra a tu pedido."}</p>
+      <div class="modifier-options">
+        ${extras.map((extra) => `
+          <label class="modifier-option">
+            <input type="checkbox" name="extras" value="${escapeAttribute(extra.id)}">
+            <span class="modifier-control" aria-hidden="true"></span>
+            <span class="modifier-option-copy">
+              <strong>${escapeHtml(extra[state.lang] || extra.es)}</strong>
+              <small>${Number(extra.price || 0) > 0 ? "+" : ""}${money(extra.price || 0)}</small>
+            </span>
+          </label>
+        `).join("")}
+      </div>
+    </fieldset>
+  ` : "";
+
+  const removablesHtml = removables.length ? `
+    <fieldset class="modifier-group">
+      <legend>
+        <span class="modifier-title">${state.lang === "en" ? "Remove ingredients" : "Quitar ingredientes"}</span>
+        <span class="modifier-badge">${text("optional")}</span>
+      </legend>
+      <div class="modifier-options">
+        ${removables.map((remove) => `
+          <label class="modifier-option">
+            <input type="checkbox" name="removables" value="${escapeAttribute(remove.id)}">
+            <span class="modifier-control" aria-hidden="true"></span>
+            <span class="modifier-option-copy">
+              <strong>${escapeHtml(remove[state.lang] || remove.es)}</strong>
+            </span>
+          </label>
+        `).join("")}
+      </div>
+    </fieldset>
+  ` : "";
+
   modal.innerHTML = `
-    <div class="modal-sheet">
-      <button class="icon-btn modal-close" type="button" aria-label="Cerrar">×</button>
-      <div class="modal-hero">
-        <div class="product-image large">
-          ${item.image ? `<img src="${item.image}" alt="${itemName(item)}" onerror="this.closest('.product-image').classList.add('missing-image'); this.remove();">` : ""}
+    <div class="modal-sheet product-detail-sheet">
+      <button class="icon-btn modal-close" type="button" aria-label="${state.lang === "en" ? "Close" : "Cerrar"}">×</button>
+
+      <div class="product-detail-hero">
+        <div class="product-detail-image product-image ${item.image ? "is-loading" : "missing-image"}">
+          ${item.image ? `<img
+            src="${escapeAttribute(item.image)}"
+            alt="${escapeAttribute(itemName(item))}"
+            loading="eager"
+            fetchpriority="high"
+            decoding="async"
+            width="640"
+            height="557"
+            onload="handleProductImageLoad(this)"
+            onerror="handleProductImageError(this)"
+          >` : ""}
+          <span class="product-image-placeholder" aria-hidden="true">
+            <span class="product-image-placeholder-icon">FG</span>
+          </span>
         </div>
-        <div>
-          <h2>${itemName(item)}</h2>
-          <p>${itemDescription(item)}</p>
-          <strong>${money(item.price)}</strong>
+
+        <div class="product-detail-summary">
+          <p class="product-detail-kicker">${state.lang === "en" ? "Customize your dish" : "Personaliza tu plato"}</p>
+          <h2>${escapeHtml(itemName(item))}</h2>
+          <p>${escapeHtml(itemDescription(item))}</p>
+          <strong class="product-detail-price">${money(item.price)}</strong>
         </div>
       </div>
-      <form id="productForm" class="product-form">
-        ${groups.map((group) => `
-          <fieldset>
-            <legend>${group[state.lang] || group.es} <span>${group.required ? text("required") : text("optional")}</span></legend>
-            ${group.options.length ? group.options.map((option) => `
-              <label class="choice-row">
-                <input type="${group.type === "multi" ? "checkbox" : "radio"}" name="${group.id}" value="${option.id}" ${group.required ? "required" : ""}>
-                <span>${optionLabel(option)}</span>
-              </label>
-            `).join("") : `<p class="choice-empty">${state.lang === "en" ? "Not available right now." : "No disponible por ahora."}</p>`}
-          </fieldset>
-        `).join("")}
-        ${extras.length ? `
-          <fieldset>
-            <legend>Extras <span>${text("optional")}</span></legend>
-            ${extras.map((extra) => `
-              <label class="choice-row">
-                <input type="checkbox" name="extras" value="${extra.id}">
-                <span>${optionLabel(extra)}</span>
-              </label>
-            `).join("")}
-          </fieldset>
-        ` : ""}
-        ${removables.length ? `
-          <fieldset>
-            <legend>${state.lang === "en" ? "Remove ingredients" : "Quitar ingredientes"} <span>${text("optional")}</span></legend>
-            ${removables.map((remove) => `
-              <label class="choice-row">
-                <input type="checkbox" name="removables" value="${remove.id}">
-                <span>${remove[state.lang] || remove.es}</span>
-              </label>
-            `).join("")}
-          </fieldset>
-        ` : ""}
-        <label class="notes-label">
+
+      <form id="productForm" class="product-form product-detail-form">
+        <div class="modifier-groups">
+          ${optionGroupHtml}
+          ${extrasHtml}
+          ${removablesHtml}
+        </div>
+
+        <label class="notes-label product-notes">
           <span>${text("notes")}</span>
-          <textarea name="notes" rows="3"></textarea>
+          <small>${state.lang === "en" ? "Optional. Tell us anything the kitchen should know." : "Opcional. Dinos lo que debe saber la cocina."}</small>
+          <textarea name="notes" rows="3" placeholder="${state.lang === "en" ? "Example: sauce on the side" : "Ejemplo: salsa aparte"}"></textarea>
         </label>
-        <button class="primary-btn full sticky-add" type="submit">${text("addToCart")} · ${money(item.price)}</button>
+
+        <div class="product-submit-spacer" aria-hidden="true"></div>
+        <div class="product-submit-bar">
+          <div>
+            <small>${state.lang === "en" ? "Starting at" : "Desde"}</small>
+            <strong>${money(item.price)}</strong>
+          </div>
+          <button class="primary-btn product-submit-button" type="submit">
+            ${text("addToCart")}
+          </button>
+        </div>
       </form>
     </div>
   `;
+
+  hydrateRenderedProductImages(modal);
   $("#modalBackdrop").hidden = false;
   modal.setAttribute("aria-hidden", "false");
   document.body.classList.add("modal-open");
 }
-
 function closeProduct() {
   $("#productModal").setAttribute("aria-hidden", "true");
   $("#modalBackdrop").hidden = true;
@@ -1293,6 +1372,14 @@ async function saveOrder(paymentMethod) {
   }
 }
 
+
+function refreshModifierSelectionState(root = document) {
+  root.querySelectorAll(".modifier-option").forEach((row) => {
+    const input = row.querySelector("input");
+    row.classList.toggle("is-selected", Boolean(input?.checked));
+  });
+}
+
 function initEvents() {
   document.addEventListener("click", (event) => {
     const langButton = event.target.closest("[data-set-lang]");
@@ -1353,6 +1440,12 @@ function initEvents() {
 
     if (event.target.closest("#closeOrderThanksBtn")) {
       closePayment();
+    }
+  });
+
+  document.addEventListener("change", (event) => {
+    if (event.target.matches(".modifier-option input")) {
+      refreshModifierSelectionState(event.target.closest(".modifier-group") || document);
     }
   });
 
