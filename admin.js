@@ -76,7 +76,7 @@ function showLoginRuntimeError(error) {
   console.error("Error del administrador:", error);
 }
 
-window.FOGON_ADMIN_BUILD = "71-collapsible-order-cards";
+window.FOGON_ADMIN_BUILD = "72-management-payment-actions";
 
 if (!window.CSS) window.CSS = {};
 if (!window.CSS.escape) {
@@ -102,6 +102,7 @@ let adminPinInMemory = "";
   productos para Disponibilidad se cargan después desde admin-catalog.
 */
 let adminCatalogMenuItems = [];
+let adminCatalogInventoryItems = [];
 const BACKEND_URL = (window.FOGON_BACKEND_URL || "").replace(/\/$/, "");
 const ORDER_MODE_MANUAL_KEY = "system:orders-manual";
 const ORDER_MODE_OPEN_KEY = "system:orders-open";
@@ -412,6 +413,22 @@ async function loadAdminCatalogMenuItems() {
         en: String(product.name_en || product.name_es || product.id)
       }));
 
+    const inventory = Array.isArray(result?.catalog?.inventory)
+      ? result.catalog.inventory
+      : [];
+
+    adminCatalogInventoryItems = inventory
+      .filter((item) => item && item.id && item.active !== false)
+      .map((item) => ({
+        id: String(item.id).startsWith("inventory:")
+          ? String(item.id)
+          : `inventory:${String(item.id)}`,
+        es: String(item.name_es || item.name_en || item.id),
+        en: String(item.name_en || item.name_es || item.id),
+        group: String(item.group_name || "Inventario"),
+        sortOrder: Number(item.sort_order || 0)
+      }));
+
     renderAvailability();
     return adminCatalogMenuItems;
   } catch (error) {
@@ -425,6 +442,7 @@ async function loadAdminCatalogMenuItems() {
     );
 
     adminCatalogMenuItems = [];
+    adminCatalogInventoryItems = [];
     renderAvailability();
     return [];
   }
@@ -1118,13 +1136,6 @@ async function startCloverPayment(orderId, options = {}) {
     return { ok: false, reason: status };
   }
 
-  if (!automatic) {
-    const confirmed = confirm(
-      `¿Enviar el pedido #${order.id} por ${money(order.totals?.total)} al Clover?`
-    );
-    if (!confirmed) return { ok: false, reason: "cancelled_by_user" };
-  }
-
   paymentActionLocks.add(cleanOrderId);
   automaticCloverAttemptedAt.set(cleanOrderId, Date.now());
   renderOrders();
@@ -1323,16 +1334,18 @@ async function hidePaidOrder(orderId) {
     return;
   }
 
-  if (normalizePaymentStatus(order) !== "paid") {
-    alert("El pedido todavía no está marcado como cobrado.");
-    return;
-  }
+  const firstConfirmation = confirm(
+    `¿Quitar el pedido #${order.id} para todos los dispositivos?`
+  );
+  if (!firstConfirmation) return;
 
-  if (!confirm(
-    `¿Quitar el pedido #${order.id} para todos? La venta seguirá guardada en Supabase.`
-  )) return;
+  const secondConfirmation = confirm(
+    `CONFIRMACIÓN FINAL\n\nEl pedido #${order.id} desaparecerá de Pedidos, Cocina y Cobros para todos.\nLa venta seguirá guardada en Supabase.\n\n¿Confirmas que deseas quitarlo?`
+  );
+  if (!secondConfirmation) return;
 
   paymentActionLocks.add(cleanOrderId);
+  renderOrders();
   renderPayments();
 
   try {
@@ -1355,6 +1368,7 @@ async function hidePaidOrder(orderId) {
     alert(`No se pudo quitar el pedido.\n\n${error?.message || error}`);
   } finally {
     paymentActionLocks.delete(cleanOrderId);
+    renderOrders();
     renderPayments();
   }
 }
@@ -1984,40 +1998,59 @@ function paymentActionHtml(order) {
   const method = String(order.paymentMethod || "").toLowerCase();
   const status = normalizePaymentStatus(order);
   const busy = paymentActionLocks.has(String(order.id));
+  const removeButton = `<button class="secondary-btn danger-btn full remove-order-btn" data-hide-paid="${orderId}" type="button">Quitar pedido para todos</button>`;
 
   if (busy) {
-    return `<button class="primary-btn full" type="button" disabled>Procesando…</button>`;
+    return `
+      <button class="primary-btn full" type="button" disabled>Procesando…</button>
+      ${removeButton}
+    `;
   }
 
   if (method === "card") {
     if (status === "processing") {
-      return `<button class="primary-btn full" type="button" disabled>Esperando tarjeta en Clover…</button>`;
+      return `
+        <button class="primary-btn full clover-pay-btn" type="button" disabled>Esperando tarjeta en Clover…</button>
+        ${removeButton}
+      `;
     }
 
     if (status === "review") {
       return `
         <div class="payment-review-warning">
-          Revisa este cobro en Clover antes de intentar cualquier otro pago para este pedido.
+          Revisa este cobro en Clover antes de volver a cobrar.
         </div>
+        ${removeButton}
       `;
     }
 
     if (status === "paid") {
-      return `<button class="secondary-btn danger-btn full" data-hide-paid="${orderId}" type="button">Quitar pedido para todos</button>`;
+      return removeButton;
     }
 
-    return `<button class="primary-btn full clover-pay-btn" data-clover-pay="${orderId}" type="button">${status === "failed" || status === "cancelled" ? "Reintentar con Clover" : "Cobrar con Clover"}</button>`;
+    return `
+      <button class="primary-btn full clover-pay-btn" data-clover-pay="${orderId}" type="button">
+        ${status === "failed" || status === "cancelled" ? "Reintentar con Clover" : "Cobrar con Clover"}
+      </button>
+      ${removeButton}
+    `;
   }
 
   if (method === "cash") {
     if (status === "paid") {
-      return `<button class="secondary-btn danger-btn full" data-hide-paid="${orderId}" type="button">Quitar pedido para todos</button>`;
+      return removeButton;
     }
 
-    return `<button class="primary-btn full cash-pay-btn" data-cash-pay="${orderId}" type="button">Cobrar en efectivo</button>`;
+    return `
+      <button class="primary-btn full cash-pay-btn" data-cash-pay="${orderId}" type="button">Cobrar en efectivo</button>
+      ${removeButton}
+    `;
   }
 
-  return `<button class="secondary-btn full" type="button" disabled>Método de pago no indicado</button>`;
+  return `
+    <button class="secondary-btn full" type="button" disabled>Método de pago no indicado</button>
+    ${removeButton}
+  `;
 }
 
 function paymentQueuePriority(order) {
