@@ -1,3 +1,5 @@
+window.FOGON_MENU_BUILD = "65-stable-images-marketing";
+
 const state = {
   lang: localStorage.getItem("fogon_lang") || "",
   category: Array.isArray(CATEGORIES) && CATEGORIES.length ? CATEGORIES[0].id : "",
@@ -527,7 +529,7 @@ async function syncAvailabilityFromBackend() {
     try {
       const availability = await db.fetchAvailability();
       localStorage.setItem("fogon_availability", JSON.stringify(availability));
-      refreshAvailabilityIfChanged(true);
+      refreshAvailabilityIfChanged(false);
     } catch (error) {
       console.warn("No se pudo actualizar disponibilidad desde Supabase:", error);
     }
@@ -541,7 +543,7 @@ async function syncAvailabilityFromBackend() {
     const data = await response.json();
     if (data?.availability) {
       localStorage.setItem("fogon_availability", JSON.stringify(data.availability));
-      refreshAvailabilityIfChanged(true);
+      refreshAvailabilityIfChanged(false);
     }
   } catch (error) {
     console.warn("No se pudo actualizar disponibilidad desde el backend:", error);
@@ -550,10 +552,15 @@ async function syncAvailabilityFromBackend() {
 
 function refreshAvailabilityIfChanged(force = false) {
   const nextSnapshot = localStorage.getItem("fogon_availability") || "{}";
-  if (!force && nextSnapshot === lastAvailabilitySnapshot) return;
+  if (nextSnapshot === lastAvailabilitySnapshot) {
+    updateOrderingUi();
+    return false;
+  }
+
   lastAvailabilitySnapshot = nextSnapshot;
   renderMenu();
   updateOrderingUi();
+  return true;
 }
 
 function setLanguage(lang) {
@@ -575,6 +582,29 @@ function applyText() {
   $$(".lang-switch button").forEach((button) => {
     button.classList.toggle("active", button.dataset.setLang === state.lang);
   });
+  const heroTitle = document.querySelector('[data-i18n="heroTitle"]');
+  const heroSubtitle = document.querySelector('[data-i18n="heroSubtitle"]');
+
+  if (heroTitle) {
+    heroTitle.textContent = state.lang === "en"
+      ? "Order your favorites"
+      : "Haz tu pedido";
+  }
+
+  if (heroSubtitle) {
+    heroSubtitle.textContent = state.lang === "en"
+      ? "Add your favorite dishes, review your cart and pick up at the window."
+      : "Añade tus platos favoritos, revisa el carrito y recoge en la ventanilla.";
+  }
+
+  document.querySelectorAll(".hero-steps span").forEach((step, index) => {
+    const labels = state.lang === "en"
+      ? ["Add", "Review", "Pick up"]
+      : ["Añade", "Revisa", "Recoge"];
+    const number = step.querySelector("strong")?.outerHTML || `<strong>${index + 1}</strong>`;
+    step.innerHTML = `${number} ${labels[index]}`;
+  });
+
   updateThemeButton();
 }
 
@@ -606,14 +636,63 @@ function renderCategories() {
   `).join("");
 }
 
+
+const loadedImageUrls = new Set();
+
+function escapeAttribute(value) {
+  return String(value == null ? "" : value)
+    .replace(/&/g, "&amp;")
+    .replace(/"/g, "&quot;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+}
+
+function handleProductImageLoad(image) {
+  if (!image) return;
+  loadedImageUrls.add(String(image.currentSrc || image.src || ""));
+  image.classList.add("is-loaded");
+  const frame = image.closest(".product-image");
+  if (frame) {
+    frame.classList.add("has-loaded-image");
+    frame.classList.remove("is-loading", "missing-image");
+  }
+}
+
+function handleProductImageError(image) {
+  if (!image) return;
+  const frame = image.closest(".product-image");
+  if (frame) {
+    frame.classList.remove("is-loading", "has-loaded-image");
+    frame.classList.add("missing-image");
+  }
+  image.hidden = true;
+}
+
+function hydrateRenderedProductImages(root = document) {
+  root.querySelectorAll(".product-image img").forEach((image) => {
+    const currentUrl = String(image.currentSrc || image.src || "");
+    if (image.complete && image.naturalWidth > 0) {
+      handleProductImageLoad(image);
+      return;
+    }
+    if (loadedImageUrls.has(currentUrl)) {
+      image.classList.add("is-loaded");
+      image.closest(".product-image")?.classList.add("has-loaded-image");
+    }
+  });
+}
+
 function productCardHtml(item, imageIndex) {
   const unavailable = !isProductAvailable(item);
   const priorityImage = imageIndex < 6;
   return `
     <article class="product-card ${unavailable ? "is-unavailable" : ""}">
       <button class="product-trigger" data-product-id="${item.id}" ${unavailable ? "disabled" : ""}>
-        <div class="product-image">
-          ${item.image ? `<img src="${item.image}" alt="${itemName(item)}" loading="${priorityImage ? "eager" : "lazy"}" fetchpriority="${priorityImage ? "high" : "auto"}" decoding="async" width="640" height="557" onerror="this.closest('.product-image').classList.add('missing-image'); this.remove();">` : ""}
+        <div class="product-image ${item.image ? "is-loading" : "missing-image"}">
+          ${item.image ? `<img src="${escapeAttribute(item.image)}" alt="${escapeAttribute(itemName(item))}" loading="${priorityImage ? "eager" : "lazy"}" fetchpriority="${priorityImage ? "high" : "auto"}" decoding="async" width="640" height="557" onload="handleProductImageLoad(this)" onerror="handleProductImageError(this)">` : ""}
+          <span class="product-image-placeholder" aria-hidden="true">
+            <span class="product-image-placeholder-icon">FG</span>
+          </span>
         </div>
         <div class="product-info">
           <div>
@@ -648,6 +727,7 @@ function renderMenu() {
       </section>
     `;
   }).join("");
+  hydrateRenderedProductImages(grid);
   setupCategoryObserver();
 }
 
@@ -1318,7 +1398,7 @@ async function init() {
   applyTheme();
   initEvents();
   window.addEventListener("storage", (event) => {
-    if (event.key === "fogon_availability" || event.key === null) refreshAvailabilityIfChanged(true);
+    if (event.key === "fogon_availability") refreshAvailabilityIfChanged(false);
   });
   setInterval(refreshAvailabilityIfChanged, 1000);
   await loadPublicCatalog({ render: false, force: true });
@@ -1342,7 +1422,7 @@ async function init() {
     loadPublicCatalog({ render: true }).catch((error) => {
       console.warn("No se pudo refrescar el catálogo público:", error);
     });
-  }, 60000);
+  }, 180000);
 
   document.addEventListener("visibilitychange", () => {
     if (document.visibilityState === "visible") {
