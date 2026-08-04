@@ -698,3 +698,55 @@ body.admin-body [data-hide-paid] {
     grid-template-columns: 1fr !important;
   }
 }
+
+
+/* ===== V74 · SIN BOTÓN VISUAL DE MINIMIZAR + TIPO EN COCINA ===== */
+body.admin-body .order-card-summary.order-card-toggle-hint {
+  border: 0 !important;
+  border-top: 1px solid var(--line) !important;
+  border-radius: 0 !important;
+  padding: 10px 0 0 !important;
+  background: transparent !important;
+  color: var(--muted) !important;
+  font-size: .74rem !important;
+  font-weight: 800 !important;
+}
+
+body.admin-body .order-card-summary.order-card-toggle-hint > span:first-child,
+body.admin-body .order-card-summary.order-card-toggle-hint .order-chevron {
+  color: var(--muted) !important;
+}
+
+body.admin-body .kitchen-order-identity {
+  display: grid;
+  gap: 7px;
+}
+
+body.admin-body .kitchen-fulfillment-type {
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  min-height: 32px;
+  border: 1px solid color-mix(in srgb, var(--accent) 45%, var(--line));
+  border-radius: 999px;
+  padding: 5px 11px;
+  background: rgba(255,255,255,.09);
+  color: #fff;
+  font-size: .82rem;
+  font-weight: 950;
+}
+
+body.admin-body.light-mode .kitchen-order-card .kitchen-fulfillment-type {
+  background: color-mix(in srgb, var(--accent) 10%, #fff);
+  color: var(--ink);
+}
+
+@media (max-width: 720px) {
+  body.admin-body .kitchen-order-identity {
+    width: 100%;
+  }
+
+  body.admin-body .kitchen-fulfillment-type {
+    font-size: .78rem;
+  }
+}
