@@ -28,7 +28,7 @@
   <meta name="twitter:description" content="Autentica comida dominicana en San Jose, California.">
   <meta name="twitter:image" content="https://el-fongo-geny.github.io/el-fongon-dgeny/assets/images/logo.png">
 
-  <link rel="stylesheet" href="style.css?v=67-mobile-navigation-fixed">
+  <link rel="stylesheet" href="style.css?v=72-public-settings">
 
   <script type="application/ld+json">
   {
@@ -262,27 +262,28 @@
   </main>
 
   <section class="seo-local-content" aria-labelledby="seoLocalTitle">
-    <h2 id="seoLocalTitle">Comida dominicana y latina en San Jose, California</h2>
+    <h2 id="seoLocalTitle" data-business-setting="footer_title">Comida dominicana y latina en San Jose, California</h2>
 
-    <p>
+    <p id="seoParagraph1" data-business-setting="footer_paragraph_1">
       El Fogon D' Geny prepara autentica comida dominicana, latina y caribeña
       en el centro de San Jose. Nuestro menu incluye mofongo, mangu, sancocho,
       frituras dominicanas, carnes, arroces, habichuelas, desayunos y jugos naturales.
     </p>
 
-    <p>
+    <p id="seoParagraph2" data-business-setting="footer_paragraph_2">
       Si buscas comida dominicana sabrosa, comida latina o un restaurante
       dominicano en San Jose, visita El Fogon D' Geny.
     </p>
 
-    <address>796 S 1st St, San Jose, CA 95113</address>
+    <address id="businessAddress" data-business-setting="address">796 S 1st St, San Jose, CA 95113</address>
 
     <a
+      id="businessMapsLink"
       href="https://www.google.com/maps/search/?api=1&amp;query=El+Fogon+D%27+Geny+796+S+1st+St+San+Jose+CA+95113"
       target="_blank"
       rel="noopener noreferrer"
     >
-      Ver ubicacion en Google Maps
+      <span id="businessMapsLabel" data-business-setting="maps_label">Ver ubicacion en Google Maps</span>
     </a>
   </section>
 
@@ -371,6 +372,6 @@
   <script src="supabase-client.js?v=30-order-fix"></script>
   <script src="backend-config.js?v=18-mobile-fixed"></script>
   <script src="menu-data.js?v=60-public-catalog"></script>
-  <script src="app.js?v=67-mobile-navigation-fixed"></script>
+  <script src="app.js?v=72-public-settings"></script>
 </body>
 </html>
