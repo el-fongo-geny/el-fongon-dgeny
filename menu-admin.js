@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-window.FOGON_MENU_ADMIN_BUILD = "72-availability-business";
+window.FOGON_MENU_ADMIN_BUILD = "77-inventory-business";
 
   const $ = (selector) => document.querySelector(selector);
   const $$ = (selector) => Array.from(document.querySelectorAll(selector));
@@ -480,7 +480,7 @@ window.FOGON_MENU_ADMIN_BUILD = "72-availability-business";
       });
 
     if (!items.length) {
-      list.innerHTML = `<div class="empty-state"><h2>No hay elementos</h2><p>Crea el primer elemento de disponibilidad.</p></div>`;
+      list.innerHTML = `<div class="empty-state"><h2>No hay elementos</h2><p>Crea el primer artículo del inventario.</p></div>`;
       return;
     }
 
@@ -503,14 +503,44 @@ window.FOGON_MENU_ADMIN_BUILD = "72-availability-business";
     `).join("");
   }
 
+  function inventoryGroupNames() {
+    return Array.from(new Set((state.catalog.inventory || []).map((item) => String(item.group_name || "").trim()).filter(Boolean))).sort((a,b) => a.localeCompare(b,"es"));
+  }
+
+  function populateInventoryGroupSelect(selectedGroup = "") {
+    const select = $("#availabilityItemGroupSelect");
+    if (!select) return;
+    const groups = inventoryGroupNames();
+    const current = String(selectedGroup || "").trim();
+    if (current && !groups.includes(current)) groups.unshift(current);
+    if (!groups.length) groups.push("General");
+    select.innerHTML = groups.map((group) => `<option value="${escapeHtml(group)}">${escapeHtml(group)}</option>`).join("") + `<option value="__new__">+ Crear nuevo grupo</option>`;
+    select.value = current && groups.includes(current) ? current : groups[0];
+    toggleNewInventoryGroupField();
+  }
+
+  function toggleNewInventoryGroupField() {
+    const creating = $("#availabilityItemGroupSelect")?.value === "__new__";
+    const field = $("#availabilityNewGroupField");
+    const input = $("#availabilityItemNewGroup");
+    if (field) field.hidden = !creating;
+    if (!creating && input) input.value = "";
+    if (creating) input?.focus();
+  }
+
+  function selectedInventoryGroupName() {
+    const selected = String($("#availabilityItemGroupSelect")?.value || "").trim();
+    if (selected === "__new__") return String($("#availabilityItemNewGroup")?.value || "").trim() || "General";
+    return selected || "General";
+  }
+
   function openAvailabilityItemForm(item = null) {
     const form = $("#availabilityItemForm");
     if (!form) return;
 
     $("#availabilityItemOriginalId").value = item?.id || "";
     $("#availabilityItemNameEs").value = item?.name_es || "";
-    $("#availabilityItemNameEn").value = item?.name_en || item?.name_es || "";
-    $("#availabilityItemGroup").value = item?.group_name || "";
+    populateInventoryGroupSelect(item?.group_name || "General");
     $("#availabilityItemSort").value = Number(item?.sort_order || 0);
     $("#availabilityItemActive").checked = item?.active !== false;
     form.hidden = false;
@@ -539,15 +569,15 @@ window.FOGON_MENU_ADMIN_BUILD = "72-availability-business";
         item: {
           id: String($("#availabilityItemOriginalId")?.value || "").trim(),
           name_es: nameEs,
-          name_en: String($("#availabilityItemNameEn")?.value || "").trim() || nameEs,
-          group_name: String($("#availabilityItemGroup")?.value || "").trim() || "General",
+          name_en: nameEs,
+          group_name: selectedInventoryGroupName(),
           sort_order: Number($("#availabilityItemSort")?.value || 0),
           active: Boolean($("#availabilityItemActive")?.checked)
         }
       });
       closeAvailabilityItemForm();
       await loadCatalog({ preserveSelection: true });
-      toast("Elemento de disponibilidad guardado.");
+      toast("Artículo del inventario guardado.");
     } catch (error) {
       toast(`No se pudo guardar. ${menuAdminErrorMessage(error)}`, "error");
     } finally {
@@ -559,14 +589,14 @@ window.FOGON_MENU_ADMIN_BUILD = "72-availability-business";
     const item = (state.catalog.inventory || []).find((candidate) => String(candidate.id) === String(itemId));
     if (!item) return;
 
-    const first = confirm(`¿Eliminar “${availabilityItemLabel(item)}” de Disponibilidad?`);
+    const first = confirm(`¿Eliminar “${availabilityItemLabel(item)}” del Inventario?`);
     if (!first) return;
 
     setBusy(true);
     try {
       await callAdminCatalog("delete_inventory_item", { itemId });
       await loadCatalog({ preserveSelection: true });
-      toast("Elemento eliminado.");
+      toast("Artículo eliminado.");
     } catch (error) {
       toast(`No se pudo eliminar. ${menuAdminErrorMessage(error)}`, "error");
     } finally {
@@ -792,7 +822,7 @@ window.FOGON_MENU_ADMIN_BUILD = "72-availability-business";
       products: "Productos",
       categories: "Categorías",
       schedule: "Horario y cierres",
-      "availability-items": "Gestionar disponibilidad",
+      "availability-items": "Inventario",
       business: "Datos del menú"
     };
 
@@ -2132,6 +2162,7 @@ window.FOGON_MENU_ADMIN_BUILD = "72-availability-business";
     $("#newAvailabilityItemButton")?.addEventListener("click", () => openAvailabilityItemForm());
     $("#cancelAvailabilityItemButton")?.addEventListener("click", closeAvailabilityItemForm);
     $("#availabilityItemForm")?.addEventListener("submit", saveAvailabilityItem);
+    $("#availabilityItemGroupSelect")?.addEventListener("change", toggleNewInventoryGroupField);
     $("#availabilityItemSearch")?.addEventListener("input", (event) => {
       state.availabilityQuery = event.target.value || "";
       renderAvailabilityItems();
