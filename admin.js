@@ -76,7 +76,14 @@ function showLoginRuntimeError(error) {
   console.error("Error del administrador:", error);
 }
 
-window.FOGON_ADMIN_BUILD = "70-inline-payment-actions";
+window.FOGON_ADMIN_BUILD = "71-collapsible-order-cards";
+
+if (!window.CSS) window.CSS = {};
+if (!window.CSS.escape) {
+  window.CSS.escape = function (value) {
+    return String(value).replace(/["\\]/g, "\\$&");
+  };
+}
 
 
 const STORAGE_ORDERS = "fogon_orders";
@@ -174,6 +181,7 @@ let ordersRenderInitialized = false;
 let knownOrderIds = new Set();
 let lastOrdersRenderSignature = "";
 const paymentActionLocks = new Set();
+const expandedOrderIds = new Set();
 let automaticCloverQueueRunning = false;
 let automaticCloverQueueTimer = null;
 const automaticCloverAttemptedAt = new Map();
@@ -1826,6 +1834,38 @@ function updateElapsedLabels() {
   });
 }
 
+
+function toggleOrderCard(orderId) {
+  const cleanOrderId = String(orderId || "");
+  if (!cleanOrderId) return;
+
+  const card = document.querySelector(
+    `[data-order-card="${CSS.escape(cleanOrderId)}"]`
+  );
+
+  const body = card?.querySelector(".order-card-body");
+  const button = card?.querySelector("[data-toggle-order]");
+  const openLabel = card?.querySelector(".order-card-open-label");
+  const isExpanded = expandedOrderIds.has(cleanOrderId);
+
+  if (isExpanded) {
+    expandedOrderIds.delete(cleanOrderId);
+    card?.classList.remove("is-expanded");
+    card?.classList.add("is-collapsed");
+    if (body) body.hidden = true;
+    if (button) button.setAttribute("aria-expanded", "false");
+    if (openLabel) openLabel.textContent = "Abrir pedido";
+    return;
+  }
+
+  expandedOrderIds.add(cleanOrderId);
+  card?.classList.remove("is-collapsed");
+  card?.classList.add("is-expanded");
+  if (body) body.hidden = false;
+  if (button) button.setAttribute("aria-expanded", "true");
+  if (openLabel) openLabel.textContent = "Minimizar";
+}
+
 function renderOrders() {
   const orders = getOrders()
     .slice()
@@ -1846,6 +1886,9 @@ function renderOrders() {
 
   lastOrdersRenderSignature = renderSignature;
   knownOrderIds = new Set(orders.map((order) => String(order.id)));
+  Array.from(expandedOrderIds).forEach((orderId) => {
+    if (!knownOrderIds.has(orderId)) expandedOrderIds.delete(orderId);
+  });
   ordersRenderInitialized = true;
   updateCounters();
 
@@ -1853,12 +1896,21 @@ function renderOrders() {
     const orderId = String(order.id);
     const isNew = order.status === "new" || !order.status;
     const isReady = order.status === "ready";
+    const isExpanded = expandedOrderIds.has(orderId);
+    const totalQuantity = orderTotalQuantity(order.items);
     return `
     <article
-      class="order-card ${isNew ? "is-new" : "is-accepted"} is-expanded"
+      class="order-card ${isNew ? "is-new" : "is-accepted"} ${isExpanded ? "is-expanded" : "is-collapsed"}"
       data-order-card="${escapeHtml(orderId)}"
     >
-      <header class="order-card-toggle order-card-static-header">
+      <button
+        class="order-card-toggle"
+        type="button"
+        data-toggle-order="${escapeHtml(orderId)}"
+        aria-expanded="${isExpanded ? "true" : "false"}"
+        aria-controls="order-body-${escapeHtml(orderId)}"
+      >
+        <span class="order-card-accent" aria-hidden="true"></span>
         <span class="order-card-topline">
           <span class="order-number">#${escapeHtml(orderId)}</span>
           <span class="order-status ${statusClass(order)}">${statusLabel(order)}</span>
@@ -1869,12 +1921,17 @@ function renderOrders() {
           <span>${escapeHtml(orderTypeLabel(order))}</span>
         </span>
         <span class="order-card-summary">
-          ${orderTotalQuantity(order.items)} artículo${orderTotalQuantity(order.items) === 1 ? "" : "s"}
+          <span>${totalQuantity} artículo${totalQuantity === 1 ? "" : "s"}</span>
+          <span class="order-card-open-label">${isExpanded ? "Minimizar" : "Abrir pedido"}</span>
           <span class="order-chevron" aria-hidden="true">⌄</span>
         </span>
-      </header>
+      </button>
 
-      <div class="order-card-body">
+      <div
+        id="order-body-${escapeHtml(orderId)}"
+        class="order-card-body"
+        ${isExpanded ? "" : "hidden"}
+      >
         <div class="order-contact">
           <p class="order-fulfillment-type"><strong>Tipo de pedido:</strong> ${escapeHtml(orderTypeLabel(order))}</p>
           <p><strong>Teléfono:</strong> ${escapeHtml(order.customer?.phone || "Sin teléfono")}</p>
@@ -2495,6 +2552,13 @@ function init() {
   });
 
   document.addEventListener("click", (event) => {
+    const orderToggle = event.target.closest("[data-toggle-order]");
+    if (orderToggle) {
+      event.preventDefault();
+      toggleOrderCard(orderToggle.dataset.toggleOrder);
+      return;
+    }
+
     const tabButton = event.target.closest("[data-admin-tab]");
     if (tabButton) switchTab(tabButton.dataset.adminTab);
 
