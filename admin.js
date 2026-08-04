@@ -76,7 +76,7 @@ function showLoginRuntimeError(error) {
   console.error("Error del administrador:", error);
 }
 
-window.FOGON_ADMIN_BUILD = "79-remove-accepted-step";
+window.FOGON_ADMIN_BUILD = "80-panel-runtime-fixes";
 
 if (!window.CSS) window.CSS = {};
 if (!window.CSS.escape) {
@@ -762,6 +762,12 @@ function setKitchenHiddenIds(ids) {
   safeLocalSet(STORAGE_KITCHEN_HIDDEN, JSON.stringify(Array.from(new Set(ids))));
 }
 
+function isKitchenOrderHidden(orderId) {
+  return getKitchenHiddenIds().some(
+    (id) => String(id) === String(orderId)
+  );
+}
+
 function getSelectedKitchenOrderId() {
   return String(safeLocalGet(STORAGE_KITCHEN_SELECTED) || "");
 }
@@ -1043,40 +1049,66 @@ function updateAlarm() {
 
 async function acceptOrder(orderId) {
   const cleanOrderId = String(orderId || "");
-  const current = findOrder(cleanOrderId);
-  if (!current || String(current.status || "new") !== "new") return;
-
   const acceptedAt = new Date().toISOString();
-  const button = document.querySelector(`[data-accept-order="${CSS.escape(cleanOrderId)}"]`);
+  const button = document.querySelector(
+    `[data-accept-order="${CSS.escape(cleanOrderId)}"]`
+  );
+
   if (button) {
     button.disabled = true;
     button.textContent = "Aceptando…";
   }
 
   try {
-    await updateOrderStatusBackend(cleanOrderId, "accepted", { acceptedAt });
+    await updateOrderStatusBackend(
+      cleanOrderId,
+      "accepted",
+      { acceptedAt }
+    );
 
     const orders = getOrders().map((order) => (
       String(order.id) === cleanOrderId
-        ? { ...order, status: "accepted", acceptedAt }
+        ? {
+            ...order,
+            status: "accepted",
+            acceptedAt
+          }
         : order
     ));
 
-    saveOrders(orders);
-    stopAlarm();
+    setOrders(orders);
 
-    // Espera antes de consultar de nuevo para no recuperar por unos milisegundos
-    // el estado antiguo "new" desde Supabase.
-    setTimeout(() => {
-      void syncOrdersFromBackend();
-    }, 1200);
+    try {
+      renderOrders();
+      renderKitchen();
+      renderPayments();
+      updateAlarm();
+    } catch (renderError) {
+      console.warn(
+        "El pedido se aceptó, pero una sección no pudo redibujarse:",
+        renderError
+      );
+    }
+
+    try {
+      await syncOrdersFromBackend();
+    } catch (syncError) {
+      console.warn(
+        "El pedido se aceptó, pero falló la resincronización:",
+        syncError
+      );
+    }
   } catch (error) {
     console.error("No se pudo aceptar el pedido:", error);
+
     if (button) {
       button.disabled = false;
       button.textContent = "Aceptar pedido";
     }
-    alert(`No se pudo aceptar el pedido.\n\n${error?.message || error}`);
+
+    alert(
+      `No se pudo aceptar el pedido.\n\n${error?.message || error}`
+    );
   }
 }
 
@@ -1364,9 +1396,11 @@ async function confirmCashPayment(orderId) {
 
 async function hidePaidOrder(orderId) {
   const cleanOrderId = String(orderId || "");
+
   if (paymentActionLocks.has(cleanOrderId)) return;
 
   const order = findOrder(cleanOrderId);
+
   if (!order) {
     alert("No se encontró el pedido.");
     return;
@@ -1376,16 +1410,14 @@ async function hidePaidOrder(orderId) {
     `¿Quitar el pedido #${order.id} para todos?\n\n` +
     "Desaparecerá de Pedidos, Cocina y Cobros, pero la venta seguirá guardada en Supabase."
   );
+
   if (!confirmed) return;
 
   paymentActionLocks.add(cleanOrderId);
-  renderOrders();
-  renderPayments();
+
+  let removed = false;
 
   try {
-    let removed = false;
-    let protectedFunctionError = null;
-
     try {
       await callProtectedAdminFunction(
         "admin-order-payment",
@@ -1394,57 +1426,79 @@ async function hidePaidOrder(orderId) {
           order_id: requireDatabaseOrderId(order)
         }
       );
-      removed = true;
-    } catch (error) {
-      protectedFunctionError = error;
-      console.warn(
-        "admin-order-payment no respondió; intentando actualización directa en Supabase:",
-        error
-      );
-    }
 
-    if (!removed) {
+      removed = true;
+    } catch (functionError) {
+      console.warn(
+        "admin-order-payment no respondió; intentando actualización directa:",
+        functionError
+      );
+
       const db = window.FOGON_DB;
 
       if (!db?.isReady?.() || typeof db.hideOrderForAll !== "function") {
-        throw protectedFunctionError || new Error(
-          "No existe una vía disponible para ocultar el pedido."
-        );
+        throw functionError;
       }
 
       await db.hideOrderForAll(
         order.databaseId || order.id
       );
+
       removed = true;
     }
 
     if (!removed) {
-      throw new Error("Supabase no confirmó que el pedido fuera ocultado.");
+      throw new Error(
+        "Supabase no confirmó que el pedido fuera ocultado."
+      );
     }
 
     expandedOrderIds.delete(cleanOrderId);
 
     const nextOrders = getOrders().filter(
-      (candidate) => String(candidate.id) !== cleanOrderId
+      (candidate) =>
+        String(candidate.id) !== cleanOrderId
     );
 
     setOrders(nextOrders);
-    renderAll();
+
+    try {
+      renderOrders();
+      renderKitchen();
+      renderPayments();
+      updateCounters();
+    } catch (renderError) {
+      console.warn(
+        "El pedido se quitó, pero una sección no pudo redibujarse:",
+        renderError
+      );
+    }
 
     try {
       await syncOrdersFromBackend();
     } catch (syncError) {
-      console.warn("El pedido se ocultó, pero falló la resincronización:", syncError);
+      console.warn(
+        "El pedido se quitó, pero falló la resincronización:",
+        syncError
+      );
     }
   } catch (error) {
     console.error("No se pudo quitar el pedido:", error);
+
     alert(
       `No se pudo quitar el pedido.\n\n${error?.message || error}`
     );
   } finally {
     paymentActionLocks.delete(cleanOrderId);
-    renderOrders();
-    renderPayments();
+
+    if (!removed) {
+      try {
+        renderOrders();
+        renderPayments();
+      } catch (_) {
+        // No mostrar una segunda advertencia al usuario.
+      }
+    }
   }
 }
 
@@ -2390,6 +2444,104 @@ function renderKitchen() {
       </div>
     </article>
   `).join("") : `<p class="empty-state">No hay comandas pendientes.</p>`;
+
+  renderOrderModeButton();
+}
+
+
+function renderAvailability() {
+  const availability = getAvailability();
+  const query = availabilityQuery.trim().toLowerCase();
+
+  const menuItems = (Array.isArray(adminCatalogMenuItems)
+    ? adminCatalogMenuItems
+    : []
+  ).map((item) => ({
+    id: item.id,
+    es: item.es,
+    en: item.en || item.es,
+    group: "Productos del menú",
+    sortOrder: 0
+  }));
+
+  const inventorySource = adminCatalogInventoryItems.length
+    ? adminCatalogInventoryItems
+    : INVENTORY_ITEMS.map((item) => ({
+        ...item,
+        group: "Inventario",
+        sortOrder: 0
+      }));
+
+  const inventoryItems = inventorySource.map((item) => ({
+    ...item,
+    group: item.group || "Inventario"
+  }));
+
+  const items = [...menuItems, ...inventoryItems]
+    .filter((item) => {
+      const haystack = [
+        item.es,
+        item.en,
+        item.group
+      ].filter(Boolean).join(" ").toLowerCase();
+
+      return !query || haystack.includes(query);
+    })
+    .sort((left, right) => {
+      const groupComparison = String(left.group || "").localeCompare(
+        String(right.group || ""),
+        "es"
+      );
+
+      if (groupComparison) return groupComparison;
+
+      const orderComparison =
+        Number(left.sortOrder || 0) - Number(right.sortOrder || 0);
+
+      if (orderComparison) return orderComparison;
+
+      return String(left.es || "").localeCompare(
+        String(right.es || ""),
+        "es"
+      );
+    });
+
+  const availabilityList = $("#availabilityList");
+  if (!availabilityList) return;
+
+  const groups = Array.from(
+    new Set(items.map((item) => item.group || "Inventario"))
+  );
+
+  availabilityList.innerHTML = groups.map((group) => {
+    const groupItems = items.filter(
+      (item) => (item.group || "Inventario") === group
+    );
+
+    if (!groupItems.length) return "";
+
+    return `
+      <section class="availability-group">
+        <h3>${escapeHtml(group)}</h3>
+
+        ${groupItems.map((item) => {
+          const available = availability[item.id] !== false;
+
+          return `
+            <label class="availability-row">
+              <span>${escapeHtml(item.es || item.id)}</span>
+
+              <input
+                type="checkbox"
+                data-availability="${escapeHtml(item.id)}"
+                ${available ? "checked" : ""}
+              >
+            </label>
+          `;
+        }).join("")}
+      </section>
+    `;
+  }).join("");
 
   renderOrderModeButton();
 }
