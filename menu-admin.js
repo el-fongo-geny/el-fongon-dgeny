@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-window.FOGON_MENU_ADMIN_BUILD = "77-inventory-business";
+window.FOGON_MENU_ADMIN_BUILD = "83-weekly-schedule-editor";
 
   const $ = (selector) => document.querySelector(selector);
   const $$ = (selector) => Array.from(document.querySelectorAll(selector));
@@ -612,7 +612,10 @@ window.FOGON_MENU_ADMIN_BUILD = "77-inventory-business";
     footer_paragraph_2: "Si buscas comida dominicana sabrosa, comida latina o un restaurante dominicano en San Jose, visita El Fogon D' Geny.",
     address: "796 S 1st St, San Jose, CA 95113",
     maps_label: "Ver ubicación en Google Maps",
-    maps_url: "https://www.google.com/maps/search/?api=1&query=El+Fogon+D%27+Geny+796+S+1st+St+San+Jose+CA+95113"
+    maps_url: "https://www.google.com/maps/search/?api=1&query=El+Fogon+D%27+Geny+796+S+1st+St+San+Jose+CA+95113",
+    tax_enabled: false,
+    tax_rate: 10,
+    tax_only_taxable: true
   };
 
   function currentBusinessSettings() {
@@ -633,7 +636,20 @@ window.FOGON_MENU_ADMIN_BUILD = "77-inventory-business";
     $("#businessAddress").value = settings.address || "";
     $("#businessMapsLabel").value = settings.maps_label || "";
     $("#businessMapsUrl").value = settings.maps_url || "";
+    $("#businessTaxEnabled").checked = settings.tax_enabled === true;
+    $("#businessTaxRate").value = Number(settings.tax_rate || 10).toFixed(3);
+    $("#businessTaxOnlyTaxable").checked = settings.tax_only_taxable !== false;
+    updateTaxSettingsUi();
     form.dataset.loaded = "true";
+  }
+
+  function updateTaxSettingsUi() {
+    const enabled = Boolean($("#businessTaxEnabled")?.checked);
+    const fields = $("#taxRateFields");
+    const status = $("#taxEnabledStatus");
+
+    if (fields) fields.hidden = !enabled;
+    if (status) status.textContent = enabled ? "Activado" : "Desactivado";
   }
 
   async function saveBusinessSettings(event) {
@@ -646,7 +662,10 @@ window.FOGON_MENU_ADMIN_BUILD = "77-inventory-business";
       footer_paragraph_2: String($("#businessFooterParagraph2")?.value || "").trim(),
       address: String($("#businessAddress")?.value || "").trim(),
       maps_label: String($("#businessMapsLabel")?.value || "").trim(),
-      maps_url: String($("#businessMapsUrl")?.value || "").trim()
+      maps_url: String($("#businessMapsUrl")?.value || "").trim(),
+      tax_enabled: Boolean($("#businessTaxEnabled")?.checked),
+      tax_rate: Math.max(0, Math.min(20, Number($("#businessTaxRate")?.value || 10))),
+      tax_only_taxable: Boolean($("#businessTaxOnlyTaxable")?.checked)
     };
 
     setBusy(true);
@@ -712,10 +731,56 @@ window.FOGON_MENU_ADMIN_BUILD = "77-inventory-business";
   }
 
 
-  const WEEKLY_CLOSED_DAY_KEY = "system:weekly-closed-day";
+
+  const WEEKLY_SCHEDULE_DEFAULTS = {
+  "0": { open: true, start: "11:00", end: "20:30" },
+  "1": { open: true, start: "11:00", end: "20:30" },
+  "2": { open: false, start: "11:00", end: "20:30" },
+  "3": { open: true, start: "11:00", end: "20:30" },
+  "4": { open: true, start: "11:00", end: "20:30" },
+  "5": { open: true, start: "11:00", end: "20:30" },
+  "6": { open: true, start: "11:00", end: "20:30" }
+};
+
+  const WEEKDAY_NAMES = [
+    "Domingo",
+    "Lunes",
+    "Martes",
+    "Miércoles",
+    "Jueves",
+    "Viernes",
+    "Sábado"
+  ];
+
+  function normalizedScheduleSettings() {
+    const source = state.businessSettings?.weekly_schedule;
+    const schedule = source && typeof source === "object" ? source : {};
+
+    return Object.fromEntries(
+      Object.entries(WEEKLY_SCHEDULE_DEFAULTS).map(([day, fallback]) => {
+        const candidate = schedule[day] && typeof schedule[day] === "object"
+          ? schedule[day]
+          : {};
+
+        return [
+          day,
+          {
+            open: candidate.open !== false,
+            start: /^\d{2}:\d{2}$/.test(String(candidate.start || ""))
+              ? String(candidate.start)
+              : fallback.start,
+            end: /^\d{2}:\d{2}$/.test(String(candidate.end || ""))
+              ? String(candidate.end)
+              : fallback.end
+          }
+        ];
+      })
+    );
+  }
 
   function ensureScheduleView() {
     if ($("#scheduleView")) return;
+
     const nav = $(".sidebar-nav");
     const workspace = $(".workspace");
     if (!nav || !workspace) return;
@@ -724,7 +789,12 @@ window.FOGON_MENU_ADMIN_BUILD = "77-inventory-business";
     button.className = "nav-item";
     button.type = "button";
     button.dataset.view = "schedule";
-    button.innerHTML = `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M7 3v6M17 3v6M5 11h14v9H5z"/></svg><span>Horario y cierres</span>`;
+    button.innerHTML = `
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M4 6h16M7 3v6M17 3v6M5 11h14v9H5z"/>
+      </svg>
+      <span>Horario semanal</span>
+    `;
     nav.appendChild(button);
 
     const section = document.createElement("section");
@@ -734,67 +804,168 @@ window.FOGON_MENU_ADMIN_BUILD = "77-inventory-business";
     section.innerHTML = `
       <section class="content-card schedule-settings-card">
         <div class="schedule-settings-copy">
-          <p class="eyebrow">Operación del local</p>
-          <h2>Cierre semanal automático</h2>
-          <p>El día elegido permanecerá cerrado las 24 horas según California.</p>
+          <p class="eyebrow">Hora de California</p>
+          <h2>Días y horario de pedidos</h2>
+          <p>
+            Decide qué días se aceptan pedidos web y configura la hora
+            de apertura y cierre de cada día. Los días desactivados
+            permanecen cerrados durante 24 horas.
+          </p>
         </div>
-        <div class="schedule-settings-form">
-          <label class="field">
-            <span>Día semanal de cierre</span>
-            <select id="weeklyClosedDay" class="select-control">
-              <option value="-1">Ningún día</option>
-              <option value="0">Domingo</option>
-              <option value="1">Lunes</option>
-              <option value="2">Martes</option>
-              <option value="3">Miércoles</option>
-              <option value="4">Jueves</option>
-              <option value="5">Viernes</option>
-              <option value="6">Sábado</option>
-            </select>
-          </label>
-          <button id="saveWeeklyClosedDay" class="button button-primary" type="button">Guardar día de cierre</button>
-          <p id="weeklyClosedDayStatus" class="schedule-settings-status"></p>
-        </div>
-      </section>`;
+
+        <form id="weeklyScheduleForm" class="weekly-schedule-form">
+          <div id="weeklyScheduleRows" class="weekly-schedule-rows"></div>
+
+          <div class="weekly-schedule-actions">
+            <button
+              id="restoreDefaultScheduleButton"
+              class="button button-secondary"
+              type="button"
+            >
+              Restaurar horario recomendado
+            </button>
+
+            <button class="button button-primary" type="submit">
+              Guardar horario semanal
+            </button>
+          </div>
+
+          <p id="weeklyScheduleStatus" class="schedule-settings-status"></p>
+        </form>
+      </section>
+    `;
+
     workspace.appendChild(section);
   }
 
-  async function loadWeeklyClosedDay() {
-    const select = $("#weeklyClosedDay");
-    const status = $("#weeklyClosedDayStatus");
-    if (!select) return;
-    try {
-      const db = window.FOGON_DB;
-      if (!db?.isReady?.()) throw new Error("Supabase no está disponible.");
-      const availability = await db.fetchAvailability();
-      const value = Number(availability[WEEKLY_CLOSED_DAY_KEY]);
-      select.value = Number.isInteger(value) && value >= -1 && value <= 6 ? String(value) : "2";
-      if (status) status.textContent = "Configuración cargada.";
-    } catch (error) {
-      console.error(error);
-      if (status) status.textContent = "No se pudo cargar.";
-    }
+  function renderWeeklySchedule() {
+    const container = $("#weeklyScheduleRows");
+    if (!container) return;
+
+    const schedule = normalizedScheduleSettings();
+
+    container.innerHTML = WEEKDAY_NAMES.map((name, day) => {
+      const config = schedule[String(day)];
+      const isOpen = config.open !== false;
+
+      return `
+        <article class="weekly-schedule-row" data-schedule-day="${day}">
+          <label class="weekly-day-toggle">
+            <input
+              type="checkbox"
+              data-schedule-open="${day}"
+              ${isOpen ? "checked" : ""}
+            >
+            <span class="switch-control" aria-hidden="true"></span>
+            <strong>${name}</strong>
+            <small>${isOpen ? "Abierto" : "Cerrado todo el día"}</small>
+          </label>
+
+          <label class="field weekly-time-field">
+            <span>Abre</span>
+            <input
+              type="time"
+              data-schedule-start="${day}"
+              value="${config.start}"
+              ${isOpen ? "" : "disabled"}
+              required
+            >
+          </label>
+
+          <label class="field weekly-time-field">
+            <span>Cierra</span>
+            <input
+              type="time"
+              data-schedule-end="${day}"
+              value="${config.end}"
+              ${isOpen ? "" : "disabled"}
+              required
+            >
+          </label>
+        </article>
+      `;
+    }).join("");
   }
 
-  async function saveWeeklyClosedDay() {
-    const select = $("#weeklyClosedDay");
-    const status = $("#weeklyClosedDayStatus");
-    const button = $("#saveWeeklyClosedDay");
-    if (!select || !button) return;
-    button.disabled = true;
+  function readWeeklyScheduleForm() {
+    return Object.fromEntries(
+      WEEKDAY_NAMES.map((_, day) => {
+        const open = Boolean(
+          document.querySelector(`[data-schedule-open="${day}"]`)?.checked
+        );
+
+        return [
+          String(day),
+          {
+            open,
+            start: String(
+              document.querySelector(`[data-schedule-start="${day}"]`)?.value
+              || "11:00"
+            ),
+            end: String(
+              document.querySelector(`[data-schedule-end="${day}"]`)?.value
+              || "20:30"
+            )
+          }
+        ];
+      })
+    );
+  }
+
+  function updateScheduleRow(day) {
+    const openInput = document.querySelector(`[data-schedule-open="${day}"]`);
+    const startInput = document.querySelector(`[data-schedule-start="${day}"]`);
+    const endInput = document.querySelector(`[data-schedule-end="${day}"]`);
+    const row = document.querySelector(`[data-schedule-day="${day}"]`);
+    const status = row?.querySelector(".weekly-day-toggle small");
+    const open = Boolean(openInput?.checked);
+
+    if (startInput) startInput.disabled = !open;
+    if (endInput) endInput.disabled = !open;
+    if (status) status.textContent = open ? "Abierto" : "Cerrado todo el día";
+    row?.classList.toggle("is-closed", !open);
+  }
+
+  async function saveWeeklySchedule(event) {
+    event?.preventDefault();
+
+    const status = $("#weeklyScheduleStatus");
+    const form = $("#weeklyScheduleForm");
+    const submit = form?.querySelector('button[type="submit"]');
+
+    if (submit) submit.disabled = true;
     if (status) status.textContent = "Guardando…";
+
     try {
-      const db = window.FOGON_DB;
-      if (!db?.isReady?.()) throw new Error("Supabase no está disponible.");
-      await db.setAvailability(WEEKLY_CLOSED_DAY_KEY, Number(select.value));
-      if (status) status.textContent = "Día de cierre guardado.";
-      toast("Día de cierre guardado.", "success");
+      const weeklySchedule = readWeeklyScheduleForm();
+
+      const result = await callAdminCatalog("update_menu_settings", {
+        settings: {
+          weekly_schedule: weeklySchedule
+        }
+      });
+
+      state.businessSettings = {
+        ...(state.businessSettings || {}),
+        ...(result.settings || {}),
+        weekly_schedule: weeklySchedule
+      };
+
+      if (status) {
+        status.textContent =
+          "Horario guardado. Los cambios se aplican en hora de California.";
+      }
+
+      toast("Horario semanal guardado.", "success");
     } catch (error) {
       console.error(error);
-      if (status) status.textContent = "No se pudo guardar.";
-      toast("No se pudo guardar el día de cierre.", "error");
+      if (status) status.textContent = "No se pudo guardar el horario.";
+      toast(
+        `No se pudo guardar. ${menuAdminErrorMessage(error)}`,
+        "error"
+      );
     } finally {
-      button.disabled = false;
+      if (submit) submit.disabled = false;
     }
   }
 
@@ -821,7 +992,7 @@ window.FOGON_MENU_ADMIN_BUILD = "77-inventory-business";
     const titles = {
       products: "Productos",
       categories: "Categorías",
-      schedule: "Horario y cierres",
+      schedule: "Horario semanal",
       "availability-items": "Inventario",
       business: "Datos del menú"
     };
@@ -830,7 +1001,7 @@ window.FOGON_MENU_ADMIN_BUILD = "77-inventory-business";
     const addProductButton = $("#addProductButton");
     if (pageTitle) pageTitle.textContent = titles[view] || "Administración";
     if (addProductButton) addProductButton.hidden = view !== "products";
-    if (view === "schedule") loadWeeklyClosedDay();
+    if (view === "schedule") renderWeeklySchedule();
     if (view === "availability-items") renderAvailabilityItems();
     if (view === "business") fillBusinessSettingsForm(true);
 
@@ -2150,6 +2321,7 @@ window.FOGON_MENU_ADMIN_BUILD = "77-inventory-business";
   }
 
   function init() {
+    ensureScheduleView();
     const loginForm = $("#loginForm");
 
     if (!loginForm) {
@@ -2168,6 +2340,22 @@ window.FOGON_MENU_ADMIN_BUILD = "77-inventory-business";
       renderAvailabilityItems();
     });
     $("#businessSettingsForm")?.addEventListener("submit", saveBusinessSettings);
+    $("#weeklyScheduleForm")?.addEventListener("submit", saveWeeklySchedule);
+    $("#weeklyScheduleRows")?.addEventListener("change", (event) => {
+      const input = event.target.closest("[data-schedule-open]");
+      if (input) updateScheduleRow(input.dataset.scheduleOpen);
+    });
+    $("#restoreDefaultScheduleButton")?.addEventListener("click", () => {
+      state.businessSettings = {
+        ...(state.businessSettings || {}),
+        weekly_schedule: JSON.parse(JSON.stringify(WEEKLY_SCHEDULE_DEFAULTS))
+      };
+      renderWeeklySchedule();
+      const status = $("#weeklyScheduleStatus");
+      if (status) status.textContent =
+        "Horario recomendado cargado. Pulsa Guardar para aplicarlo.";
+    });
+    $("#businessTaxEnabled")?.addEventListener("change", updateTaxSettingsUi);
     $("#resetBusinessSettingsButton")?.addEventListener("click", () => {
       state.businessSettings = { ...BUSINESS_DEFAULTS };
       const form = $("#businessSettingsForm");
