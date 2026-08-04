@@ -1,4 +1,4 @@
-window.FOGON_MENU_BUILD = "83-weekly-california-schedule";
+window.FOGON_MENU_BUILD = "85-no-zoom-locked-product";
 
 const state = {
   lang: localStorage.getItem("fogon_lang") || "",
@@ -1562,6 +1562,31 @@ function refreshModifierSelectionState(root = document) {
   });
 }
 
+
+function preventMenuZoomGestures() {
+  document.addEventListener("gesturestart", (event) => {
+    event.preventDefault();
+  }, { passive: false });
+
+  document.addEventListener("gesturechange", (event) => {
+    event.preventDefault();
+  }, { passive: false });
+
+  document.addEventListener("gestureend", (event) => {
+    event.preventDefault();
+  }, { passive: false });
+
+  let lastTouchEnd = 0;
+
+  document.addEventListener("touchend", (event) => {
+    const now = Date.now();
+    if (now - lastTouchEnd <= 280) {
+      event.preventDefault();
+    }
+    lastTouchEnd = now;
+  }, { passive: false });
+}
+
 function initEvents() {
   document.addEventListener("click", (event) => {
     const langButton = event.target.closest("[data-set-lang]");
@@ -1581,7 +1606,17 @@ function initEvents() {
       return;
     }
 
-    if (event.target.closest(".modal-close") || event.target === $("#modalBackdrop")) closeProduct();
+    if (event.target.closest(".modal-close")) {
+      event.preventDefault();
+      closeProduct();
+      return;
+    }
+
+    if (event.target === $("#modalBackdrop")) {
+      event.preventDefault();
+      event.stopPropagation();
+      return;
+    }
     if (event.target.closest("#cartFab")) {
       if (document.body.classList.contains("cart-open")) {
         closeCart();
@@ -1676,6 +1711,7 @@ function initEvents() {
 async function init() {
   applyTheme();
   void loadPublicBusinessSettings();
+  preventMenuZoomGestures();
   initEvents();
   window.addEventListener("storage", (event) => {
     if (event.key === "fogon_availability") refreshAvailabilityIfChanged(false);
