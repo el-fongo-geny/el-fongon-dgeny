@@ -76,7 +76,7 @@ function showLoginRuntimeError(error) {
   console.error("Error del administrador:", error);
 }
 
-window.FOGON_ADMIN_BUILD = "54-fullscreen-static-orders";
+window.FOGON_ADMIN_BUILD = "57-quantity-grouped-items";
 
 
 const STORAGE_ORDERS = "fogon_orders";
@@ -1232,7 +1232,70 @@ function initKitchenGesturesAndMissingButton() {
   document.addEventListener("touchcancel", finishKitchenSwipe);
 }
 
-function orderTypeLabel(type) {
+function resolveOrderType(order) {
+  const firstItem = Array.isArray(order?.items) ? order.items[0] : null;
+  const raw = order?.raw && typeof order.raw === "object" ? order.raw : {};
+
+  const candidates = [
+    order?.orderType,
+    order?.order_type,
+    order?.fulfillmentType,
+    order?.fulfillment_type,
+    order?.serviceType,
+    order?.service_type,
+    raw?.orderType,
+    raw?.order_type,
+    raw?.fulfillmentType,
+    raw?.fulfillment_type,
+    firstItem?.orderType,
+    firstItem?.order_type,
+    firstItem?.fulfillmentType,
+    firstItem?.fulfillment_type
+  ];
+
+  for (const candidate of candidates) {
+    const normalized = String(candidate || "")
+      .trim()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toLowerCase()
+      .replace(/[_\s]+/g, "-");
+
+    if (!normalized) continue;
+
+    if (
+      normalized === "dine-in" ||
+      normalized === "dinein" ||
+      normalized === "for-here" ||
+      normalized === "here" ||
+      normalized === "para-aqui" ||
+      normalized === "comer-aqui" ||
+      normalized === "local"
+    ) {
+      return "dine-in";
+    }
+
+    if (
+      normalized === "takeout" ||
+      normalized === "take-out" ||
+      normalized === "to-go" ||
+      normalized === "togo" ||
+      normalized === "para-llevar" ||
+      normalized === "pickup" ||
+      normalized === "pick-up"
+    ) {
+      return "takeout";
+    }
+  }
+
+  return "";
+}
+
+function orderTypeLabel(typeOrOrder) {
+  const type = typeof typeOrOrder === "object"
+    ? resolveOrderType(typeOrOrder)
+    : resolveOrderType({ orderType: typeOrOrder });
+
   if (type === "dine-in") return "Para aquí";
   if (type === "takeout") return "Para llevar";
   return "No indicado";
@@ -1256,6 +1319,53 @@ function statusClass(order) {
   if (status === "ready") return "ready";
   if (status === "accepted") return "accepted";
   return "new";
+}
+
+function adminItemConfigurationKey(item) {
+  return JSON.stringify({
+    productId: String(item?.productId || item?.product_id || item?.nameEs || item?.name || ""),
+    name: String(item?.nameEs || item?.name || ""),
+    selections: (item?.selections || []).map((selection) => ({
+      group: String(selection.groupEs || selection.group || ""),
+      name: String(selection.nameEs || selection.name || ""),
+      price: Number(selection.price || 0)
+    })),
+    extras: (item?.extras || []).map((extra) => ({
+      name: String(extra.nameEs || extra.name || ""),
+      price: Number(extra.price || 0)
+    })),
+    removables: (item?.removables || []).map((remove) =>
+      typeof remove === "string" ? remove : String(remove.nameEs || remove.name || "")
+    ),
+    notes: String(item?.notes || "").trim(),
+    lineTotal: Number(item?.lineTotal || 0)
+  });
+}
+
+function aggregateOrderItems(items) {
+  const grouped = new Map();
+
+  (Array.isArray(items) ? items : []).forEach((item) => {
+    const key = adminItemConfigurationKey(item);
+    const quantity = Math.max(1, Number(item?.quantity || 1));
+
+    if (!grouped.has(key)) {
+      grouped.set(key, { ...item, quantity });
+      return;
+    }
+
+    const existing = grouped.get(key);
+    existing.quantity = Number(existing.quantity || 1) + quantity;
+  });
+
+  return Array.from(grouped.values());
+}
+
+function orderTotalQuantity(items) {
+  return aggregateOrderItems(items).reduce(
+    (total, item) => total + Math.max(1, Number(item.quantity || 1)),
+    0
+  );
 }
 
 function itemDetailsHtml(item, compact = false) {
@@ -1371,23 +1481,24 @@ function renderOrders() {
         <span class="order-customer-name">${escapeHtml(order.customer?.name || "Sin nombre")}</span>
         <span class="order-card-meta">
           <span data-order-elapsed="${escapeHtml(orderId)}">${escapeHtml(orderElapsedLabel(order))}</span>
-          <span>${escapeHtml(orderTypeLabel(order.orderType || ((order.items || [])[0] || {}).orderType))}</span>
+          <span>${escapeHtml(orderTypeLabel(order))}</span>
         </span>
         <span class="order-card-summary">
-          ${(order.items || []).length} artículo${(order.items || []).length === 1 ? "" : "s"}
+          ${orderTotalQuantity(order.items)} artículo${orderTotalQuantity(order.items) === 1 ? "" : "s"}
           <span class="order-chevron" aria-hidden="true">⌄</span>
         </span>
       </header>
 
       <div class="order-card-body">
         <div class="order-contact">
+          <p class="order-fulfillment-type"><strong>Tipo de pedido:</strong> ${escapeHtml(orderTypeLabel(order))}</p>
           <p><strong>Teléfono:</strong> ${escapeHtml(order.customer?.phone || "Sin teléfono")}</p>
           <p><strong>Pago:</strong> ${escapeHtml(paymentLabel(order.paymentMethod))}</p>
           <p><strong>Entrada:</strong> ${escapeHtml(new Date(order.createdAt).toLocaleString())}</p>
         </div>
 
         <div class="order-items">
-          ${(order.items || []).map((item) => itemDetailsHtml(item)).join("")}
+          ${aggregateOrderItems(order.items).map((item) => itemDetailsHtml(item)).join("")}
         </div>
 
         <div class="order-total">
@@ -1426,7 +1537,7 @@ function renderKitchen() {
         <span>${statusLabel(order)}</span>
       </div>
       <div class="kitchen-items">
-        ${(order.items || []).map((item) => itemDetailsHtml(item, true)).join("")}
+        ${aggregateOrderItems(order.items).map((item) => itemDetailsHtml(item, true)).join("")}
       </div>
       <p class="kitchen-swipe-hint">Toca para preparar · desliza a la izquierda para retirar de Cocina</p>
       <button class="secondary-btn full" data-kitchen-done="${escapeHtml(order.id)}" type="button">Terminado en cocina</button>
