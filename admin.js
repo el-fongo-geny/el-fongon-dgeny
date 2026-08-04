@@ -76,7 +76,7 @@ function showLoginRuntimeError(error) {
   console.error("Error del administrador:", error);
 }
 
-window.FOGON_ADMIN_BUILD = "68-clover-payment-queue-merged";
+window.FOGON_ADMIN_BUILD = "69-auto-clover-priority-queue";
 
 
 const STORAGE_ORDERS = "fogon_orders";
@@ -174,6 +174,10 @@ let ordersRenderInitialized = false;
 let knownOrderIds = new Set();
 let lastOrdersRenderSignature = "";
 const paymentActionLocks = new Set();
+let automaticCloverQueueRunning = false;
+let automaticCloverQueueTimer = null;
+const automaticCloverAttemptedAt = new Map();
+const AUTOMATIC_CLOVER_RETRY_MS = 8000;
 
 function applyAdminTheme() {
   const theme = safeLocalGet(STORAGE_ADMIN_THEME) || "dark";
@@ -579,6 +583,7 @@ async function syncOrdersFromBackend() {
     if (stableOrdersSignature(currentOrders) === stableOrdersSignature(nextOrders)) {
       updateElapsedLabels();
       updateAlarm();
+      scheduleAutomaticCloverQueue(300);
       return false;
     }
 
@@ -586,6 +591,7 @@ async function syncOrdersFromBackend() {
     renderOrders();
     renderKitchen();
     renderPayments();
+    scheduleAutomaticCloverQueue(300);
     return true;
   }
 
@@ -983,18 +989,30 @@ function updateAlarm() {
 }
 
 async function acceptOrder(orderId) {
+  const cleanOrderId = String(orderId || "");
   const acceptedAt = new Date().toISOString();
   const orders = getOrders().map((order) => (
-    order.id === orderId
+    String(order.id) === cleanOrderId
       ? { ...order, status: "accepted", acceptedAt }
       : order
   ));
+
   saveOrders(orders);
+
   try {
-    await updateOrderStatusBackend(orderId, "accepted", { acceptedAt });
+    await updateOrderStatusBackend(cleanOrderId, "accepted", { acceptedAt });
     await syncOrdersFromBackend();
+
+    const acceptedOrder = findOrder(cleanOrderId);
+    if (
+      acceptedOrder &&
+      String(acceptedOrder.paymentMethod || "").toLowerCase() === "card" &&
+      normalizePaymentStatus(acceptedOrder) !== "paid"
+    ) {
+      scheduleAutomaticCloverQueue(0);
+    }
   } catch (error) {
-    console.warn("No se pudo actualizar pedido en Supabase:", error);
+    console.warn("No se pudo aceptar el pedido o colocarlo en la cola Clover:", error);
   }
 }
 
@@ -1062,70 +1080,186 @@ function requireDatabaseOrderId(order) {
   return databaseId;
 }
 
-async function startCloverPayment(orderId) {
+async function startCloverPayment(orderId, options = {}) {
   const cleanOrderId = String(orderId || "");
-  if (paymentActionLocks.has(cleanOrderId)) return;
+  const automatic = options.automatic === true;
+
+  if (paymentActionLocks.has(cleanOrderId)) {
+    return { ok: false, reason: "locked" };
+  }
 
   const order = findOrder(cleanOrderId);
+
   if (!order) {
-    alert("No se encontró el pedido.");
-    return;
+    if (!automatic) alert("No se encontró el pedido.");
+    return { ok: false, reason: "not_found" };
   }
 
   if (String(order.paymentMethod || "").toLowerCase() !== "card") {
-    alert("Este pedido no fue marcado para pago con tarjeta.");
-    return;
+    if (!automatic) alert("Este pedido no fue marcado para pago con tarjeta.");
+    return { ok: false, reason: "not_card" };
   }
 
-  if (!confirm(
-    `¿Enviar el pedido #${order.id} por ${money(order.totals?.total)} al Clover?`
-  )) return;
+  const status = normalizePaymentStatus(order);
+
+  if (status === "paid") {
+    return { ok: true, reason: "already_paid" };
+  }
+
+  if (status === "processing" || status === "review") {
+    return { ok: false, reason: status };
+  }
+
+  if (!automatic) {
+    const confirmed = confirm(
+      `¿Enviar el pedido #${order.id} por ${money(order.totals?.total)} al Clover?`
+    );
+    if (!confirmed) return { ok: false, reason: "cancelled_by_user" };
+  }
 
   paymentActionLocks.add(cleanOrderId);
+  automaticCloverAttemptedAt.set(cleanOrderId, Date.now());
+  renderOrders();
   renderPayments();
 
   try {
     const result = await callProtectedAdminFunction(
       "clover-start-payment",
-      { order_id: requireDatabaseOrderId(order) }
+      {
+        order_id: requireDatabaseOrderId(order),
+        queue_if_busy: true,
+        priority: "latest"
+      }
     );
 
     await syncOrdersFromBackend();
 
-    if (result?.warning) {
-      alert(
-        `El pago fue aprobado, pero requiere atención.\n\n${result.warning}`
-      );
-      return;
-    }
-
-    alert(
-      `Pago aprobado para el pedido #${order.id}. ` +
-      "El pedido fue quitado automáticamente para todos."
-    );
+    return {
+      ok: true,
+      queued: Boolean(result?.queued),
+      result
+    };
   } catch (error) {
-    console.error("Falló el cobro con Clover:", error);
+    console.error("Falló el envío automático a Clover:", error);
     await syncOrdersFromBackend();
 
     const code = String(error?.payload?.error || "");
-    const message = error?.message || String(error);
+    const busy =
+      code === "clover_busy" ||
+      code === "active_payment_exists" ||
+      Number(error?.status || 0) === 409 ||
+      Boolean(error?.payload?.active_public_id);
 
-    if (code === "payment_state_indeterminate" || code === "payment_requires_review") {
-      alert(
-        `No vuelvas a cobrar el pedido #${order.id} todavía.\n\n` +
-        "Revisa la transacción en Clover y el estado mostrado en la pestaña Cobros.\n\n" +
-        message
-      );
-      return;
+    if (busy) {
+      /*
+        Clover solo puede presentar un cobro físico a la vez.
+        El pedido nuevo conserva estado pending y tendrá prioridad
+        en el siguiente intento automático.
+      */
+      return {
+        ok: false,
+        queued: true,
+        reason: "clover_busy",
+        activePublicId: error?.payload?.active_public_id || null
+      };
     }
 
-    alert(`No se pudo completar el cobro.\n\n${message}`);
+    const indeterminate =
+      code === "payment_state_indeterminate" ||
+      code === "payment_requires_review";
+
+    if (!automatic && indeterminate) {
+      alert(
+        `No vuelvas a cobrar el pedido #${order.id} todavía.\n\n` +
+        "Revisa la transacción en Clover antes de repetirla."
+      );
+    } else if (!automatic) {
+      alert(`No se pudo enviar el cobro a Clover.\n\n${error?.message || error}`);
+    }
+
+    return {
+      ok: false,
+      reason: indeterminate ? "review" : "error",
+      error
+    };
   } finally {
     paymentActionLocks.delete(cleanOrderId);
+    renderOrders();
     renderPayments();
+    scheduleAutomaticCloverQueue(AUTOMATIC_CLOVER_RETRY_MS);
   }
 }
 
+function automaticCloverCandidates() {
+  return getOrders()
+    .filter((order) => {
+      const method = String(order.paymentMethod || "").toLowerCase();
+      const status = normalizePaymentStatus(order);
+      const accepted = order.status === "accepted" || order.status === "ready";
+
+      return (
+        method === "card" &&
+        accepted &&
+        !order.hiddenForAll &&
+        ["pending", "failed", "cancelled"].includes(status)
+      );
+    })
+    .sort((left, right) =>
+      orderCreatedTimestamp(right) - orderCreatedTimestamp(left)
+    );
+}
+
+function scheduleAutomaticCloverQueue(delay = 250) {
+  if (automaticCloverQueueTimer) {
+    clearTimeout(automaticCloverQueueTimer);
+  }
+
+  automaticCloverQueueTimer = setTimeout(() => {
+    automaticCloverQueueTimer = null;
+    void processAutomaticCloverQueue();
+  }, Math.max(0, Number(delay || 0)));
+}
+
+async function processAutomaticCloverQueue() {
+  if (automaticCloverQueueRunning || !adminPinInMemory) return;
+
+  const orders = getOrders();
+  const active = orders.find(
+    (order) => normalizePaymentStatus(order) === "processing"
+  );
+
+  /*
+    Nunca se interrumpe a ciegas un cobro que ya está visible
+    en el terminal. El pedido más nuevo queda primero y se envía
+    inmediatamente cuando Clover deja de estar procesando.
+  */
+  if (active) {
+    scheduleAutomaticCloverQueue(AUTOMATIC_CLOVER_RETRY_MS);
+    return;
+  }
+
+  const candidate = automaticCloverCandidates()[0];
+  if (!candidate) return;
+
+  const lastAttempt = Number(
+    automaticCloverAttemptedAt.get(String(candidate.id)) || 0
+  );
+
+  if (Date.now() - lastAttempt < AUTOMATIC_CLOVER_RETRY_MS) {
+    scheduleAutomaticCloverQueue(
+      AUTOMATIC_CLOVER_RETRY_MS - (Date.now() - lastAttempt)
+    );
+    return;
+  }
+
+  automaticCloverQueueRunning = true;
+
+  try {
+    await startCloverPayment(candidate.id, { automatic: true });
+  } finally {
+    automaticCloverQueueRunning = false;
+  }
+}
 async function confirmCashPayment(orderId) {
   const cleanOrderId = String(orderId || "");
   if (paymentActionLocks.has(cleanOrderId)) return;
@@ -1765,8 +1899,12 @@ function renderOrders() {
         ${!isNew ? `
           <div class="order-actions-row">
             <button class="secondary-btn" data-ready-order="${escapeHtml(orderId)}" type="button">Pedido listo / Enviar WhatsApp</button>
-            <button class="secondary-btn" data-admin-tab-jump="payments" type="button">Ir a Cobros</button>
           </div>
+          <p class="order-payment-inline-status payment-${paymentStatusClass(order)}">
+            ${String(order.paymentMethod || "").toLowerCase() === "card"
+              ? `Clover: ${escapeHtml(paymentStatusLabel(order))}`
+              : `Pago: ${escapeHtml(paymentLabel(order.paymentMethod))}`}
+          </p>
         ` : ""}
       </div>
     </article>`;
