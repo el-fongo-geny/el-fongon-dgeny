@@ -948,3 +948,36 @@ body.admin-body .workflow-complete-btn {
 body.admin-body.light-mode .workflow-complete-btn {
   color: #17683a !important;
 }
+
+
+/* ===== V83 · TIPO DE PEDIDO COMO ESTADO PRINCIPAL EN COCINA ===== */
+body.admin-body .kitchen-order-head {
+  align-items: flex-start !important;
+}
+
+body.admin-body .kitchen-order-head > .kitchen-fulfillment-type {
+  flex: 0 0 auto;
+  margin-left: auto;
+  background: color-mix(in srgb, var(--accent) 18%, var(--surface));
+  border-color: color-mix(in srgb, var(--accent) 52%, var(--line));
+  color: var(--ink);
+  font-size: .88rem;
+  font-weight: 950;
+}
+
+body.admin-body.dark-mode .kitchen-order-head > .kitchen-fulfillment-type {
+  color: #fff;
+}
+
+@media (max-width: 720px) {
+  body.admin-body .kitchen-order-head {
+    display: flex !important;
+    flex-direction: row !important;
+    align-items: flex-start !important;
+  }
+
+  body.admin-body .kitchen-order-head > .kitchen-fulfillment-type {
+    max-width: 52%;
+    text-align: center;
+  }
+}
