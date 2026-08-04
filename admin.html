@@ -6,7 +6,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#111111">
   <title>Panel iPad | El Fogon D' Geny</title>
-  <link rel="stylesheet" href="style.css?v=57-quantity-grouped-items">
+  <link rel="stylesheet" href="style.css?v=68-clover-payment-queue-merged">
   <style>
     .admin-build-label {
       margin: 12px 0 0;
@@ -41,7 +41,7 @@
       </label>
       <button id="loginButton" class="primary-btn full" type="button">Entrar</button>
       <p id="pinError" class="error-text" hidden>PIN incorrecto.</p>
-      <p id="adminBuildLabel" class="admin-build-label">Acceso V57 · sesión de 8 horas</p>
+      <p id="adminBuildLabel" class="admin-build-label">Acceso V68 · sesión de 8 horas</p>
     </form>
   </main>
 
@@ -49,10 +49,11 @@
     <header class="admin-header">
       <div>
         <p class="eyebrow">Panel iPad</p>
-        <h1>Pedidos, cocina y disponibilidad</h1>
+        <h1>Pedidos, cocina, cobros y disponibilidad</h1>
         <div class="admin-stats">
           <span class="admin-pill">Pendientes: <strong id="pendingCount">0</strong></span>
           <span class="admin-pill">En cocina: <strong id="kitchenCount">0</strong></span>
+          <span class="admin-pill">Por cobrar: <strong id="paymentCount">0</strong></span>
         </div>
       </div>
       <div class="admin-actions">
@@ -81,6 +82,7 @@
     <nav class="admin-tabs" aria-label="Secciones del panel">
       <button class="admin-tab active" type="button" data-admin-tab="orders">Pedidos</button>
       <button class="admin-tab" type="button" data-admin-tab="kitchen">Cocina</button>
+      <button class="admin-tab" type="button" data-admin-tab="payments">Cobros</button>
       <button class="admin-tab" type="button" data-admin-tab="availability">Disponibilidad</button>
     </nav>
 
@@ -90,7 +92,7 @@
           <h2>Pedidos recibidos</h2>
           <span id="orderCount">0</span>
         </div>
-        <p class="admin-help">Aquí se ve el pedido completo: cliente, teléfono, total, pago y estado. Cuando marques “Entregado / quitar”, desaparece para todos.</p>
+        <p class="admin-help">Aquí se ve el pedido completo: cliente, teléfono, total, pago y estado. Los cobros y la retirada global del pedido se gestionan desde la pestaña Cobros.</p>
         <div id="ordersList" class="orders-list"></div>
       </div>
     </section>
@@ -103,6 +105,25 @@
         </div>
         <p class="admin-help">Vista limpia para cocina. Solo muestra ID, platos y subopciones. “Terminado en cocina” oculta la comanda solo aquí; el pedido sigue en el panel principal.</p>
         <div id="kitchenList" class="kitchen-list"></div>
+      </div>
+    </section>
+
+
+    <section id="paymentsTab" class="admin-tab-panel" data-admin-panel="payments" hidden>
+      <div class="admin-card wide payments-card">
+        <div class="section-title">
+          <h2>Cobros</h2>
+          <span id="paymentOrderCount">0</span>
+        </div>
+        <div id="cloverQueueStatus" class="clover-queue-status" role="status" aria-live="polite">
+          Clover disponible. Selecciona el pedido del cliente que está frente al terminal.
+        </div>
+        <p class="admin-help">
+          Tarjeta: pulsa “Cobrar con Clover”; al aprobarse, el pedido desaparece automáticamente para todos.
+          Efectivo: pulsa “Cobrar en efectivo” y después aparecerá “Quitar pedido para todos”.
+          Solo puede existir un cobro Clover activo a la vez.
+        </p>
+        <div id="paymentsList" class="payments-list"></div>
       </div>
     </section>
 
@@ -133,10 +154,10 @@
   </script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="supabase-config.js?v=18-mobile-fixed"></script>
-  <script src="supabase-client.js?v=30-order-fix"></script>
+  <script src="supabase-client.js?v=68-payment-fields"></script>
   <script src="backend-config.js?v=18-mobile-fixed"></script>
   <script>
-  window.FOGON_ADMIN_EXPECTED_BUILD = "57-quantity-grouped-items";
+  window.FOGON_ADMIN_EXPECTED_BUILD = "68-clover-payment-queue-merged";
 
   window.reportAdminScriptLoadFailure = function () {
     var errorBox = document.getElementById("pinError");
@@ -154,7 +175,7 @@
     }
   };
   </script>
-  <script src="admin.js?v=57-quantity-grouped-items" onerror="window.reportAdminScriptLoadFailure()"></script>
+  <script src="admin.js?v=68-clover-payment-queue-merged" onerror="window.reportAdminScriptLoadFailure()"></script>
   <script>
   window.setTimeout(function () {
     if (window.FOGON_ADMIN_BUILD !== window.FOGON_ADMIN_EXPECTED_BUILD) {
