@@ -913,3 +913,10 @@ body.admin-body .kitchen-list {
     padding-bottom: 12px;
   }
 }
+
+/* V77 botones compactos siempre visibles */
+body.admin-body .order-card.is-collapsed{display:flex!important;flex-direction:column!important}
+body.admin-body .order-card.is-collapsed .compact-order-actions{position:relative!important;z-index:20!important;display:grid!important;visibility:visible!important;opacity:1!important;pointer-events:auto!important;width:100%!important;margin-top:auto!important;padding:12px 14px 14px!important}
+body.admin-body .order-card.is-collapsed .compact-order-actions button{display:block!important;visibility:visible!important;opacity:1!important;pointer-events:auto!important;width:100%!important;min-height:54px!important}
+body.admin-body .compact-accept-btn{border:0!important;background:#1d8b4d!important;color:#fff!important}
+body.admin-body .compact-ready-btn{border:0!important;background:#285bb5!important;color:#fff!important}
