@@ -6,7 +6,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#111111">
   <title>Panel iPad | El Fogon D' Geny</title>
-  <link rel="stylesheet" href="style.css?v=54-fullscreen-static-orders">
+  <link rel="stylesheet" href="style.css?v=57-quantity-grouped-items">
   <style>
     .admin-build-label {
       margin: 12px 0 0;
@@ -41,7 +41,7 @@
       </label>
       <button id="loginButton" class="primary-btn full" type="button">Entrar</button>
       <p id="pinError" class="error-text" hidden>PIN incorrecto.</p>
-      <p id="adminBuildLabel" class="admin-build-label">Acceso V55 · sesión de 8 horas</p>
+      <p id="adminBuildLabel" class="admin-build-label">Acceso V57 · sesión de 8 horas</p>
     </form>
   </main>
 
@@ -136,7 +136,7 @@
   <script src="supabase-client.js?v=30-order-fix"></script>
   <script src="backend-config.js?v=18-mobile-fixed"></script>
   <script>
-  window.FOGON_ADMIN_EXPECTED_BUILD = "54-fullscreen-static-orders";
+  window.FOGON_ADMIN_EXPECTED_BUILD = "57-quantity-grouped-items";
 
   window.reportAdminScriptLoadFailure = function () {
     var errorBox = document.getElementById("pinError");
@@ -154,7 +154,7 @@
     }
   };
   </script>
-  <script src="admin.js?v=54-fullscreen-static-orders" onerror="window.reportAdminScriptLoadFailure()"></script>
+  <script src="admin.js?v=57-quantity-grouped-items" onerror="window.reportAdminScriptLoadFailure()"></script>
   <script>
   window.setTimeout(function () {
     if (window.FOGON_ADMIN_BUILD !== window.FOGON_ADMIN_EXPECTED_BUILD) {
