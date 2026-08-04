@@ -76,7 +76,7 @@ function showLoginRuntimeError(error) {
   console.error("Error del administrador:", error);
 }
 
-window.FOGON_ADMIN_BUILD = "77-compact-actions-inventory-menu";
+window.FOGON_ADMIN_BUILD = "78-fixed-add-bar-stable-order-flow";
 
 if (!window.CSS) window.CSS = {};
 if (!window.CSS.escape) {
@@ -615,7 +615,32 @@ async function syncOrdersFromBackend() {
       return false;
     }
 
-    setOrders(nextOrders);
+    const currentById = new Map(
+      currentOrders.map((order) => [String(order.id), order])
+    );
+    const statusRank = { new: 0, accepted: 1, ready: 2 };
+
+    const mergedOrders = nextOrders.map((incoming) => {
+      const current = currentById.get(String(incoming.id));
+      if (!current) return incoming;
+
+      const currentStatus = String(current.status || "new");
+      const incomingStatus = String(incoming.status || "new");
+
+      if ((statusRank[currentStatus] ?? 0) > (statusRank[incomingStatus] ?? 0)) {
+        return {
+          ...incoming,
+          status: currentStatus,
+          acceptedAt: current.acceptedAt || incoming.acceptedAt,
+          readyAt: current.readyAt || incoming.readyAt,
+          whatsappSent: current.whatsappSent || incoming.whatsappSent
+        };
+      }
+
+      return incoming;
+    });
+
+    setOrders(mergedOrders);
     renderOrders();
     renderKitchen();
     renderPayments();
@@ -1018,29 +1043,40 @@ function updateAlarm() {
 
 async function acceptOrder(orderId) {
   const cleanOrderId = String(orderId || "");
-  const acceptedAt = new Date().toISOString();
-  const orders = getOrders().map((order) => (
-    String(order.id) === cleanOrderId
-      ? { ...order, status: "accepted", acceptedAt }
-      : order
-  ));
+  const current = findOrder(cleanOrderId);
+  if (!current || String(current.status || "new") !== "new") return;
 
-  saveOrders(orders);
+  const acceptedAt = new Date().toISOString();
+  const button = document.querySelector(`[data-accept-order="${CSS.escape(cleanOrderId)}"]`);
+  if (button) {
+    button.disabled = true;
+    button.textContent = "Aceptando…";
+  }
 
   try {
     await updateOrderStatusBackend(cleanOrderId, "accepted", { acceptedAt });
-    await syncOrdersFromBackend();
 
-    const acceptedOrder = findOrder(cleanOrderId);
-    if (
-      acceptedOrder &&
-      String(acceptedOrder.paymentMethod || "").toLowerCase() === "card" &&
-      normalizePaymentStatus(acceptedOrder) !== "paid"
-    ) {
-      scheduleAutomaticCloverQueue(0);
-    }
+    const orders = getOrders().map((order) => (
+      String(order.id) === cleanOrderId
+        ? { ...order, status: "accepted", acceptedAt }
+        : order
+    ));
+
+    saveOrders(orders);
+    stopAlarm();
+
+    // Espera antes de consultar de nuevo para no recuperar por unos milisegundos
+    // el estado antiguo "new" desde Supabase.
+    setTimeout(() => {
+      void syncOrdersFromBackend();
+    }, 1200);
   } catch (error) {
-    console.warn("No se pudo aceptar el pedido o colocarlo en la cola Clover:", error);
+    console.error("No se pudo aceptar el pedido:", error);
+    if (button) {
+      button.disabled = false;
+      button.textContent = "Aceptar pedido";
+    }
+    alert(`No se pudo aceptar el pedido.\n\n${error?.message || error}`);
   }
 }
 
@@ -1950,11 +1986,15 @@ function compactOrderItemHtml(item) {
 
 
 function preservePinnedCardIds(orders, previousIds = []) {
-  const currentIds = orders.map((order) => String(order.id));
-  const currentSet = new Set(currentIds);
+  const sortedCurrentIds = orders
+    .slice()
+    .sort((left, right) => orderCreatedTimestamp(left) - orderCreatedTimestamp(right))
+    .map((order) => String(order.id));
+
+  const currentSet = new Set(sortedCurrentIds);
   const pinned = previousIds.filter((id) => currentSet.has(id));
 
-  currentIds.forEach((id) => {
+  sortedCurrentIds.forEach((id) => {
     if (!pinned.includes(id)) pinned.push(id);
   });
 
@@ -2010,6 +2050,57 @@ function compactCardActionHtml(order) {
 }
 
 
+
+function expandedWorkflowActionsHtml(order) {
+  const orderId = escapeHtml(order.id);
+  const status = String(order.status || "new").toLowerCase();
+  const paymentMethod = String(order.paymentMethod || "").toLowerCase();
+  const paymentStatus = normalizePaymentStatus(order);
+  const busy = paymentActionLocks.has(String(order.id));
+
+  const accepted = status === "accepted" || status === "ready";
+  const ready = status === "ready";
+
+  const acceptButton = status === "new"
+    ? `<button class="primary-btn full workflow-accept-btn" data-accept-order="${orderId}" type="button">Aceptar pedido</button>`
+    : `<button class="primary-btn full workflow-complete-btn" type="button" disabled>Pedido aceptado ✓</button>`;
+
+  const readyButton = ready
+    ? `<button class="secondary-btn full workflow-complete-btn" type="button" disabled>Pedido listo ✓</button>`
+    : accepted
+      ? `<button class="secondary-btn full ready-order-btn" data-ready-order="${orderId}" type="button">Pedido listo</button>`
+      : `<button class="secondary-btn full" type="button" disabled>Pedido listo</button>`;
+
+  let payButton = `<button class="secondary-btn full" type="button" disabled>Cobrar</button>`;
+
+  if (ready) {
+    if (busy) {
+      payButton = `<button class="primary-btn full" type="button" disabled>Procesando…</button>`;
+    } else if (paymentStatus === "paid") {
+      payButton = `<button class="primary-btn full workflow-complete-btn" type="button" disabled>Pedido cobrado ✓</button>`;
+    } else if (paymentMethod === "card") {
+      if (paymentStatus === "processing") {
+        payButton = `<button class="primary-btn full" type="button" disabled>Esperando tarjeta en Clover…</button>`;
+      } else if (paymentStatus === "review") {
+        payButton = `<button class="secondary-btn full" type="button" disabled>Revisar cobro en Clover</button>`;
+      } else {
+        payButton = `<button class="primary-btn full clover-pay-btn" data-clover-pay="${orderId}" type="button">${paymentStatus === "failed" || paymentStatus === "cancelled" ? "Reintentar con Clover" : "Cobrar con Clover"}</button>`;
+      }
+    } else if (paymentMethod === "cash") {
+      payButton = `<button class="primary-btn full cash-pay-btn" data-cash-pay="${orderId}" type="button">Cobrar en efectivo</button>`;
+    }
+  }
+
+  return `
+    <section class="expanded-workflow-actions" aria-label="Flujo completo del pedido">
+      ${acceptButton}
+      ${readyButton}
+      ${payButton}
+      <button class="secondary-btn danger-btn full remove-order-btn" data-hide-paid="${orderId}" type="button">Quitar pedido para todos</button>
+    </section>
+  `;
+}
+
 function renderOrders() {
   const sourceOrders = getOrders().slice();
   const orders = ordersInPinnedCardOrder(sourceOrders);
@@ -2044,37 +2135,6 @@ function renderOrders() {
     const isExpanded = expandedOrderIds.has(orderId);
     const totalQuantity = orderTotalQuantity(order.items);
 
-    const fullPrimaryAction = isNew
-      ? `
-        <button class="primary-btn full accept-order-btn" data-accept-order="${escapeHtml(orderId)}" type="button">
-          Aceptar pedido
-        </button>
-      `
-      : (!isReady
-        ? `
-          <button class="secondary-btn full ready-order-btn" data-ready-order="${escapeHtml(orderId)}" type="button">
-            Pedido listo
-          </button>
-        `
-        : "");
-
-    const paymentSection = isReady
-      ? `
-        <section class="order-inline-payment" aria-label="Acciones del pedido y cobro">
-          <div class="order-inline-payment-head">
-            <div>
-              <small>${String(order.paymentMethod || "").toLowerCase() === "card" ? "Cobro con tarjeta" : "Cobro en efectivo"}</small>
-              <strong>${money(order.totals?.total)}</strong>
-            </div>
-            <span class="payment-state ${paymentStatusClass(order)}">${escapeHtml(paymentStatusLabel(order))}</span>
-          </div>
-
-          <div class="order-inline-payment-actions">
-            ${paymentActionHtml(order)}
-          </div>
-        </section>
-      `
-      : "";
 
     return `
       <article
@@ -2153,8 +2213,7 @@ function renderOrders() {
             <strong>${money(order.totals?.total)}</strong>
           </div>
 
-          ${fullPrimaryAction}
-          ${paymentSection}
+          ${expandedWorkflowActionsHtml(order)}
         </div>
       </article>`;
   }).join("") : `<p class="empty-state">No hay pedidos todavía.</p>`;
