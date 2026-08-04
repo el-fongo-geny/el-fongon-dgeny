@@ -291,3 +291,174 @@ body.admin-body .order-primary-actions {
     text-align: center;
   }
 }
+
+
+/* ===== V71 · TARJETAS DE PEDIDO MINIMIZABLES ===== */
+body.admin-body .orders-list {
+  display: grid !important;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr)) !important;
+  align-items: start !important;
+  gap: 14px !important;
+}
+
+body.admin-body .order-card {
+  width: 100% !important;
+  min-width: 0 !important;
+  margin: 0 !important;
+  overflow: hidden !important;
+  border: 1px solid var(--line) !important;
+  border-radius: 16px !important;
+  background: var(--surface) !important;
+  box-shadow: 0 8px 24px rgba(0,0,0,.13) !important;
+}
+
+body.admin-body .order-card.is-expanded {
+  grid-column: 1 / -1;
+}
+
+body.admin-body .order-card-toggle {
+  position: relative !important;
+  display: grid !important;
+  gap: 8px !important;
+  width: 100% !important;
+  min-height: 164px !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  padding: 16px !important;
+  overflow: hidden !important;
+  background:
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--surface) 88%, var(--accent) 12%),
+      var(--surface)
+    ) !important;
+  color: var(--ink) !important;
+  text-align: left !important;
+  cursor: pointer !important;
+  pointer-events: auto !important;
+  touch-action: manipulation !important;
+  transition: filter 140ms ease, transform 140ms ease !important;
+}
+
+body.admin-body .order-card-toggle:hover {
+  filter: brightness(1.045);
+}
+
+body.admin-body .order-card-toggle:active {
+  transform: scale(.994) !important;
+}
+
+body.admin-body .order-card-toggle:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--accent) 66%, white);
+  outline-offset: -3px;
+}
+
+body.admin-body .order-card-accent {
+  position: absolute;
+  inset: 0 0 auto;
+  height: 7px;
+  background: linear-gradient(90deg, var(--accent), #7d65d8);
+}
+
+body.admin-body .order-card.is-accepted .order-card-accent {
+  background: linear-gradient(90deg, var(--ok), #2666d6);
+}
+
+body.admin-body .order-card-topline,
+body.admin-body .order-card-meta,
+body.admin-body .order-card-summary {
+  position: relative;
+  z-index: 1;
+}
+
+body.admin-body .order-customer-name {
+  position: relative;
+  z-index: 1;
+  display: block;
+  overflow: hidden;
+  font-size: 1.35rem;
+  font-weight: 950;
+  line-height: 1.05;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+body.admin-body .order-card-summary {
+  margin-top: auto;
+  border-top: 1px solid var(--line);
+  padding-top: 10px;
+}
+
+body.admin-body .order-card-open-label {
+  margin-left: auto;
+  color: var(--accent);
+  font-size: .75rem;
+  font-weight: 900;
+}
+
+body.admin-body .order-chevron {
+  display: inline-block !important;
+  font-size: 1.25rem;
+  transition: transform 160ms ease;
+}
+
+body.admin-body .order-card.is-expanded .order-chevron {
+  transform: rotate(180deg);
+}
+
+body.admin-body .order-card-body,
+body.admin-body .order-card-body[hidden] {
+  position: static !important;
+  width: 100% !important;
+  max-height: none !important;
+  border-top: 1px solid var(--line) !important;
+  padding: 16px !important;
+  overflow: visible !important;
+}
+
+body.admin-body .order-card-body[hidden] {
+  display: none !important;
+}
+
+body.admin-body .order-card.is-expanded .order-card-toggle {
+  min-height: 126px !important;
+}
+
+@media (min-width: 1100px) {
+  body.admin-body .orders-list {
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  }
+}
+
+@media (min-width: 720px) and (max-width: 1099px) {
+  body.admin-body .orders-list {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+}
+
+@media (max-width: 719px) {
+  body.admin-body .orders-list {
+    grid-template-columns: 1fr !important;
+    gap: 12px !important;
+  }
+
+  body.admin-body .order-card-toggle {
+    min-height: 150px !important;
+    padding: 15px 14px !important;
+  }
+
+  body.admin-body .order-card.is-expanded .order-card-toggle {
+    min-height: 118px !important;
+  }
+
+  body.admin-body .order-card-open-label {
+    font-size: .72rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  body.admin-body .order-card-toggle,
+  body.admin-body .order-chevron {
+    transition: none !important;
+  }
+}
