@@ -76,7 +76,7 @@ function showLoginRuntimeError(error) {
   console.error("Error del administrador:", error);
 }
 
-window.FOGON_ADMIN_BUILD = "74-kitchen-order-type-no-minimize-button";
+window.FOGON_ADMIN_BUILD = "75-open-card-no-duplicate";
 
 if (!window.CSS) window.CSS = {};
 if (!window.CSS.escape) {
@@ -1334,38 +1334,75 @@ async function hidePaidOrder(orderId) {
     return;
   }
 
-  const firstConfirmation = confirm(
-    `¿Quitar el pedido #${order.id} para todos los dispositivos?`
+  const confirmed = confirm(
+    `¿Quitar el pedido #${order.id} para todos?\n\n` +
+    "Desaparecerá de Pedidos, Cocina y Cobros, pero la venta seguirá guardada en Supabase."
   );
-  if (!firstConfirmation) return;
-
-  const secondConfirmation = confirm(
-    `CONFIRMACIÓN FINAL\n\nEl pedido #${order.id} desaparecerá de Pedidos, Cocina y Cobros para todos.\nLa venta seguirá guardada en Supabase.\n\n¿Confirmas que deseas quitarlo?`
-  );
-  if (!secondConfirmation) return;
+  if (!confirmed) return;
 
   paymentActionLocks.add(cleanOrderId);
   renderOrders();
   renderPayments();
 
   try {
-    await callProtectedAdminFunction(
-      "admin-order-payment",
-      {
-        action: "hide_for_all",
-        order_id: requireDatabaseOrderId(order)
+    let removed = false;
+    let protectedFunctionError = null;
+
+    try {
+      await callProtectedAdminFunction(
+        "admin-order-payment",
+        {
+          action: "hide_for_all",
+          order_id: requireDatabaseOrderId(order)
+        }
+      );
+      removed = true;
+    } catch (error) {
+      protectedFunctionError = error;
+      console.warn(
+        "admin-order-payment no respondió; intentando actualización directa en Supabase:",
+        error
+      );
+    }
+
+    if (!removed) {
+      const db = window.FOGON_DB;
+
+      if (!db?.isReady?.() || typeof db.hideOrderForAll !== "function") {
+        throw protectedFunctionError || new Error(
+          "No existe una vía disponible para ocultar el pedido."
+        );
       }
-    );
+
+      await db.hideOrderForAll(
+        order.databaseId || order.id
+      );
+      removed = true;
+    }
+
+    if (!removed) {
+      throw new Error("Supabase no confirmó que el pedido fuera ocultado.");
+    }
+
+    expandedOrderIds.delete(cleanOrderId);
 
     const nextOrders = getOrders().filter(
       (candidate) => String(candidate.id) !== cleanOrderId
     );
+
     setOrders(nextOrders);
     renderAll();
-    await syncOrdersFromBackend();
+
+    try {
+      await syncOrdersFromBackend();
+    } catch (syncError) {
+      console.warn("El pedido se ocultó, pero falló la resincronización:", syncError);
+    }
   } catch (error) {
     console.error("No se pudo quitar el pedido:", error);
-    alert(`No se pudo quitar el pedido.\n\n${error?.message || error}`);
+    alert(
+      `No se pudo quitar el pedido.\n\n${error?.message || error}`
+    );
   } finally {
     paymentActionLocks.delete(cleanOrderId);
     renderOrders();
@@ -1990,6 +2027,16 @@ function renderOrders() {
         class="order-card-body"
         ${isExpanded ? "" : "hidden"}
       >
+        <button
+          class="expanded-order-close"
+          type="button"
+          data-toggle-order="${escapeHtml(orderId)}"
+          aria-label="Cerrar pedido"
+        >
+          <span>#${escapeHtml(orderId)} · ${escapeHtml(order.customer?.name || "Sin nombre")}</span>
+          <strong>Cerrar pedido ×</strong>
+        </button>
+
         <div class="order-contact">
           <p class="order-fulfillment-type"><strong>Tipo de pedido:</strong> ${escapeHtml(orderTypeLabel(order))}</p>
           <p><strong>Teléfono:</strong> ${escapeHtml(order.customer?.phone || "Sin teléfono")}</p>
