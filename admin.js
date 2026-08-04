@@ -76,7 +76,7 @@ function showLoginRuntimeError(error) {
   console.error("Error del administrador:", error);
 }
 
-window.FOGON_ADMIN_BUILD = "72-management-payment-actions";
+window.FOGON_ADMIN_BUILD = "73-complete-collapsed-cards";
 
 if (!window.CSS) window.CSS = {};
 if (!window.CSS.escape) {
@@ -1880,6 +1880,35 @@ function toggleOrderCard(orderId) {
   if (openLabel) openLabel.textContent = "Minimizar";
 }
 
+
+function compactOrderItemHtml(item) {
+  const quantity = Math.max(1, Number(item?.quantity || 1));
+  const itemNameEs = item?.nameEs || item?.name || "";
+
+  const details = [
+    ...(item?.selections || []).map((selection) =>
+      `${selection.groupEs || selection.group}: ${selection.nameEs || selection.name}`
+    ),
+    ...(item?.extras || []).map((extra) =>
+      `Extra: ${extra.nameEs || extra.name}${Number(extra.price || 0) ? ` +${money(extra.price)}` : ""}`
+    ),
+    ...(item?.removables || []).map((remove) =>
+      `Sin: ${typeof remove === "string" ? remove : (remove.nameEs || remove.name || "")}`
+    ),
+    ...(item?.notes ? [`Nota: ${item.notes}`] : [])
+  ];
+
+  return `
+    <span class="compact-order-item">
+      <span class="compact-order-item-head">
+        <strong>${escapeHtml(quantity)}x ${escapeHtml(itemNameEs)}</strong>
+        <b>${money(Number(item?.lineTotal || 0) * quantity)}</b>
+      </span>
+      ${details.map((detail) => `<span>${escapeHtml(detail)}</span>`).join("")}
+    </span>
+  `;
+}
+
 function renderOrders() {
   const orders = getOrders()
     .slice()
@@ -1934,9 +1963,24 @@ function renderOrders() {
           <span data-order-elapsed="${escapeHtml(orderId)}">${escapeHtml(orderElapsedLabel(order))}</span>
           <span>${escapeHtml(orderTypeLabel(order))}</span>
         </span>
-        <span class="order-card-summary">
+        <span class="compact-order-service">
+          <span><strong>Teléfono:</strong> ${escapeHtml(order.customer?.phone || "Sin teléfono")}</span>
+          <span><strong>Pago:</strong> ${escapeHtml(paymentLabel(order.paymentMethod))}</span>
+          <span><strong>Cobro:</strong> ${escapeHtml(paymentStatusLabel(order))}</span>
+          <span><strong>Entrada:</strong> ${escapeHtml(new Date(order.createdAt).toLocaleString())}</span>
+        </span>
+
+        <span class="compact-order-items">
+          ${aggregateOrderItems(order.items).map((item) => compactOrderItemHtml(item)).join("")}
+        </span>
+
+        <span class="compact-order-total">
           <span>${totalQuantity} artículo${totalQuantity === 1 ? "" : "s"}</span>
-          <span class="order-card-open-label">${isExpanded ? "Minimizar" : "Abrir pedido"}</span>
+          <strong>Total ${money(order.totals?.total)}</strong>
+        </span>
+
+        <span class="order-card-summary">
+          <span class="order-card-open-label">${isExpanded ? "Minimizar pedido" : "Abrir acciones del pedido"}</span>
           <span class="order-chevron" aria-hidden="true">⌄</span>
         </span>
       </button>
@@ -1968,11 +2012,7 @@ function renderOrders() {
           : `<p class="accepted-note">${isReady ? "Pedido listo" : "Pedido aceptado"}${order.acceptedAt ? ` · ${new Date(order.acceptedAt).toLocaleTimeString()}` : ""}</p>`}
 
         ${!isNew ? `
-          <div class="order-actions-row order-primary-actions">
-            <button class="secondary-btn" data-ready-order="${escapeHtml(orderId)}" type="button">Pedido listo / Enviar WhatsApp</button>
-          </div>
-
-          <section class="order-inline-payment" aria-label="Cobro del pedido">
+          <section class="order-inline-payment" aria-label="Acciones del pedido y cobro">
             <div class="order-inline-payment-head">
               <div>
                 <small>${String(order.paymentMethod || "").toLowerCase() === "card" ? "Cobro con tarjeta" : "Cobro en efectivo"}</small>
@@ -1982,6 +2022,9 @@ function renderOrders() {
             </div>
 
             <div class="order-inline-payment-actions">
+              <button class="secondary-btn ready-order-btn" data-ready-order="${escapeHtml(orderId)}" type="button">
+                Pedido listo / Enviar WhatsApp
+              </button>
               ${paymentActionHtml(order)}
             </div>
           </section>
