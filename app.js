@@ -1,4 +1,4 @@
-window.FOGON_MENU_BUILD = "80-mobile-menu-fixed-price";
+window.FOGON_MENU_BUILD = "83-weekly-california-schedule";
 
 const state = {
   lang: localStorage.getItem("fogon_lang") || "",
@@ -19,15 +19,102 @@ const STORAGE_ORDER_COUNTER = "fogon_order_counter";
 const BACKEND_URL = (window.FOGON_BACKEND_URL || "").replace(/\/$/, "");
 const ORDER_MODE_MANUAL_KEY = "system:orders-manual";
 const ORDER_MODE_OPEN_KEY = "system:orders-open";
-const WEEKLY_CLOSED_DAY_KEY = "system:weekly-closed-day";
 let orderSubmissionInProgress = false;
 const CALIFORNIA_TIME_ZONE = "America/Los_Angeles";
-const ORDER_OPEN_MINUTES = 11 * 60;
-const ORDER_CLOSE_MINUTES = 20 * 60 + 30;
+const DEFAULT_WEEKLY_SCHEDULE = {
+  "0": { open: true, start: "11:00", end: "20:30" },
+  "1": { open: true, start: "11:00", end: "20:30" },
+  "2": { open: false, start: "11:00", end: "20:30" },
+  "3": { open: true, start: "11:00", end: "20:30" },
+  "4": { open: true, start: "11:00", end: "20:30" },
+  "5": { open: true, start: "11:00", end: "20:30" },
+  "6": { open: true, start: "11:00", end: "20:30" }
+};
+let publicWeeklySchedule = { ...DEFAULT_WEEKLY_SCHEDULE };
 
 function uniqueCartLineId(productId) {
   if (window.crypto?.randomUUID) return `${productId}-${window.crypto.randomUUID()}`;
   return `${productId}-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+}
+
+
+function californiaDateParts(date = new Date()) {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: CALIFORNIA_TIME_ZONE,
+    weekday: "short",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23"
+  }).formatToParts(date);
+
+  const shortDay = parts.find((part) => part.type === "weekday")?.value || "Sun";
+  const hour = Number(parts.find((part) => part.type === "hour")?.value || 0);
+  const minute = Number(parts.find((part) => part.type === "minute")?.value || 0);
+
+  return {
+    weekday: ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].indexOf(shortDay),
+    minutes: hour * 60 + minute
+  };
+}
+
+function timeStringToMinutes(value, fallback = 0) {
+  const match = String(value || "").match(/^(\d{1,2}):(\d{2})$/);
+  if (!match) return fallback;
+
+  const hour = Math.max(0, Math.min(23, Number(match[1])));
+  const minute = Math.max(0, Math.min(59, Number(match[2])));
+  return hour * 60 + minute;
+}
+
+function normalizeWeeklySchedule(schedule) {
+  const source = schedule && typeof schedule === "object" ? schedule : {};
+
+  return Object.fromEntries(
+    Object.entries(DEFAULT_WEEKLY_SCHEDULE).map(([day, fallback]) => {
+      const candidate = source[day] && typeof source[day] === "object"
+        ? source[day]
+        : {};
+
+      return [
+        day,
+        {
+          open: candidate.open !== false,
+          start: /^\d{2}:\d{2}$/.test(String(candidate.start || ""))
+            ? String(candidate.start)
+            : fallback.start,
+          end: /^\d{2}:\d{2}$/.test(String(candidate.end || ""))
+            ? String(candidate.end)
+            : fallback.end
+        }
+      ];
+    })
+  );
+}
+
+function currentScheduleDay(date = new Date()) {
+  const now = californiaDateParts(date);
+  const day = publicWeeklySchedule[String(now.weekday)]
+    || DEFAULT_WEEKLY_SCHEDULE[String(now.weekday)];
+
+  return {
+    ...day,
+    weekday: now.weekday,
+    minutes: now.minutes
+  };
+}
+
+function scheduleDayIsOpen(day) {
+  if (!day?.open) return false;
+
+  const start = timeStringToMinutes(day.start, 11 * 60);
+  const end = timeStringToMinutes(day.end, 20 * 60 + 30);
+  const now = day.minutes;
+
+  if (start === end) return true;
+  if (end > start) return now >= start && now < end;
+
+  // Horarios que cruzan medianoche.
+  return now >= start || now < end;
 }
 
 function californiaMinutesNow(date = new Date()) {
@@ -54,35 +141,36 @@ function currentOrderingState() {
   const availability = getAvailability();
   const manual = availability[ORDER_MODE_MANUAL_KEY] === true;
   const forcedOpen = availability[ORDER_MODE_OPEN_KEY] === true;
-  const configuredClosedDay = Number(availability[WEEKLY_CLOSED_DAY_KEY]);
-  const weeklyClosed =
-    Number.isInteger(configuredClosedDay) &&
-    configuredClosedDay >= 0 &&
-    configuredClosedDay <= 6 &&
-    californiaWeekdayNow() === configuredClosedDay;
-
-  const automaticOpen =
-    !weeklyClosed &&
-    californiaMinutesNow() >= ORDER_OPEN_MINUTES &&
-    californiaMinutesNow() < ORDER_CLOSE_MINUTES;
+  const scheduleDay = currentScheduleDay();
+  const automaticOpen = scheduleDayIsOpen(scheduleDay);
 
   return {
-    mode: weeklyClosed ? "weekly-closed" : manual ? (forcedOpen ? "open" : "closed") : "auto",
-    open: weeklyClosed ? false : (manual ? forcedOpen : automaticOpen),
-    weeklyClosed
+    mode: manual ? (forcedOpen ? "open" : "closed") : "auto",
+    open: manual ? forcedOpen : automaticOpen,
+    weeklyClosed: !manual && scheduleDay.open === false,
+    scheduleDay
   };
 }
 
 function orderingClosedMessage() {
   const status = currentOrderingState();
+  const day = status.scheduleDay;
+
   if (status.weeklyClosed) {
     return state.lang === "en"
-      ? "Online ordering is closed today for the restaurant's weekly closing day."
-      : "Los pedidos en línea están cerrados hoy por el día semanal de cierre del local.";
+      ? "Online ordering is closed all day today."
+      : "Los pedidos en línea están cerrados durante todo el día de hoy.";
   }
+
+  if (status.mode === "closed") {
+    return state.lang === "en"
+      ? "Online ordering was manually closed by the restaurant."
+      : "Los pedidos en línea fueron cerrados manualmente por el restaurante.";
+  }
+
   return state.lang === "en"
-    ? "Online ordering is currently closed. Regular ordering hours are 11:00 AM to 8:30 PM, California time."
-    : "Los pedidos en línea están cerrados ahora mismo. El horario habitual es de 11:00 a. m. a 8:30 p. m., hora de California.";
+    ? `Online ordering is currently closed. Today's hours are ${day.start}–${day.end}, California time.`
+    : `Los pedidos en línea están cerrados ahora mismo. El horario de hoy es de ${day.start} a ${day.end}, hora de California.`;
 }
 
 function updateOrderingUi() {
@@ -414,13 +502,19 @@ const DEFAULT_PUBLIC_SETTINGS = {
   footer_paragraph_2: "Si buscas comida dominicana sabrosa, comida latina o un restaurante dominicano en San Jose, visita El Fogon D' Geny.",
   address: "796 S 1st St, San Jose, CA 95113",
   maps_label: "Ver ubicación en Google Maps",
-  maps_url: "https://www.google.com/maps/search/?api=1&query=El+Fogon+D%27+Geny+796+S+1st+St+San+Jose+CA+95113"
+  maps_url: "https://www.google.com/maps/search/?api=1&query=El+Fogon+D%27+Geny+796+S+1st+St+San+Jose+CA+95113",
+  tax_enabled: false,
+  tax_rate: 10,
+  tax_only_taxable: true
 };
 
 let publicBusinessSettings = { ...DEFAULT_PUBLIC_SETTINGS };
 
 function applyPublicBusinessSettings(settings = {}) {
   publicBusinessSettings = { ...DEFAULT_PUBLIC_SETTINGS, ...(settings || {}) };
+  publicWeeklySchedule = normalizeWeeklySchedule(
+    publicBusinessSettings.weekly_schedule
+  );
 
   const heroTitle = document.querySelector('[data-i18n="heroTitle"]');
   const heroSubtitle = document.querySelector('[data-i18n="heroSubtitle"]');
@@ -453,6 +547,7 @@ async function loadPublicBusinessSettings() {
 
     const settings = await db.fetchMenuSettings();
     applyPublicBusinessSettings(settings);
+    renderCart();
   } catch (error) {
     console.warn("No se pudieron cargar los datos públicos del negocio:", error);
     applyPublicBusinessSettings();
@@ -1041,8 +1136,8 @@ function buildCartItem(form) {
     nameEs: item.es,
     nameEn: item.en,
     basePrice: Number(item.price),
-    taxable: false,
-    taxRate: 0,
+    taxable: item.taxable !== false,
+    taxRate: Number(publicBusinessSettings.tax_rate || 10),
     selections,
     extras,
     removables,
@@ -1111,9 +1206,28 @@ function addToCart(cartItem) {
 }
 
 function getTotals() {
-  const subtotal = state.cart.reduce((sum, item) => sum + item.lineTotal * item.quantity, 0);
-  const tax = 0;
-  return { subtotal, tax, total: subtotal };
+  const subtotal = state.cart.reduce(
+    (sum, item) => sum + Number(item.lineTotal || 0) * Number(item.quantity || 1),
+    0
+  );
+
+  const taxEnabled = publicBusinessSettings.tax_enabled === true;
+  const taxRate = Math.max(0, Number(publicBusinessSettings.tax_rate || 0)) / 100;
+  const onlyTaxable = publicBusinessSettings.tax_only_taxable !== false;
+
+  const taxableSubtotal = taxEnabled
+    ? state.cart.reduce((sum, item) => {
+        const shouldTax = !onlyTaxable || item.taxable !== false;
+        return shouldTax
+          ? sum + Number(item.lineTotal || 0) * Number(item.quantity || 1)
+          : sum;
+      }, 0)
+    : 0;
+
+  const tax = Math.round(taxableSubtotal * taxRate * 100) / 100;
+  const total = Math.round((subtotal + tax) * 100) / 100;
+
+  return { subtotal, taxableSubtotal, tax, total };
 }
 
 function renderCart() {
@@ -1152,9 +1266,18 @@ function renderCart() {
   const taxValue = $("#taxValue");
   const totalValue = $("#totalValue");
 
+  const taxSummaryRow = $("#taxSummaryRow");
+  const taxSummaryLabel = $("#taxSummaryLabel");
+
   if (subtotalValue) subtotalValue.textContent = money(totals.subtotal);
   if (taxValue) taxValue.textContent = money(totals.tax);
   if (totalValue) totalValue.textContent = money(totals.total);
+  if (taxSummaryRow) taxSummaryRow.hidden = publicBusinessSettings.tax_enabled !== true;
+  if (taxSummaryLabel) {
+    taxSummaryLabel.textContent = state.lang === "en"
+      ? `Tax (${Number(publicBusinessSettings.tax_rate || 0).toFixed(3)}%)`
+      : `Impuesto (${Number(publicBusinessSettings.tax_rate || 0).toFixed(3)}%)`;
+  }
 }
 
 function updateCartFabCompact(forceExpanded = false) {
