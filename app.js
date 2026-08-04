@@ -1,4 +1,4 @@
-window.FOGON_MENU_BUILD = "67-mobile-navigation-fixed";
+window.FOGON_MENU_BUILD = "72-public-settings";
 
 const state = {
   lang: localStorage.getItem("fogon_lang") || "",
@@ -405,6 +405,60 @@ async function loadPublicCatalog({ render = false, force = false } = {}) {
 }
 
 
+
+const DEFAULT_PUBLIC_SETTINGS = {
+  menu_title: "Haz tu pedido",
+  menu_subtitle: "Elige tus favoritos, personaliza y recoge en la ventanilla.",
+  footer_title: "Comida dominicana y latina en San Jose, California",
+  footer_paragraph_1: "El Fogon D' Geny prepara autentica comida dominicana, latina y caribeña en el centro de San Jose.",
+  footer_paragraph_2: "Si buscas comida dominicana sabrosa, comida latina o un restaurante dominicano en San Jose, visita El Fogon D' Geny.",
+  address: "796 S 1st St, San Jose, CA 95113",
+  maps_label: "Ver ubicación en Google Maps",
+  maps_url: "https://www.google.com/maps/search/?api=1&query=El+Fogon+D%27+Geny+796+S+1st+St+San+Jose+CA+95113"
+};
+
+let publicBusinessSettings = { ...DEFAULT_PUBLIC_SETTINGS };
+
+function applyPublicBusinessSettings(settings = {}) {
+  publicBusinessSettings = { ...DEFAULT_PUBLIC_SETTINGS, ...(settings || {}) };
+
+  const heroTitle = document.querySelector('[data-i18n="heroTitle"]');
+  const heroSubtitle = document.querySelector('[data-i18n="heroSubtitle"]');
+  if (heroTitle && publicBusinessSettings.menu_title) {
+    heroTitle.textContent = publicBusinessSettings.menu_title;
+  }
+  if (heroSubtitle && publicBusinessSettings.menu_subtitle) {
+    heroSubtitle.textContent = publicBusinessSettings.menu_subtitle;
+  }
+
+  document.querySelectorAll("[data-business-setting]").forEach((node) => {
+    const key = node.dataset.businessSetting;
+    const value = publicBusinessSettings[key];
+    if (value) node.textContent = value;
+  });
+
+  const mapsLink = document.getElementById("businessMapsLink");
+  if (mapsLink && publicBusinessSettings.maps_url) {
+    mapsLink.href = publicBusinessSettings.maps_url;
+  }
+}
+
+async function loadPublicBusinessSettings() {
+  try {
+    const db = window.FOGON_DB;
+    if (!db?.isReady?.() || typeof db.fetchMenuSettings !== "function") {
+      applyPublicBusinessSettings();
+      return;
+    }
+
+    const settings = await db.fetchMenuSettings();
+    applyPublicBusinessSettings(settings);
+  } catch (error) {
+    console.warn("No se pudieron cargar los datos públicos del negocio:", error);
+    applyPublicBusinessSettings();
+  }
+}
+
 function getAvailability() {
   try {
     return JSON.parse(localStorage.getItem("fogon_availability") || "{}");
@@ -586,15 +640,15 @@ function applyText() {
   const heroSubtitle = document.querySelector('[data-i18n="heroSubtitle"]');
 
   if (heroTitle) {
-    heroTitle.textContent = state.lang === "en"
-      ? "Order your favorites"
-      : "Haz tu pedido";
+    heroTitle.textContent = publicBusinessSettings.menu_title ||
+      (state.lang === "en" ? "Order your favorites" : "Haz tu pedido");
   }
 
   if (heroSubtitle) {
-    heroSubtitle.textContent = state.lang === "en"
-      ? "Choose your favorites, customize and pick up at the window."
-      : "Elige tus favoritos, personaliza y recoge en la ventanilla.";
+    heroSubtitle.textContent = publicBusinessSettings.menu_subtitle ||
+      (state.lang === "en"
+        ? "Choose your favorites, customize and pick up at the window."
+        : "Elige tus favoritos, personaliza y recoge en la ventanilla.");
   }
 
   const trustLabels = state.lang === "en"
@@ -1498,6 +1552,7 @@ function initEvents() {
 
 async function init() {
   applyTheme();
+  void loadPublicBusinessSettings();
   initEvents();
   window.addEventListener("storage", (event) => {
     if (event.key === "fogon_availability") refreshAvailabilityIfChanged(false);
