@@ -1,13 +1,13 @@
 (() => {
   "use strict";
 
-window.FOGON_MENU_ADMIN_BUILD = "8-subopciones-20260801";
+window.FOGON_MENU_ADMIN_BUILD = "72-availability-business";
 
   const $ = (selector) => document.querySelector(selector);
   const $$ = (selector) => Array.from(document.querySelectorAll(selector));
   const money = (value) => `$${Number(value || 0).toFixed(2)}`;
 
-  window.FOGON_MENU_ADMIN_BUILD = "6-image-editor-20260724";
+  window.FOGON_MENU_ADMIN_BUILD = "72-availability-business";
 
   const state = {
     pin: "",
@@ -32,7 +32,9 @@ window.FOGON_MENU_ADMIN_BUILD = "8-subopciones-20260801";
     dirty: false,
     busy: false,
     imageUploading: false,
-    optionDraftGroups: []
+    optionDraftGroups: [],
+    availabilityQuery: "",
+    businessSettings: {}
   };
 
   function escapeHtml(value) {
@@ -451,9 +453,189 @@ window.FOGON_MENU_ADMIN_BUILD = "8-subopciones-20260801";
     }).join("");
   }
 
+
+  function availabilityItemLabel(item) {
+    return String(item?.name_es || item?.name_en || item?.id || "");
+  }
+
+  function renderAvailabilityItems() {
+    const list = $("#availabilityItemsList");
+    if (!list) return;
+
+    const query = state.availabilityQuery.trim().toLowerCase();
+    const items = (state.catalog.inventory || [])
+      .slice()
+      .sort((left, right) => {
+        const group = String(left.group_name || "").localeCompare(String(right.group_name || ""));
+        return group || Number(left.sort_order || 0) - Number(right.sort_order || 0);
+      })
+      .filter((item) => {
+        const text = [
+          item.id,
+          item.name_es,
+          item.name_en,
+          item.group_name
+        ].filter(Boolean).join(" ").toLowerCase();
+        return !query || text.includes(query);
+      });
+
+    if (!items.length) {
+      list.innerHTML = `<div class="empty-state"><h2>No hay elementos</h2><p>Crea el primer elemento de disponibilidad.</p></div>`;
+      return;
+    }
+
+    list.innerHTML = items.map((item) => `
+      <article class="management-row">
+        <div class="management-row-main">
+          <small>${escapeHtml(item.group_name || "Sin grupo")}</small>
+          <strong>${escapeHtml(availabilityItemLabel(item))}</strong>
+          <span>${escapeHtml(item.name_en || item.name_es || "")}</span>
+        </div>
+        <span class="management-order">Orden ${Number(item.sort_order || 0)}</span>
+        <span class="status-badge ${item.active === false ? "status-hidden" : "status-visible"}">
+          ${item.active === false ? "Inactivo" : "Activo"}
+        </span>
+        <div class="management-row-actions">
+          <button class="row-button" type="button" data-edit-availability-item="${escapeHtml(item.id)}">Editar</button>
+          <button class="row-button danger-row-button" type="button" data-delete-availability-item="${escapeHtml(item.id)}">Eliminar</button>
+        </div>
+      </article>
+    `).join("");
+  }
+
+  function openAvailabilityItemForm(item = null) {
+    const form = $("#availabilityItemForm");
+    if (!form) return;
+
+    $("#availabilityItemOriginalId").value = item?.id || "";
+    $("#availabilityItemNameEs").value = item?.name_es || "";
+    $("#availabilityItemNameEn").value = item?.name_en || item?.name_es || "";
+    $("#availabilityItemGroup").value = item?.group_name || "";
+    $("#availabilityItemSort").value = Number(item?.sort_order || 0);
+    $("#availabilityItemActive").checked = item?.active !== false;
+    form.hidden = false;
+    $("#availabilityItemNameEs")?.focus();
+  }
+
+  function closeAvailabilityItemForm() {
+    const form = $("#availabilityItemForm");
+    if (form) form.hidden = true;
+    form?.reset();
+    if ($("#availabilityItemActive")) $("#availabilityItemActive").checked = true;
+  }
+
+  async function saveAvailabilityItem(event) {
+    event.preventDefault();
+
+    const nameEs = String($("#availabilityItemNameEs")?.value || "").trim();
+    if (!nameEs) {
+      toast("Escribe el nombre del elemento.", "error");
+      return;
+    }
+
+    setBusy(true);
+    try {
+      await callAdminCatalog("save_inventory_item", {
+        item: {
+          id: String($("#availabilityItemOriginalId")?.value || "").trim(),
+          name_es: nameEs,
+          name_en: String($("#availabilityItemNameEn")?.value || "").trim() || nameEs,
+          group_name: String($("#availabilityItemGroup")?.value || "").trim() || "General",
+          sort_order: Number($("#availabilityItemSort")?.value || 0),
+          active: Boolean($("#availabilityItemActive")?.checked)
+        }
+      });
+      closeAvailabilityItemForm();
+      await loadCatalog({ preserveSelection: true });
+      toast("Elemento de disponibilidad guardado.");
+    } catch (error) {
+      toast(`No se pudo guardar. ${menuAdminErrorMessage(error)}`, "error");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function deleteAvailabilityItem(itemId) {
+    const item = (state.catalog.inventory || []).find((candidate) => String(candidate.id) === String(itemId));
+    if (!item) return;
+
+    const first = confirm(`¿Eliminar “${availabilityItemLabel(item)}” de Disponibilidad?`);
+    if (!first) return;
+
+    setBusy(true);
+    try {
+      await callAdminCatalog("delete_inventory_item", { itemId });
+      await loadCatalog({ preserveSelection: true });
+      toast("Elemento eliminado.");
+    } catch (error) {
+      toast(`No se pudo eliminar. ${menuAdminErrorMessage(error)}`, "error");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const BUSINESS_DEFAULTS = {
+    menu_title: "Haz tu pedido",
+    menu_subtitle: "Elige tus favoritos, personaliza y recoge en la ventanilla.",
+    footer_title: "Comida dominicana y latina en San Jose, California",
+    footer_paragraph_1: "El Fogon D' Geny prepara autentica comida dominicana, latina y caribeña en el centro de San Jose.",
+    footer_paragraph_2: "Si buscas comida dominicana sabrosa, comida latina o un restaurante dominicano en San Jose, visita El Fogon D' Geny.",
+    address: "796 S 1st St, San Jose, CA 95113",
+    maps_label: "Ver ubicación en Google Maps",
+    maps_url: "https://www.google.com/maps/search/?api=1&query=El+Fogon+D%27+Geny+796+S+1st+St+San+Jose+CA+95113"
+  };
+
+  function currentBusinessSettings() {
+    return { ...BUSINESS_DEFAULTS, ...(state.businessSettings || {}) };
+  }
+
+  function fillBusinessSettingsForm(force = false) {
+    const form = $("#businessSettingsForm");
+    if (!form) return;
+    if (!force && form.dataset.loaded === "true") return;
+
+    const settings = currentBusinessSettings();
+    $("#businessMenuTitle").value = settings.menu_title || "";
+    $("#businessMenuSubtitle").value = settings.menu_subtitle || "";
+    $("#businessFooterTitle").value = settings.footer_title || "";
+    $("#businessFooterParagraph1").value = settings.footer_paragraph_1 || "";
+    $("#businessFooterParagraph2").value = settings.footer_paragraph_2 || "";
+    $("#businessAddress").value = settings.address || "";
+    $("#businessMapsLabel").value = settings.maps_label || "";
+    $("#businessMapsUrl").value = settings.maps_url || "";
+    form.dataset.loaded = "true";
+  }
+
+  async function saveBusinessSettings(event) {
+    event.preventDefault();
+    const settings = {
+      menu_title: String($("#businessMenuTitle")?.value || "").trim(),
+      menu_subtitle: String($("#businessMenuSubtitle")?.value || "").trim(),
+      footer_title: String($("#businessFooterTitle")?.value || "").trim(),
+      footer_paragraph_1: String($("#businessFooterParagraph1")?.value || "").trim(),
+      footer_paragraph_2: String($("#businessFooterParagraph2")?.value || "").trim(),
+      address: String($("#businessAddress")?.value || "").trim(),
+      maps_label: String($("#businessMapsLabel")?.value || "").trim(),
+      maps_url: String($("#businessMapsUrl")?.value || "").trim()
+    };
+
+    setBusy(true);
+    try {
+      const result = await callAdminCatalog("update_menu_settings", { settings });
+      state.businessSettings = { ...(result.settings || settings) };
+      toast("Información del menú actualizada.");
+    } catch (error) {
+      toast(`No se pudo guardar. ${menuAdminErrorMessage(error)}`, "error");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   function renderAll() {
     renderProducts();
     renderCategories();
+    renderAvailabilityItems();
+    fillBusinessSettingsForm();
   }
 
   async function loadCatalog({ preserveSelection = true } = {}) {
@@ -472,8 +654,11 @@ window.FOGON_MENU_ADMIN_BUILD = "8-subopciones-20260801";
         productExtras: result.catalog?.productExtras || [],
         removables: result.catalog?.removables || [],
         productRemovables: result.catalog?.productRemovables || [],
-        inventory: result.catalog?.inventory || []
+        inventory: result.catalog?.inventory || [],
+        settings: result.catalog?.settings || {}
       };
+
+      state.businessSettings = { ...(result.catalog?.settings || {}) };
 
       renderAll();
 
@@ -590,18 +775,34 @@ window.FOGON_MENU_ADMIN_BUILD = "8-subopciones-20260801";
       button.classList.toggle("active", button.dataset.view === view);
     });
 
-    const productsView = $("#productsView");
-    const categoriesView = $("#categoriesView");
-    const scheduleView = $("#scheduleView");
+    const viewIds = {
+      products: "productsView",
+      categories: "categoriesView",
+      schedule: "scheduleView",
+      "availability-items": "availabilityItemsView",
+      business: "businessView"
+    };
+
+    Object.entries(viewIds).forEach(([key, id]) => {
+      const section = document.getElementById(id);
+      if (section) section.hidden = key !== view;
+    });
+
+    const titles = {
+      products: "Productos",
+      categories: "Categorías",
+      schedule: "Horario y cierres",
+      "availability-items": "Gestionar disponibilidad",
+      business: "Datos del menú"
+    };
+
     const pageTitle = $("#pageTitle");
     const addProductButton = $("#addProductButton");
-
-    if (productsView) productsView.hidden = view !== "products";
-    if (categoriesView) categoriesView.hidden = view !== "categories";
-    if (scheduleView) scheduleView.hidden = view !== "schedule";
-    if (pageTitle) pageTitle.textContent = view === "products" ? "Productos" : view === "categories" ? "Categorías" : "Horario y cierres";
+    if (pageTitle) pageTitle.textContent = titles[view] || "Administración";
     if (addProductButton) addProductButton.hidden = view !== "products";
     if (view === "schedule") loadWeeklyClosedDay();
+    if (view === "availability-items") renderAvailabilityItems();
+    if (view === "business") fillBusinessSettingsForm(true);
 
     closeMobileSidebar();
   }
@@ -1928,6 +2129,20 @@ window.FOGON_MENU_ADMIN_BUILD = "8-subopciones-20260801";
 
     loginForm.addEventListener("submit", login);
     $("#logoutButton")?.addEventListener("click", logout);
+    $("#newAvailabilityItemButton")?.addEventListener("click", () => openAvailabilityItemForm());
+    $("#cancelAvailabilityItemButton")?.addEventListener("click", closeAvailabilityItemForm);
+    $("#availabilityItemForm")?.addEventListener("submit", saveAvailabilityItem);
+    $("#availabilityItemSearch")?.addEventListener("input", (event) => {
+      state.availabilityQuery = event.target.value || "";
+      renderAvailabilityItems();
+    });
+    $("#businessSettingsForm")?.addEventListener("submit", saveBusinessSettings);
+    $("#resetBusinessSettingsButton")?.addEventListener("click", () => {
+      state.businessSettings = { ...BUSINESS_DEFAULTS };
+      const form = $("#businessSettingsForm");
+      if (form) form.dataset.loaded = "false";
+      fillBusinessSettingsForm(true);
+    });
 
     $$('[data-view]').forEach((button) => {
       button.addEventListener("click", () => switchView(button.dataset.view));
@@ -1990,6 +2205,21 @@ window.FOGON_MENU_ADMIN_BUILD = "8-subopciones-20260801";
           (candidate) => candidate.id === productButton.dataset.editProduct
         );
         if (product) openProductDrawer(product, false);
+        return;
+      }
+
+      const editAvailabilityButton = target.closest("[data-edit-availability-item]");
+      if (editAvailabilityButton) {
+        const item = (state.catalog.inventory || []).find(
+          (candidate) => String(candidate.id) === String(editAvailabilityButton.dataset.editAvailabilityItem)
+        );
+        if (item) openAvailabilityItemForm(item);
+        return;
+      }
+
+      const deleteAvailabilityButton = target.closest("[data-delete-availability-item]");
+      if (deleteAvailabilityButton) {
+        void deleteAvailabilityItem(deleteAvailabilityButton.dataset.deleteAvailabilityItem);
         return;
       }
 
