@@ -76,7 +76,7 @@ function showLoginRuntimeError(error) {
   console.error("Error del administrador:", error);
 }
 
-window.FOGON_ADMIN_BUILD = "83-weekly-schedule-kitchen-type";
+window.FOGON_ADMIN_BUILD = "84-kitchen-whatsapp-premium";
 
 if (!window.CSS) window.CSS = {};
 if (!window.CSS.escape) {
@@ -2154,14 +2154,30 @@ function compactCardActionHtml(order) {
   const paymentStatus = normalizePaymentStatus(order);
   const busy = paymentActionLocks.has(String(order.id));
 
-  if (busy) return `<button class="primary-btn full compact-card-action-btn" type="button" disabled>Procesando…</button>`;
+  if (busy) {
+    if (status === "new" || !status) {
+      return `<button class="primary-btn full compact-card-action-btn compact-accept-btn" type="button" disabled>Aceptar pedido</button>`;
+    }
+
+    if (status === "accepted") {
+      return `<button class="secondary-btn full compact-card-action-btn compact-ready-btn" type="button" disabled>Pedido listo / WhatsApp</button>`;
+    }
+
+    if (status === "ready" && paymentMethod === "card") {
+      return `<button class="primary-btn full clover-pay-btn compact-card-action-btn" type="button" disabled>Cobrar con Clover</button>`;
+    }
+
+    if (status === "ready" && paymentMethod === "cash") {
+      return `<button class="primary-btn full cash-pay-btn compact-card-action-btn" type="button" disabled>Cobrar en efectivo</button>`;
+    }
+  }
 
   if (status === "new" || !status) {
     return `<button class="primary-btn full compact-card-action-btn compact-accept-btn" data-accept-order="${orderId}" type="button">Aceptar pedido</button>`;
   }
 
   if (status === "accepted") {
-    return `<button class="secondary-btn full compact-card-action-btn compact-ready-btn" data-ready-order="${orderId}" type="button">Pedido listo</button>`;
+    return `<button class="secondary-btn full compact-card-action-btn compact-ready-btn" data-ready-order="${orderId}" type="button">Pedido listo / WhatsApp</button>`;
   }
 
   if (status === "ready") {
@@ -2200,16 +2216,20 @@ function expandedWorkflowActionsHtml(order) {
     : "";
 
   const readyButton = ready
-    ? `<button class="secondary-btn full workflow-complete-btn" type="button" disabled>Pedido listo ✓</button>`
+    ? `<button class="secondary-btn full workflow-complete-btn" type="button" disabled>Pedido listo / WhatsApp ✓</button>`
     : accepted
-      ? `<button class="secondary-btn full ready-order-btn" data-ready-order="${orderId}" type="button">Pedido listo</button>`
-      : `<button class="secondary-btn full" type="button" disabled>Pedido listo</button>`;
+      ? `<button class="secondary-btn full ready-order-btn" data-ready-order="${orderId}" type="button">Pedido listo / WhatsApp</button>`
+      : `<button class="secondary-btn full" type="button" disabled>Pedido listo / WhatsApp</button>`;
 
   let payButton = `<button class="secondary-btn full" type="button" disabled>Cobrar</button>`;
 
   if (ready) {
     if (busy) {
-      payButton = `<button class="primary-btn full" type="button" disabled>Procesando…</button>`;
+      if (paymentMethod === "card") {
+        payButton = `<button class="primary-btn full clover-pay-btn" type="button" disabled>Cobrar con Clover</button>`;
+      } else if (paymentMethod === "cash") {
+        payButton = `<button class="primary-btn full cash-pay-btn" type="button" disabled>Cobrar en efectivo</button>`;
+      }
     } else if (paymentStatus === "paid") {
       payButton = `<button class="primary-btn full workflow-complete-btn" type="button" disabled>Pedido cobrado ✓</button>`;
     } else if (paymentMethod === "card") {
@@ -2517,8 +2537,12 @@ function renderKitchen() {
         ${aggregateOrderItems(order.items).map((item) => itemDetailsHtml(item, true)).join("")}
       </div>
       <div class="kitchen-actions">
-        <button class="secondary-btn full" data-kitchen-toggle="${escapeHtml(order.id)}" type="button">
-          ${isKitchenOrderHidden(order.id) ? "Mostrar comanda" : "Quitar de cocina"}
+        <button
+          class="secondary-btn full kitchen-done-btn"
+          data-kitchen-done="${escapeHtml(order.id)}"
+          type="button"
+        >
+          Pedido terminado en cocina
         </button>
       </div>
     </article>
@@ -3040,7 +3064,12 @@ function init() {
     }
 
     const kitchenDoneButton = event.target.closest("[data-kitchen-done]");
-    if (kitchenDoneButton) hideKitchenOrder(kitchenDoneButton.dataset.kitchenDone);
+    if (kitchenDoneButton) {
+      event.preventDefault();
+      event.stopPropagation();
+      hideKitchenOrder(kitchenDoneButton.dataset.kitchenDone);
+      return;
+    }
 
     const cloverPayButton = event.target.closest("[data-clover-pay]");
     if (cloverPayButton) {
