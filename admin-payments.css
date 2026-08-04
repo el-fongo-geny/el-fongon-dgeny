@@ -519,3 +519,182 @@ body.admin-body [data-hide-paid] {
     width: 100% !important;
   }
 }
+
+
+/* ===== V73 · TARJETAS MINIMIZADAS CON INFORMACIÓN COMPLETA ===== */
+body.admin-body .orders-list {
+  display: grid !important;
+  grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  align-items: start !important;
+  gap: 16px !important;
+}
+
+body.admin-body .order-card.is-collapsed {
+  grid-column: auto !important;
+}
+
+body.admin-body .order-card.is-expanded {
+  grid-column: 1 / -1 !important;
+}
+
+body.admin-body .order-card-toggle {
+  min-height: 0 !important;
+  height: auto !important;
+  gap: 10px !important;
+  padding: 17px 16px 15px !important;
+}
+
+body.admin-body .compact-order-service {
+  display: grid;
+  gap: 4px;
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+  padding: 10px 0;
+  color: var(--muted);
+  font-size: .78rem;
+  line-height: 1.35;
+}
+
+body.admin-body .compact-order-service > span {
+  display: block;
+}
+
+body.admin-body .compact-order-service strong {
+  color: var(--ink);
+}
+
+body.admin-body .compact-order-items {
+  display: grid;
+  gap: 8px;
+}
+
+body.admin-body .compact-order-item {
+  display: grid;
+  gap: 3px;
+  border: 1px solid var(--line);
+  border-radius: 11px;
+  padding: 9px 10px;
+  background: color-mix(in srgb, var(--surface) 86%, var(--bg));
+  color: var(--muted);
+  font-size: .76rem;
+  line-height: 1.32;
+}
+
+body.admin-body .compact-order-item-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+  color: var(--ink);
+}
+
+body.admin-body .compact-order-item-head strong {
+  min-width: 0;
+  font-size: .86rem;
+  line-height: 1.25;
+}
+
+body.admin-body .compact-order-item-head b {
+  flex: 0 0 auto;
+  white-space: nowrap;
+  color: var(--ink);
+  font-size: .82rem;
+}
+
+body.admin-body .compact-order-total {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  border-top: 1px solid var(--line);
+  padding-top: 10px;
+  color: var(--muted);
+  font-size: .78rem;
+  font-weight: 800;
+}
+
+body.admin-body .compact-order-total strong {
+  color: var(--ink);
+  font-size: .95rem;
+}
+
+body.admin-body .order-card-summary {
+  justify-content: center !important;
+  margin-top: 0 !important;
+  border: 1px solid color-mix(in srgb, var(--accent) 46%, var(--line)) !important;
+  border-radius: 11px !important;
+  padding: 10px 12px !important;
+  background: color-mix(in srgb, var(--accent) 10%, var(--surface));
+}
+
+body.admin-body .order-card-open-label {
+  margin-left: 0 !important;
+  color: var(--accent) !important;
+  font-size: .8rem !important;
+}
+
+body.admin-body .order-card-summary .order-chevron {
+  margin-left: 8px;
+}
+
+/* El botón de pedido listo ahora comparte el mismo recuadro y alineación. */
+body.admin-body .order-inline-payment-actions {
+  grid-template-columns: minmax(220px, 800px) !important;
+  justify-content: center !important;
+  justify-items: stretch !important;
+  width: 100% !important;
+  max-width: none !important;
+  margin: 0 auto !important;
+}
+
+body.admin-body .order-inline-payment-actions > button {
+  width: 100% !important;
+  max-width: 800px !important;
+  margin: 0 auto !important;
+}
+
+body.admin-body .ready-order-btn {
+  border: 0 !important;
+  background: #2858ad !important;
+  color: #fff !important;
+}
+
+body.admin-body .clover-pay-btn {
+  background: #20924f !important;
+}
+
+body.admin-body .cash-pay-btn {
+  background: #dba32f !important;
+}
+
+body.admin-body .remove-order-btn,
+body.admin-body [data-hide-paid] {
+  background: #992f28 !important;
+  color: #fff !important;
+}
+
+@media (min-width: 1100px) {
+  body.admin-body .orders-list {
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  }
+}
+
+@media (min-width: 720px) and (max-width: 1099px) {
+  body.admin-body .orders-list {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+}
+
+@media (max-width: 719px) {
+  body.admin-body .orders-list {
+    grid-template-columns: 1fr !important;
+  }
+
+  body.admin-body .compact-order-item-head {
+    gap: 7px;
+  }
+
+  body.admin-body .order-inline-payment-actions {
+    grid-template-columns: 1fr !important;
+  }
+}
