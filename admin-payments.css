@@ -462,3 +462,60 @@ body.admin-body .order-card.is-expanded .order-card-toggle {
     transition: none !important;
   }
 }
+
+
+/* ===== V72 · ACCIONES CENTRADAS, VERTICALES Y DIFERENCIADAS ===== */
+body.admin-body .order-primary-actions,
+body.admin-body .order-inline-payment-actions,
+body.admin-body .payment-action-wrap {
+  display: grid !important;
+  grid-template-columns: minmax(220px, 1fr) !important;
+  justify-items: center !important;
+  gap: 10px !important;
+  width: min(100%, 744px) !important;
+  margin-left: auto !important;
+  margin-right: auto !important;
+}
+
+body.admin-body .order-primary-actions > button,
+body.admin-body .order-inline-payment-actions > button,
+body.admin-body .payment-action-wrap > button {
+  width: 100% !important;
+  min-height: 56px !important;
+  margin: 0 auto !important;
+  border-radius: 14px !important;
+  text-align: center !important;
+}
+
+body.admin-body [data-ready-order] {
+  border-color: #4c74c9 !important;
+  background: #244d9b !important;
+  color: #fff !important;
+}
+
+body.admin-body .clover-pay-btn {
+  border: 0 !important;
+  background: #1f8b4c !important;
+  color: #fff !important;
+}
+
+body.admin-body .cash-pay-btn {
+  border: 0 !important;
+  background: #d69a22 !important;
+  color: #211603 !important;
+}
+
+body.admin-body .remove-order-btn,
+body.admin-body [data-hide-paid] {
+  border: 1px solid #d84c42 !important;
+  background: #8f261f !important;
+  color: #fff !important;
+}
+
+@media (max-width: 720px) {
+  body.admin-body .order-primary-actions,
+  body.admin-body .order-inline-payment-actions,
+  body.admin-body .payment-action-wrap {
+    width: 100% !important;
+  }
+}
