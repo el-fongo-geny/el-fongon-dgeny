@@ -907,3 +907,6 @@ body.image-crop-open { overflow: hidden; }
     width: 100%;
   }
 }
+
+#availabilityItemGroupSelect{width:100%;min-height:46px;border:1px solid var(--line);border-radius:12px;padding:0 12px;background:var(--surface);color:var(--text)}
+#availabilityNewGroupField[hidden]{display:none!important}
