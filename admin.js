@@ -76,7 +76,7 @@ function showLoginRuntimeError(error) {
   console.error("Error del administrador:", error);
 }
 
-window.FOGON_ADMIN_BUILD = "78-fixed-add-bar-stable-order-flow";
+window.FOGON_ADMIN_BUILD = "79-remove-accepted-step";
 
 if (!window.CSS) window.CSS = {};
 if (!window.CSS.escape) {
@@ -2063,7 +2063,7 @@ function expandedWorkflowActionsHtml(order) {
 
   const acceptButton = status === "new"
     ? `<button class="primary-btn full workflow-accept-btn" data-accept-order="${orderId}" type="button">Aceptar pedido</button>`
-    : `<button class="primary-btn full workflow-complete-btn" type="button" disabled>Pedido aceptado ✓</button>`;
+    : "";
 
   const readyButton = ready
     ? `<button class="secondary-btn full workflow-complete-btn" type="button" disabled>Pedido listo ✓</button>`
