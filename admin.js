@@ -76,7 +76,7 @@ function showLoginRuntimeError(error) {
   console.error("Error del administrador:", error);
 }
 
-window.FOGON_ADMIN_BUILD = "80-panel-runtime-fixes";
+window.FOGON_ADMIN_BUILD = "83-weekly-schedule-kitchen-type";
 
 if (!window.CSS) window.CSS = {};
 if (!window.CSS.escape) {
@@ -108,6 +108,17 @@ let pinnedKitchenCardIds = [];
 const BACKEND_URL = (window.FOGON_BACKEND_URL || "").replace(/\/$/, "");
 const ORDER_MODE_MANUAL_KEY = "system:orders-manual";
 const ORDER_MODE_OPEN_KEY = "system:orders-open";
+const CALIFORNIA_TIME_ZONE = "America/Los_Angeles";
+const DEFAULT_WEEKLY_SCHEDULE = {
+  "0": { open: true, start: "11:00", end: "20:30" },
+  "1": { open: true, start: "11:00", end: "20:30" },
+  "2": { open: false, start: "11:00", end: "20:30" },
+  "3": { open: true, start: "11:00", end: "20:30" },
+  "4": { open: true, start: "11:00", end: "20:30" },
+  "5": { open: true, start: "11:00", end: "20:30" },
+  "6": { open: true, start: "11:00", end: "20:30" }
+};
+let adminWeeklySchedule = { ...DEFAULT_WEEKLY_SCHEDULE };
 
 const INVENTORY_ITEMS = [
   "Pollo guisar", "Pollo pica pollo", "Alitas", "Bistec", "Chuleta", "Orejita",
@@ -144,16 +155,62 @@ function getOrderMode() {
 function renderOrderModeButton() {
   const button = $("#orderModeBtn");
   if (!button) return;
+
   const mode = getOrderMode();
-  const labels = {
-    auto: "Pedidos: AUTOMATICO (11:00-20:30)",
-    open: "Pedidos: ABIERTO",
-    closed: "Pedidos: CERRADO"
+
+  if (mode === "open") {
+    button.textContent = "Pedidos: ABIERTO MANUALMENTE";
+    button.classList.add("is-open");
+    button.classList.remove("is-closed");
+    return;
+  }
+
+  if (mode === "closed") {
+    button.textContent = "Pedidos: CERRADO MANUALMENTE";
+    button.classList.remove("is-open");
+    button.classList.add("is-closed");
+    return;
+  }
+
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: CALIFORNIA_TIME_ZONE,
+    weekday: "short",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23"
+  }).formatToParts(new Date());
+
+  const dayName = parts.find((part) => part.type === "weekday")?.value || "Sun";
+  const weekday = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].indexOf(dayName);
+  const hour = Number(parts.find((part) => part.type === "hour")?.value || 0);
+  const minute = Number(parts.find((part) => part.type === "minute")?.value || 0);
+  const nowMinutes = hour * 60 + minute;
+  const today = adminWeeklySchedule[String(weekday)]
+    || DEFAULT_WEEKLY_SCHEDULE[String(weekday)];
+
+  const parseTime = (value) => {
+    const match = String(value || "").match(/^(\d{1,2}):(\d{2})$/);
+    return match ? Number(match[1]) * 60 + Number(match[2]) : 0;
   };
-  button.textContent = labels[mode];
-  button.dataset.mode = mode;
-  button.classList.toggle("is-open", mode === "open");
-  button.classList.toggle("is-closed", mode === "closed");
+
+  const start = parseTime(today.start);
+  const end = parseTime(today.end);
+  const automaticallyOpen = today.open !== false && (
+    start === end
+      ? true
+      : end > start
+        ? nowMinutes >= start && nowMinutes < end
+        : nowMinutes >= start || nowMinutes < end
+  );
+
+  button.textContent = automaticallyOpen
+    ? `Pedidos: AUTOMÁTICO · ABIERTO (${today.start}–${today.end})`
+    : today.open === false
+      ? "Pedidos: AUTOMÁTICO · CERRADO TODO EL DÍA"
+      : `Pedidos: AUTOMÁTICO · CERRADO (${today.start}–${today.end})`;
+
+  button.classList.toggle("is-open", automaticallyOpen);
+  button.classList.toggle("is-closed", !automaticallyOpen);
 }
 
 async function setOrderMode(mode) {
@@ -666,6 +723,29 @@ async function syncOrdersFromBackend() {
   } catch (error) {
     console.warn("No se pudieron sincronizar pedidos desde el backend:", error);
   }
+}
+
+
+async function syncWeeklyScheduleFromBackend() {
+  const db = window.FOGON_DB;
+
+  if (!db?.isReady?.() || typeof db.fetchMenuSettings !== "function") {
+    renderOrderModeButton();
+    return;
+  }
+
+  try {
+    const settings = await db.fetchMenuSettings();
+    const source = settings?.weekly_schedule;
+
+    adminWeeklySchedule = source && typeof source === "object"
+      ? { ...DEFAULT_WEEKLY_SCHEDULE, ...source }
+      : { ...DEFAULT_WEEKLY_SCHEDULE };
+  } catch (error) {
+    console.warn("No se pudo cargar el horario semanal:", error);
+  }
+
+  renderOrderModeButton();
 }
 
 async function syncAvailabilityFromBackend() {
@@ -2430,9 +2510,8 @@ function renderKitchen() {
       <div class="kitchen-order-head">
         <div class="kitchen-order-identity">
           <strong>#${escapeHtml(order.id)}</strong>
-          <span class="kitchen-fulfillment-type">${escapeHtml(orderTypeLabel(order))}</span>
         </div>
-        <span>${statusLabel(order)}</span>
+        <span class="kitchen-fulfillment-type">${escapeHtml(orderTypeLabel(order))}</span>
       </div>
       <div class="kitchen-items">
         ${aggregateOrderItems(order.items).map((item) => itemDetailsHtml(item, true)).join("")}
@@ -2614,6 +2693,10 @@ function showAdminPanel() {
 
     Promise.resolve(syncOrdersFromBackend()).catch((error) => {
       console.warn("No se pudieron cargar los pedidos:", error);
+    });
+
+    Promise.resolve(syncWeeklyScheduleFromBackend()).catch((error) => {
+      console.warn("No se pudo cargar el horario semanal:", error);
     });
 
     Promise.resolve(syncAvailabilityFromBackend()).catch((error) => {
@@ -3020,6 +3103,10 @@ function init() {
   setInterval(() => {
     if (window.FOGON_DB?.isReady() || BACKEND_URL) syncAvailabilityFromBackend();
   }, 6000);
+
+  setInterval(() => {
+    if (window.FOGON_DB?.isReady()) void syncWeeklyScheduleFromBackend();
+  }, 30000);
 }
 window.addEventListener("error", (event) => {
   if (event?.error) {
