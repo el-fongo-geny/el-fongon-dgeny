@@ -19,7 +19,6 @@ const ORDER_MODE_MANUAL_KEY = "system:orders-manual";
 const ORDER_MODE_OPEN_KEY = "system:orders-open";
 const WEEKLY_CLOSED_DAY_KEY = "system:weekly-closed-day";
 let orderSubmissionInProgress = false;
-let checkoutPhase = "closed";
 const CALIFORNIA_TIME_ZONE = "America/Los_Angeles";
 const ORDER_OPEN_MINUTES = 11 * 60;
 const ORDER_CLOSE_MINUTES = 20 * 60 + 30;
@@ -835,8 +834,55 @@ function buildCartItem(form) {
   };
 }
 
+function cartLineConfigurationKey(item) {
+  const normalized = {
+    productId: String(item?.productId || ""),
+    selections: (item?.selections || []).map((selection) => ({
+      group: String(selection.groupEs || selection.group || ""),
+      name: String(selection.nameEs || selection.name || ""),
+      price: Number(selection.price || 0)
+    })),
+    extras: (item?.extras || []).map((extra) => ({
+      name: String(extra.nameEs || extra.name || ""),
+      price: Number(extra.price || 0)
+    })),
+    removables: (item?.removables || []).map((remove) =>
+      typeof remove === "string"
+        ? remove
+        : String(remove.nameEs || remove.name || "")
+    ),
+    notes: String(item?.notes || "").trim()
+  };
+
+  return JSON.stringify(normalized);
+}
+
+function changeCartQuantity(lineId, delta) {
+  const id = String(lineId || "");
+  const amount = Number(delta || 0);
+
+  state.cart = state.cart
+    .map((item) => {
+      if (String(item.id) !== id) return item;
+      const nextQuantity = Math.max(0, Number(item.quantity || 1) + amount);
+      return { ...item, quantity: nextQuantity };
+    })
+    .filter((item) => Number(item.quantity || 0) > 0);
+
+  renderCart();
+}
+
 function addToCart(cartItem) {
-  state.cart.push(cartItem);
+  const incomingKey = cartLineConfigurationKey(cartItem);
+  const existing = state.cart.find(
+    (item) => cartLineConfigurationKey(item) === incomingKey
+  );
+
+  if (existing) {
+    existing.quantity = Number(existing.quantity || 1) + Number(cartItem.quantity || 1);
+  } else {
+    state.cart.push(cartItem);
+  }
 
   // Cierra el producto inmediatamente después de agregarlo.
   // Así, incluso si una actualización visual falla, el modal no queda abierto.
@@ -870,8 +916,13 @@ function renderCart() {
           ${item.removables.map((remove) => `<p>${typeof remove === "string" ? remove : remove.name}</p>`).join("")}
           ${item.notes ? `<p>${item.notes}</p>` : ""}
         </div>
-        <div>
-          <strong>${money(item.lineTotal * item.quantity)}</strong>
+        <div class="cart-item-actions">
+          <strong class="cart-line-total">${money(item.lineTotal * item.quantity)}</strong>
+          <div class="cart-quantity-control" role="group" aria-label="${state.lang === "en" ? "Quantity" : "Cantidad"} ${item.name}">
+            <button class="cart-quantity-btn" data-cart-quantity="-1" data-cart-line="${item.id}" type="button" aria-label="${state.lang === "en" ? "Decrease" : "Disminuir"} ${item.name}">−</button>
+            <output class="cart-quantity-value" aria-live="polite">${item.quantity}</output>
+            <button class="cart-quantity-btn" data-cart-quantity="1" data-cart-line="${item.id}" type="button" aria-label="${state.lang === "en" ? "Increase" : "Aumentar"} ${item.name}">+</button>
+          </div>
           <button class="text-btn cart-remove-btn" data-remove-cart="${item.id}" type="button" aria-label="${text("remove")} ${item.name}">${text("remove")}</button>
         </div>
       </div>
@@ -949,27 +1000,29 @@ function nextSimpleOrderId() {
   return String(Math.floor(Math.random() * 999) + 1);
 }
 
-function setCheckoutPhase(phase) {
-  checkoutPhase = phase;
+function openPayment(order) {
+  state.pendingOrder = order;
+  state.orderType = "";
 
   const orderTypeStep = $("#orderTypeStep");
   const paymentMethodStep = $("#paymentMethodStep");
   const orderThanksStep = $("#orderThanksStep");
 
-  if (orderTypeStep) orderTypeStep.hidden = phase !== "order-type";
-  if (paymentMethodStep) paymentMethodStep.hidden = phase !== "payment";
-  if (orderThanksStep) orderThanksStep.hidden = phase !== "thanks";
-}
+  if (orderTypeStep) orderTypeStep.hidden = false;
+  if (paymentMethodStep) paymentMethodStep.hidden = true;
+  if (orderThanksStep) orderThanksStep.hidden = true;
 
-function openPayment(order) {
-  state.pendingOrder = order;
-  state.orderType = "";
-  setCheckoutPhase("order-type");
   $("#paymentModal").setAttribute("aria-hidden", "false");
 }
 
 function showOrderThanks(orderNumber, activeOrderCount = 0) {
-  setCheckoutPhase("thanks");
+  const orderTypeStep = $("#orderTypeStep");
+  const paymentMethodStep = $("#paymentMethodStep");
+  const orderThanksStep = $("#orderThanksStep");
+
+  if (orderTypeStep) orderTypeStep.hidden = true;
+  if (paymentMethodStep) paymentMethodStep.hidden = true;
+  if (orderThanksStep) orderThanksStep.hidden = false;
 
   const isEnglish = state.lang === "en";
   const title = $("#orderThanksTitle");
@@ -1008,13 +1061,22 @@ function showOrderThanks(orderNumber, activeOrderCount = 0) {
     closeButton.textContent = isEnglish ? "Close" : "Cerrar";
   }
 
+  // Impide volver a enviar el mismo pedido desde esta ventana.
   state.pendingOrder = null;
   state.orderType = "";
 }
 
 function closePayment() {
   $("#paymentModal").setAttribute("aria-hidden", "true");
-  setCheckoutPhase("closed");
+
+  const orderTypeStep = $("#orderTypeStep");
+  const paymentMethodStep = $("#paymentMethodStep");
+  const orderThanksStep = $("#orderThanksStep");
+
+  if (orderTypeStep) orderTypeStep.hidden = false;
+  if (paymentMethodStep) paymentMethodStep.hidden = true;
+  if (orderThanksStep) orderThanksStep.hidden = true;
+
   state.pendingOrder = null;
   state.orderType = "";
 }
@@ -1176,6 +1238,17 @@ function initEvents() {
     }
     if (event.target.closest("#closeCartBtn")) closeCart();
 
+    const quantityButton = event.target.closest("[data-cart-quantity]");
+    if (quantityButton) {
+      event.preventDefault();
+      event.stopPropagation();
+      changeCartQuantity(
+        quantityButton.dataset.cartLine,
+        Number(quantityButton.dataset.cartQuantity || 0)
+      );
+      return;
+    }
+
     const removeButton = event.target.closest("[data-remove-cart]");
     if (removeButton) {
       event.preventDefault();
@@ -1187,22 +1260,15 @@ function initEvents() {
     }
 
     const orderTypeButton = event.target.closest("[data-order-type]");
-    if (orderTypeButton && state.pendingOrder && checkoutPhase === "order-type") {
+    if (orderTypeButton && state.pendingOrder) {
       state.orderType = orderTypeButton.dataset.orderType;
-      setCheckoutPhase("payment");
-      return;
+      $("#orderTypeStep").hidden = true;
+      $("#paymentMethodStep").hidden = false;
     }
 
     const paymentButton = event.target.closest("[data-payment]");
-    if (
-      paymentButton &&
-      state.pendingOrder &&
-      state.orderType &&
-      checkoutPhase === "payment" &&
-      !orderSubmissionInProgress
-    ) {
+    if (paymentButton && state.pendingOrder && state.orderType) {
       saveOrder(paymentButton.dataset.payment);
-      return;
     }
 
     if (event.target.closest("#closeOrderThanksBtn")) {
