@@ -2691,3 +2691,326 @@ body.admin-body .order-fulfillment-type {
     height: 44px;
   }
 }
+
+
+/* ===== V65 · MENÚ COMERCIAL + IMÁGENES ESTABLES ===== */
+html {
+  scroll-behavior: auto;
+}
+
+.site-header {
+  position: relative;
+  align-items: center;
+  min-height: 190px;
+  margin-top: 12px;
+  border: 1px solid color-mix(in srgb, var(--accent) 18%, var(--line));
+  border-radius: 28px;
+  padding: 28px 150px 28px 28px;
+  background:
+    radial-gradient(circle at 88% 15%, color-mix(in srgb, var(--accent) 16%, transparent), transparent 18rem),
+    linear-gradient(135deg, color-mix(in srgb, var(--surface) 94%, var(--accent) 6%), var(--surface));
+  box-shadow: var(--soft-shadow);
+}
+
+.brand-heading {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  min-width: 0;
+}
+
+.brand-logo {
+  width: clamp(74px, 9vw, 108px);
+  height: clamp(74px, 9vw, 108px);
+  flex: 0 0 auto;
+  border-radius: 24px;
+  object-fit: cover;
+  box-shadow: 0 14px 34px rgba(31, 27, 22, .16);
+}
+
+.brand-copy {
+  min-width: 0;
+}
+
+.site-header h1 {
+  max-width: 720px;
+  margin-bottom: 10px;
+  font-size: clamp(2.35rem, 6vw, 4.6rem);
+  letter-spacing: -.055em;
+}
+
+.site-header .subtitle {
+  max-width: 680px;
+  font-size: clamp(.98rem, 2vw, 1.14rem);
+  line-height: 1.5;
+}
+
+.hero-steps {
+  display: flex;
+  gap: 9px;
+  flex-wrap: wrap;
+  margin-top: 16px;
+}
+
+.hero-steps span {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 38px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 0 12px 0 7px;
+  background: color-mix(in srgb, var(--surface) 90%, var(--accent) 10%);
+  color: var(--ink);
+  font-size: .86rem;
+  font-weight: 850;
+}
+
+.hero-steps strong {
+  display: grid;
+  place-items: center;
+  width: 25px;
+  height: 25px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: #fff;
+  font-size: .76rem;
+}
+
+.category-title {
+  margin-top: 14px;
+}
+
+.category-title h2 {
+  letter-spacing: -.035em;
+}
+
+.product-trigger {
+  border-color: color-mix(in srgb, var(--line) 88%, var(--accent) 12%);
+  box-shadow: 0 10px 26px rgba(31, 27, 22, .075);
+}
+
+.product-trigger:active {
+  transform: scale(.992);
+}
+
+.product-info h2 {
+  font-size: 1.08rem;
+  letter-spacing: -.018em;
+}
+
+.price-row strong {
+  font-size: 1.18rem;
+}
+
+.product-image {
+  isolation: isolate;
+}
+
+.product-image-placeholder {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  display: grid;
+  place-items: center;
+  background:
+    linear-gradient(110deg,
+      color-mix(in srgb, var(--surface) 86%, var(--line)) 8%,
+      color-mix(in srgb, var(--surface) 96%, white) 18%,
+      color-mix(in srgb, var(--surface) 86%, var(--line)) 33%);
+  background-size: 220% 100%;
+  color: var(--muted);
+  opacity: 1;
+  transition: opacity 180ms ease;
+}
+
+.product-image.is-loading .product-image-placeholder {
+  animation: menuImageSkeleton 1.3s linear infinite;
+}
+
+.product-image-placeholder-icon {
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  border: 1px solid color-mix(in srgb, var(--line) 75%, transparent);
+  border-radius: 15px;
+  background: color-mix(in srgb, var(--surface) 86%, transparent);
+  font-size: .76rem;
+  font-weight: 950;
+  letter-spacing: .04em;
+}
+
+.product-image img {
+  z-index: 2;
+  opacity: 0;
+  transform: scale(1.012);
+  transition: opacity 220ms ease, transform 300ms ease;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
+
+.product-image img.is-loaded,
+.product-image.has-loaded-image img {
+  opacity: 1;
+  transform: none;
+}
+
+.product-image.has-loaded-image .product-image-placeholder {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.product-image.missing-image .product-image-placeholder {
+  opacity: 1;
+  animation: none;
+}
+
+.product-image.missing-image::after {
+  z-index: 3;
+  content: "Imagen no disponible";
+  align-self: end;
+  margin-bottom: 10px;
+  font-size: .75rem;
+}
+
+@keyframes menuImageSkeleton {
+  from { background-position: 120% 0; }
+  to { background-position: -120% 0; }
+}
+
+.cart-fab {
+  border: 1px solid rgba(255,255,255,.32);
+  box-shadow: 0 18px 42px rgba(142, 38, 18, .30);
+}
+
+.cart-icon-wrap {
+  display: grid !important;
+}
+
+.cart-svg {
+  display: block !important;
+}
+
+.cart-label {
+  display: inline !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .product-image.is-loading .product-image-placeholder,
+  .cart-fab::before {
+    animation: none !important;
+  }
+
+  .product-trigger,
+  .product-image img {
+    transition: none !important;
+  }
+}
+
+@media (max-width: 720px) {
+  .site-header {
+    min-height: auto;
+    margin: 8px 10px 14px;
+    border-radius: 22px;
+    padding: 18px 88px 18px 16px;
+  }
+
+  .brand-heading {
+    align-items: flex-start;
+    gap: 11px;
+  }
+
+  .brand-logo {
+    width: 54px;
+    height: 54px;
+    border-radius: 16px;
+  }
+
+  .site-header h1 {
+    margin-top: 1px;
+    margin-bottom: 7px;
+    font-size: clamp(1.9rem, 9vw, 2.65rem);
+    line-height: 1;
+  }
+
+  .site-header .subtitle {
+    max-width: 100%;
+    font-size: .9rem;
+    line-height: 1.4;
+  }
+
+  .hero-steps {
+    gap: 6px;
+    margin-top: 12px;
+  }
+
+  .hero-steps span {
+    min-height: 32px;
+    padding-right: 9px;
+    font-size: .75rem;
+  }
+
+  .hero-steps strong {
+    width: 22px;
+    height: 22px;
+  }
+
+  .header-actions {
+    position: absolute;
+    top: 14px;
+    right: 12px;
+    display: grid;
+    gap: 7px;
+  }
+
+  .theme-toggle {
+    min-height: 38px;
+    max-width: 74px;
+    padding: 0 8px;
+    overflow: hidden;
+    font-size: .72rem;
+    text-overflow: ellipsis;
+  }
+
+  .lang-switch {
+    justify-self: end;
+  }
+
+  .lang-switch button {
+    min-width: 34px;
+    min-height: 32px;
+    font-size: .75rem;
+  }
+
+  .product-image-placeholder-icon {
+    width: 40px;
+    height: 40px;
+    border-radius: 12px;
+  }
+
+  .cart-fab {
+    min-width: 74px;
+    min-height: 54px;
+    padding: 0 9px;
+  }
+
+  /* Mantener siempre visible el icono. Solo se oculta la palabra para liberar espacio. */
+  .cart-fab .cart-label {
+    display: none !important;
+  }
+
+  .cart-fab .cart-icon-wrap {
+    display: grid !important;
+  }
+
+  .cart-fab #cartCount {
+    display: inline-flex !important;
+  }
+}
+
+@media (min-width: 721px) {
+  .site-header {
+    width: calc(100% - 36px);
+  }
+}
