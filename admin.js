@@ -76,7 +76,7 @@ function showLoginRuntimeError(error) {
   console.error("Error del administrador:", error);
 }
 
-window.FOGON_ADMIN_BUILD = "76-compact-actions-stable-layout";
+window.FOGON_ADMIN_BUILD = "77-compact-actions-inventory-menu";
 
 if (!window.CSS) window.CSS = {};
 if (!window.CSS.escape) {
@@ -1975,82 +1975,38 @@ function kitchenOrdersInPinnedCardOrder(orders) {
 
 function compactCardActionHtml(order) {
   const orderId = escapeHtml(order.id);
-  const isNew = order.status === "new" || !order.status;
-  const isReady = order.status === "ready";
-
-  if (isNew) {
-    return `
-      <button class="primary-btn full compact-card-action-btn" data-accept-order="${orderId}" type="button">
-        Aceptar pedido
-      </button>
-    `;
-  }
-
-  if (!isReady) {
-    return `
-      <button class="secondary-btn full compact-card-action-btn compact-ready-btn" data-ready-order="${orderId}" type="button">
-        Pedido listo
-      </button>
-    `;
-  }
-
-  const method = String(order.paymentMethod || "").toLowerCase();
+  const status = String(order.status || "new").toLowerCase();
+  const paymentMethod = String(order.paymentMethod || "").toLowerCase();
   const paymentStatus = normalizePaymentStatus(order);
   const busy = paymentActionLocks.has(String(order.id));
 
-  if (busy) {
-    return `
-      <button class="primary-btn full compact-card-action-btn" type="button" disabled>
-        Procesando…
-      </button>
-    `;
+  if (busy) return `<button class="primary-btn full compact-card-action-btn" type="button" disabled>Procesando…</button>`;
+
+  if (status === "new" || !status) {
+    return `<button class="primary-btn full compact-card-action-btn compact-accept-btn" data-accept-order="${orderId}" type="button">Aceptar pedido</button>`;
   }
 
-  if (paymentStatus === "paid") {
-    return `
-      <button class="secondary-btn danger-btn full compact-card-action-btn" data-hide-paid="${orderId}" type="button">
-        Quitar pedido para todos
-      </button>
-    `;
+  if (status === "accepted") {
+    return `<button class="secondary-btn full compact-card-action-btn compact-ready-btn" data-ready-order="${orderId}" type="button">Pedido listo</button>`;
   }
 
-  if (method === "card") {
-    if (paymentStatus === "processing") {
-      return `
-        <button class="primary-btn full compact-card-action-btn" type="button" disabled>
-          Esperando tarjeta en Clover…
-        </button>
-      `;
+  if (status === "ready") {
+    if (paymentStatus === "paid") {
+      return `<button class="secondary-btn danger-btn full compact-card-action-btn" data-hide-paid="${orderId}" type="button">Quitar pedido para todos</button>`;
     }
 
-    if (paymentStatus === "review") {
-      return `
-        <button class="secondary-btn full compact-card-action-btn" type="button" disabled>
-          Revisar cobro en Clover
-        </button>
-      `;
+    if (paymentMethod === "card") {
+      if (paymentStatus === "processing") return `<button class="primary-btn full compact-card-action-btn" type="button" disabled>Esperando tarjeta en Clover…</button>`;
+      if (paymentStatus === "review") return `<button class="secondary-btn full compact-card-action-btn" type="button" disabled>Revisar cobro en Clover</button>`;
+      return `<button class="primary-btn full clover-pay-btn compact-card-action-btn" data-clover-pay="${orderId}" type="button">${paymentStatus === "failed" || paymentStatus === "cancelled" ? "Reintentar con Clover" : "Cobrar con Clover"}</button>`;
     }
 
-    return `
-      <button class="primary-btn full clover-pay-btn compact-card-action-btn" data-clover-pay="${orderId}" type="button">
-        Cobrar con Clover
-      </button>
-    `;
+    if (paymentMethod === "cash") {
+      return `<button class="primary-btn full cash-pay-btn compact-card-action-btn" data-cash-pay="${orderId}" type="button">Cobrar en efectivo</button>`;
+    }
   }
 
-  if (method === "cash") {
-    return `
-      <button class="primary-btn full cash-pay-btn compact-card-action-btn" data-cash-pay="${orderId}" type="button">
-        Cobrar en efectivo
-      </button>
-    `;
-  }
-
-  return `
-    <button class="secondary-btn full compact-card-action-btn" type="button" disabled>
-      Método de pago no indicado
-    </button>
-  `;
+  return `<button class="secondary-btn full compact-card-action-btn" type="button" disabled>Acción no disponible</button>`;
 }
 
 
@@ -2058,7 +2014,10 @@ function renderOrders() {
   const sourceOrders = getOrders().slice();
   const orders = ordersInPinnedCardOrder(sourceOrders);
 
-  const renderSignature = stableOrdersSignature(orders);
+  const renderSignature = stableOrdersSignature(orders.map((order) => ({
+    ...order,
+    __compactAction: [order.status || "new", order.paymentMethod || "", normalizePaymentStatus(order), paymentActionLocks.has(String(order.id))].join("|")
+  })));
   const ordersList = $("#ordersList");
   if (!ordersList) return;
 
@@ -2771,10 +2730,20 @@ function init() {
     if (tabJumpButton) switchTab(tabJumpButton.dataset.adminTabJump);
 
     const acceptButton = event.target.closest("[data-accept-order]");
-    if (acceptButton) acceptOrder(acceptButton.dataset.acceptOrder);
+    if (acceptButton) {
+      event.preventDefault();
+      event.stopPropagation();
+      void acceptOrder(acceptButton.dataset.acceptOrder);
+      return;
+    }
 
     const readyButton = event.target.closest("[data-ready-order]");
-    if (readyButton) sendReadyNotification(readyButton.dataset.readyOrder);
+    if (readyButton) {
+      event.preventDefault();
+      event.stopPropagation();
+      void sendReadyNotification(readyButton.dataset.readyOrder);
+      return;
+    }
 
     const kitchenDoneButton = event.target.closest("[data-kitchen-done]");
     if (kitchenDoneButton) hideKitchenOrder(kitchenDoneButton.dataset.kitchenDone);
@@ -2782,19 +2751,22 @@ function init() {
     const cloverPayButton = event.target.closest("[data-clover-pay]");
     if (cloverPayButton) {
       event.preventDefault();
-      startCloverPayment(cloverPayButton.dataset.cloverPay, { automatic: false });
+      void startCloverPayment(cloverPayButton.dataset.cloverPay, { automatic: false });
+      return;
     }
 
     const cashPayButton = event.target.closest("[data-cash-pay]");
     if (cashPayButton) {
       event.preventDefault();
-      confirmCashPayment(cashPayButton.dataset.cashPay);
+      void confirmCashPayment(cashPayButton.dataset.cashPay);
+      return;
     }
 
     const hidePaidButton = event.target.closest("[data-hide-paid]");
     if (hidePaidButton) {
       event.preventDefault();
-      hidePaidOrder(hidePaidButton.dataset.hidePaid);
+      void hidePaidOrder(hidePaidButton.dataset.hidePaid);
+      return;
     }
 
     const deliverButton = event.target.closest("[data-deliver-order]");
