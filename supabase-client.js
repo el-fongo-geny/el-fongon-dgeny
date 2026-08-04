@@ -179,6 +179,41 @@
     if (error) throw error;
   }
 
+
+  async function hideOrderForAll(orderId) {
+    if (!client) {
+      throw new Error("Supabase no está configurado.");
+    }
+
+    const payload = {
+      hidden_for_all: true,
+      hidden_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
+    };
+
+    let query = client
+      .from(tables.orders)
+      .update(payload)
+      .select("id, public_id, hidden_for_all");
+
+    const publicId = numericOrderId(orderId);
+    query = publicId
+      ? query.eq("public_id", publicId)
+      : query.eq("id", orderId);
+
+    const { data, error } = await query;
+
+    if (error) throw error;
+
+    const updated = Array.isArray(data) ? data[0] : data;
+
+    if (!updated || updated.hidden_for_all !== true) {
+      throw new Error("Supabase no confirmó hidden_for_all=true.");
+    }
+
+    return updated;
+  }
+
   async function fetchAvailability() {
     if (!client) return {};
     const { data, error } = await client
@@ -246,6 +281,7 @@
     updateOrderStatus,
     deleteOrder,
     clearOrders,
+    hideOrderForAll,
     fetchAvailability,
     setAvailability,
     fetchMenuSettings,
