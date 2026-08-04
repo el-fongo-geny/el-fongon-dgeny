@@ -76,7 +76,7 @@ function showLoginRuntimeError(error) {
   console.error("Error del administrador:", error);
 }
 
-window.FOGON_ADMIN_BUILD = "69-auto-clover-priority-queue";
+window.FOGON_ADMIN_BUILD = "70-inline-payment-actions";
 
 
 const STORAGE_ORDERS = "fogon_orders";
@@ -1897,14 +1897,23 @@ function renderOrders() {
           : `<p class="accepted-note">${isReady ? "Pedido listo" : "Pedido aceptado"}${order.acceptedAt ? ` · ${new Date(order.acceptedAt).toLocaleTimeString()}` : ""}</p>`}
 
         ${!isNew ? `
-          <div class="order-actions-row">
+          <div class="order-actions-row order-primary-actions">
             <button class="secondary-btn" data-ready-order="${escapeHtml(orderId)}" type="button">Pedido listo / Enviar WhatsApp</button>
           </div>
-          <p class="order-payment-inline-status payment-${paymentStatusClass(order)}">
-            ${String(order.paymentMethod || "").toLowerCase() === "card"
-              ? `Clover: ${escapeHtml(paymentStatusLabel(order))}`
-              : `Pago: ${escapeHtml(paymentLabel(order.paymentMethod))}`}
-          </p>
+
+          <section class="order-inline-payment" aria-label="Cobro del pedido">
+            <div class="order-inline-payment-head">
+              <div>
+                <small>${String(order.paymentMethod || "").toLowerCase() === "card" ? "Cobro con tarjeta" : "Cobro en efectivo"}</small>
+                <strong>${money(order.totals?.total)}</strong>
+              </div>
+              <span class="payment-state ${paymentStatusClass(order)}">${escapeHtml(paymentStatusLabel(order))}</span>
+            </div>
+
+            <div class="order-inline-payment-actions">
+              ${paymentActionHtml(order)}
+            </div>
+          </section>
         ` : ""}
       </div>
     </article>`;
@@ -2502,13 +2511,22 @@ function init() {
     if (kitchenDoneButton) hideKitchenOrder(kitchenDoneButton.dataset.kitchenDone);
 
     const cloverPayButton = event.target.closest("[data-clover-pay]");
-    if (cloverPayButton) startCloverPayment(cloverPayButton.dataset.cloverPay);
+    if (cloverPayButton) {
+      event.preventDefault();
+      startCloverPayment(cloverPayButton.dataset.cloverPay, { automatic: false });
+    }
 
     const cashPayButton = event.target.closest("[data-cash-pay]");
-    if (cashPayButton) confirmCashPayment(cashPayButton.dataset.cashPay);
+    if (cashPayButton) {
+      event.preventDefault();
+      confirmCashPayment(cashPayButton.dataset.cashPay);
+    }
 
     const hidePaidButton = event.target.closest("[data-hide-paid]");
-    if (hidePaidButton) hidePaidOrder(hidePaidButton.dataset.hidePaid);
+    if (hidePaidButton) {
+      event.preventDefault();
+      hidePaidOrder(hidePaidButton.dataset.hidePaid);
+    }
 
     const deliverButton = event.target.closest("[data-deliver-order]");
     if (deliverButton) removeOrderEverywhere(deliverButton.dataset.deliverOrder);
