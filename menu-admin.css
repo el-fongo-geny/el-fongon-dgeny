@@ -799,3 +799,111 @@ body.image-crop-open { overflow: hidden; }
     justify-content: flex-end;
   }
 }
+
+
+/* ===== V72 · GESTIÓN DE DISPONIBILIDAD Y DATOS DEL MENÚ ===== */
+.management-heading {
+  align-items: center;
+}
+
+.management-form,
+.business-settings-form {
+  display: grid;
+  gap: 18px;
+  margin: 18px 0;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  padding: 18px;
+  background: var(--surface-soft);
+}
+
+.management-form-actions,
+.business-settings-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.management-search {
+  max-width: 520px;
+  margin: 18px 0 14px;
+}
+
+.management-list {
+  display: grid;
+  gap: 10px;
+}
+
+.management-row {
+  display: grid;
+  grid-template-columns: minmax(180px, 1fr) auto auto auto;
+  align-items: center;
+  gap: 14px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 14px;
+  background: var(--surface);
+}
+
+.management-row-main {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.management-row-main small,
+.management-row-main span {
+  color: var(--muted);
+  font-size: .78rem;
+}
+
+.management-row-main strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.management-order {
+  color: var(--muted);
+  font-size: .8rem;
+  font-weight: 750;
+}
+
+.management-row-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.danger-row-button {
+  border-color: #f1c6c2 !important;
+  background: var(--danger-soft) !important;
+  color: var(--danger) !important;
+}
+
+@media (max-width: 760px) {
+  .management-row {
+    grid-template-columns: 1fr auto;
+  }
+
+  .management-row-main {
+    grid-column: 1 / -1;
+  }
+
+  .management-row-actions {
+    grid-column: 1 / -1;
+  }
+
+  .management-row-actions button {
+    flex: 1;
+  }
+
+  .management-form-actions,
+  .business-settings-actions {
+    flex-direction: column-reverse;
+  }
+
+  .management-form-actions button,
+  .business-settings-actions button {
+    width: 100%;
+  }
+}
