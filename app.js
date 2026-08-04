@@ -1,4 +1,4 @@
-window.FOGON_MENU_BUILD = "72-public-settings";
+window.FOGON_MENU_BUILD = "77-explicit-order-copy";
 
 const state = {
   lang: localStorage.getItem("fogon_lang") || "",
@@ -407,8 +407,8 @@ async function loadPublicCatalog({ render = false, force = false } = {}) {
 
 
 const DEFAULT_PUBLIC_SETTINGS = {
-  menu_title: "Haz tu pedido",
-  menu_subtitle: "Elige tus favoritos, personaliza y recoge en la ventanilla.",
+  menu_title: "Haz tu pedido desde aquí",
+  menu_subtitle: "Elige tus platos, personalízalos, añádelos al carrito y completa tu pedido con tu nombre y teléfono.",
   footer_title: "Comida dominicana y latina en San Jose, California",
   footer_paragraph_1: "El Fogon D' Geny prepara autentica comida dominicana, latina y caribeña en el centro de San Jose.",
   footer_paragraph_2: "Si buscas comida dominicana sabrosa, comida latina o un restaurante dominicano en San Jose, visita El Fogon D' Geny.",
@@ -641,14 +641,14 @@ function applyText() {
 
   if (heroTitle) {
     heroTitle.textContent = publicBusinessSettings.menu_title ||
-      (state.lang === "en" ? "Order your favorites" : "Haz tu pedido");
+      (state.lang === "en" ? "Order your favorites" : "Haz tu pedido desde aquí");
   }
 
   if (heroSubtitle) {
     heroSubtitle.textContent = publicBusinessSettings.menu_subtitle ||
       (state.lang === "en"
-        ? "Choose your favorites, customize and pick up at the window."
-        : "Elige tus favoritos, personaliza y recoge en la ventanilla.");
+        ? "Choose your dishes, customize them, add them to the cart and complete your order with your name and phone number."
+        : "Elige tus platos, personalízalos, añádelos al carrito y completa tu pedido con tu nombre y teléfono.");
   }
 
   const trustLabels = state.lang === "en"
