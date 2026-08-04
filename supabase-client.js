@@ -31,7 +31,8 @@
   const tables = {
     orders: cfg.tables?.orders || "orders",
     availability: cfg.tables?.availability || "product_availability",
-    counter: cfg.tables?.counter || "order_counter"
+    counter: cfg.tables?.counter || "order_counter",
+    settings: cfg.tables?.settings || "menu_settings"
   };
 
   const functions = {
@@ -203,6 +204,19 @@
     if (error) throw error;
   }
 
+
+  async function fetchMenuSettings() {
+    if (!client) return {};
+    const { data, error } = await client
+      .from(tables.settings)
+      .select("settings")
+      .eq("id", "public")
+      .maybeSingle();
+
+    if (error) throw error;
+    return data?.settings || {};
+  }
+
   function subscribeOrders(callback) {
     if (!client) return null;
     const channel = client
@@ -234,6 +248,7 @@
     clearOrders,
     fetchAvailability,
     setAvailability,
+    fetchMenuSettings,
     subscribeOrders,
     subscribeAvailability
   };
