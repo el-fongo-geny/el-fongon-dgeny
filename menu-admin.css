@@ -910,3 +910,111 @@ body.image-crop-open { overflow: hidden; }
 
 #availabilityItemGroupSelect{width:100%;min-height:46px;border:1px solid var(--line);border-radius:12px;padding:0 12px;background:var(--surface);color:var(--text)}
 #availabilityNewGroupField[hidden]{display:none!important}
+
+
+/* ===== V81 · IMPUESTOS CALIFORNIA ===== */
+.tax-settings-card {
+  display: grid;
+  gap: 16px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  padding: 18px;
+  background: var(--surface-soft);
+}
+.tax-settings-copy h3 { margin: 4px 0 6px; }
+.tax-settings-copy p:last-child { margin: 0; color: var(--muted); line-height: 1.5; }
+.tax-master-switch { border: 1px solid color-mix(in srgb, var(--accent) 28%, var(--line)); border-radius: 14px; padding: 14px; background: var(--surface); }
+.tax-rate-fields { display: grid; grid-template-columns: minmax(220px, .8fr) minmax(280px, 1.2fr); gap: 14px; align-items: end; }
+.tax-rate-fields[hidden] { display: none !important; }
+.tax-rate-fields .field small { color: var(--muted); font-size: .76rem; line-height: 1.4; }
+@media (max-width: 760px) { .tax-rate-fields { grid-template-columns: 1fr; } }
+
+
+/* ===== V82 · HORARIO SEMANAL ===== */
+.weekly-schedule-form {
+  display: grid;
+  gap: 18px;
+  margin-top: 22px;
+}
+
+.weekly-schedule-rows {
+  display: grid;
+  gap: 10px;
+}
+
+.weekly-schedule-row {
+  display: grid;
+  grid-template-columns: minmax(220px, 1fr) minmax(135px, 180px) minmax(135px, 180px);
+  align-items: end;
+  gap: 14px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  padding: 14px;
+  background: var(--surface);
+}
+
+.weekly-schedule-row.is-closed {
+  background: color-mix(in srgb, var(--surface-soft) 85%, var(--danger-soft));
+}
+
+.weekly-day-toggle {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 3px 12px;
+  min-height: 48px;
+  cursor: pointer;
+}
+
+.weekly-day-toggle input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.weekly-day-toggle .switch-control {
+  grid-row: 1 / 3;
+}
+
+.weekly-day-toggle strong {
+  font-size: 1rem;
+}
+
+.weekly-day-toggle small {
+  color: var(--muted);
+  font-size: .76rem;
+  font-weight: 700;
+}
+
+.weekly-time-field {
+  margin: 0;
+}
+
+.weekly-time-field input:disabled {
+  opacity: .48;
+  cursor: not-allowed;
+}
+
+.weekly-schedule-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+@media (max-width: 760px) {
+  .weekly-schedule-row {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .weekly-day-toggle {
+    grid-column: 1 / -1;
+  }
+
+  .weekly-schedule-actions {
+    flex-direction: column-reverse;
+  }
+
+  .weekly-schedule-actions button {
+    width: 100%;
+  }
+}
