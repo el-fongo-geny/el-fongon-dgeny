@@ -823,3 +823,93 @@ body.admin-body .expanded-order-close:active {
     padding: 7px 10px;
   }
 }
+
+
+/* ===== V76 · ACCIONES EN TARJETA MINIMIZADA Y POSICIÓN ESTABLE ===== */
+body.admin-body .compact-order-actions {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 10px;
+  padding: 0 16px 16px;
+}
+
+body.admin-body .compact-card-action-btn {
+  width: 100% !important;
+  min-height: 52px !important;
+}
+
+body.admin-body .compact-ready-btn {
+  border: 0 !important;
+  background: #2956ad !important;
+  color: #fff !important;
+}
+
+body.admin-body .accept-order-btn,
+body.admin-body .compact-order-actions [data-accept-order] {
+  border: 0 !important;
+  background: #1d7f4a !important;
+  color: #fff !important;
+}
+
+body.admin-body .order-card.is-collapsed .order-card-toggle {
+  border-bottom-left-radius: 0 !important;
+  border-bottom-right-radius: 0 !important;
+}
+
+body.admin-body .order-card.is-collapsed .compact-order-actions {
+  border: 1px solid var(--line);
+  border-top: 0;
+  border-bottom-left-radius: 18px;
+  border-bottom-right-radius: 18px;
+  background: color-mix(in srgb, var(--surface) 88%, var(--bg));
+}
+
+body.admin-body .order-card.is-expanded .compact-order-actions {
+  display: none !important;
+}
+
+body.admin-body .orders-list,
+body.admin-body .kitchen-list {
+  align-items: start !important;
+}
+
+@media (min-width: 1100px) {
+  body.admin-body .orders-list,
+  body.admin-body .kitchen-list {
+    display: grid !important;
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+    gap: 16px !important;
+  }
+
+  body.admin-body .order-card.is-expanded {
+    grid-column: 1 / -1 !important;
+  }
+}
+
+@media (min-width: 720px) and (max-width: 1099px) {
+  body.admin-body .orders-list,
+  body.admin-body .kitchen-list {
+    display: grid !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 16px !important;
+  }
+
+  body.admin-body .order-card.is-expanded {
+    grid-column: 1 / -1 !important;
+  }
+}
+
+@media (max-width: 719px) {
+  body.admin-body .orders-list,
+  body.admin-body .kitchen-list {
+    display: grid !important;
+    grid-template-columns: 1fr !important;
+    gap: 14px !important;
+  }
+
+  body.admin-body .compact-order-actions {
+    padding-left: 12px;
+    padding-right: 12px;
+    padding-bottom: 12px;
+  }
+}
