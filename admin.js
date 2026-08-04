@@ -76,7 +76,7 @@ function showLoginRuntimeError(error) {
   console.error("Error del administrador:", error);
 }
 
-window.FOGON_ADMIN_BUILD = "57-quantity-grouped-items";
+window.FOGON_ADMIN_BUILD = "58-clover-payment-queue";
 
 
 const STORAGE_ORDERS = "fogon_orders";
@@ -173,6 +173,7 @@ let lastNewOrderSignature = "";
 let ordersRenderInitialized = false;
 let knownOrderIds = new Set();
 let lastOrdersRenderSignature = "";
+const paymentActionLocks = new Set();
 
 function applyAdminTheme() {
   const theme = safeLocalGet(STORAGE_ADMIN_THEME) || "dark";
@@ -305,6 +306,51 @@ async function callAdminAuth(adminPin) {
     ].filter(Boolean).join(" · ");
 
     const error = new Error(message || "No se pudo validar el acceso.");
+    error.status = response.status;
+    error.payload = result;
+    throw error;
+  }
+
+  return result;
+}
+
+async function callProtectedAdminFunction(functionName, payload = {}) {
+  const { supabaseUrl, anonKey } = getSupabaseFunctionConfig();
+  const response = await fetch(
+    `${supabaseUrl}/functions/v1/${encodeURIComponent(functionName)}`,
+    {
+      method: "POST",
+      mode: "cors",
+      cache: "no-store",
+      headers: buildEdgeFunctionHeaders(anonKey),
+      body: JSON.stringify({
+        ...payload,
+        adminPin: getAdminPinOrThrow()
+      })
+    }
+  );
+
+  const rawText = await response.text();
+  let result = {};
+
+  try {
+    result = rawText ? JSON.parse(rawText) : {};
+  } catch (_) {
+    result = { detail: rawText };
+  }
+
+  if (!response.ok || !result?.ok) {
+    const message = [
+      `HTTP ${response.status}`,
+      result?.error,
+      result?.detail,
+      result?.message,
+      result?.active_public_id
+        ? `Clover ocupado con el pedido #${result.active_public_id}`
+        : ""
+    ].filter(Boolean).join(" · ");
+
+    const error = new Error(message || "La operación fue rechazada.");
     error.status = response.status;
     error.payload = result;
     throw error;
@@ -500,12 +546,21 @@ function orderFromBackend(row) {
   if (!row) return null;
   return {
     ...(row.raw || {}),
-    id: String(row.id),
+    id: String(row.public_id ?? row.id),
+    databaseId: row.id || row.databaseId || null,
     createdAt: row.created_at || row.createdAt || row.raw?.createdAt || new Date().toISOString(),
     customer: row.customer || row.raw?.customer || {},
     items: row.items || row.raw?.items || [],
     totals: row.totals || row.raw?.totals || {},
     paymentMethod: row.payment_method || row.raw?.paymentMethod || "",
+    paymentStatus: row.payment_status || row.raw?.paymentStatus || "pending",
+    paymentStartedAt: row.payment_started_at || row.raw?.paymentStartedAt || null,
+    paymentCompletedAt: row.payment_completed_at || row.raw?.paymentCompletedAt || null,
+    paymentError: row.payment_error || row.raw?.paymentError || "",
+    cloverPaymentId: row.clover_payment_id || row.raw?.cloverPaymentId || null,
+    cloverExternalPaymentId: row.clover_external_payment_id || row.raw?.cloverExternalPaymentId || null,
+    hiddenForAll: Boolean(row.hidden_for_all || row.raw?.hiddenForAll),
+    hiddenAt: row.hidden_at || row.raw?.hiddenAt || null,
     orderType: row.order_type || row.raw?.orderType || (Array.isArray(row.items) && row.items[0]?.orderType) || "",
     status: row.status || row.raw?.status || "new",
     language: row.language || row.raw?.language || "es",
@@ -530,6 +585,7 @@ async function syncOrdersFromBackend() {
     setOrders(nextOrders);
     renderOrders();
     renderKitchen();
+    renderPayments();
     return true;
   }
 
@@ -959,17 +1015,205 @@ async function markReady(orderId) {
 }
 
 async function removeOrderEverywhere(orderId) {
-  if (!confirm(`¿Marcar ${orderId} como entregado y quitarlo para todos?`)) return;
-  const orders = getOrders().filter((order) => order.id !== orderId);
-  setOrders(orders);
-  const hidden = getKitchenHiddenIds().filter((id) => id !== orderId);
-  setKitchenHiddenIds(hidden);
-  renderAll();
+  return hidePaidOrder(orderId);
+}
+
+function normalizePaymentStatus(order) {
+  const value = String(order?.paymentStatus || "pending")
+    .trim()
+    .toLowerCase();
+
+  return value || "pending";
+}
+
+function paymentStatusLabel(order) {
+  const status = normalizePaymentStatus(order);
+
+  if (status === "processing") return "Cobrando en Clover";
+  if (status === "paid") return "Cobrado";
+  if (status === "failed") return "Cobro fallido";
+  if (status === "cancelled") return "Cobro cancelado";
+  if (status === "review") return "Revisar en Clover";
+  return "Pendiente de cobro";
+}
+
+function paymentStatusClass(order) {
+  const status = normalizePaymentStatus(order);
+  return ["processing", "paid", "failed", "cancelled", "review"].includes(status)
+    ? status
+    : "pending";
+}
+
+function findOrder(orderId) {
+  return getOrders().find(
+    (order) => String(order.id) === String(orderId)
+  ) || null;
+}
+
+function requireDatabaseOrderId(order) {
+  const databaseId = String(order?.databaseId || "").trim();
+
+  if (!databaseId) {
+    throw new Error(
+      "Este pedido no tiene el UUID interno de Supabase. Recarga el panel antes de cobrar."
+    );
+  }
+
+  return databaseId;
+}
+
+async function startCloverPayment(orderId) {
+  const cleanOrderId = String(orderId || "");
+  if (paymentActionLocks.has(cleanOrderId)) return;
+
+  const order = findOrder(cleanOrderId);
+  if (!order) {
+    alert("No se encontró el pedido.");
+    return;
+  }
+
+  if (String(order.paymentMethod || "").toLowerCase() !== "card") {
+    alert("Este pedido no fue marcado para pago con tarjeta.");
+    return;
+  }
+
+  if (!confirm(
+    `¿Enviar el pedido #${order.id} por ${money(order.totals?.total)} al Clover?`
+  )) return;
+
+  paymentActionLocks.add(cleanOrderId);
+  renderPayments();
+
   try {
-    await deleteOrderBackend(orderId);
+    const result = await callProtectedAdminFunction(
+      "clover-start-payment",
+      { order_id: requireDatabaseOrderId(order) }
+    );
+
+    await syncOrdersFromBackend();
+
+    if (result?.warning) {
+      alert(
+        `El pago fue aprobado, pero requiere atención.\n\n${result.warning}`
+      );
+      return;
+    }
+
+    alert(
+      `Pago aprobado para el pedido #${order.id}. ` +
+      "El pedido fue quitado automáticamente para todos."
+    );
+  } catch (error) {
+    console.error("Falló el cobro con Clover:", error);
+    await syncOrdersFromBackend();
+
+    const code = String(error?.payload?.error || "");
+    const message = error?.message || String(error);
+
+    if (code === "payment_state_indeterminate" || code === "payment_requires_review") {
+      alert(
+        `No vuelvas a cobrar el pedido #${order.id} todavía.\n\n` +
+        "Revisa la transacción en Clover y el estado mostrado en la pestaña Cobros.\n\n" +
+        message
+      );
+      return;
+    }
+
+    alert(`No se pudo completar el cobro.\n\n${message}`);
+  } finally {
+    paymentActionLocks.delete(cleanOrderId);
+    renderPayments();
+  }
+}
+
+async function confirmCashPayment(orderId) {
+  const cleanOrderId = String(orderId || "");
+  if (paymentActionLocks.has(cleanOrderId)) return;
+
+  const order = findOrder(cleanOrderId);
+  if (!order) {
+    alert("No se encontró el pedido.");
+    return;
+  }
+
+  if (String(order.paymentMethod || "").toLowerCase() !== "cash") {
+    alert("Este pedido no fue marcado para pago en efectivo.");
+    return;
+  }
+
+  if (!confirm(
+    `¿Confirmas que recibiste ${money(order.totals?.total)} en efectivo para el pedido #${order.id}?`
+  )) return;
+
+  paymentActionLocks.add(cleanOrderId);
+  renderPayments();
+
+  try {
+    await callProtectedAdminFunction(
+      "admin-order-payment",
+      {
+        action: "confirm_cash",
+        order_id: requireDatabaseOrderId(order)
+      }
+    );
+
+    await syncOrdersFromBackend();
+    alert(
+      `Efectivo confirmado para el pedido #${order.id}. ` +
+      "Ahora aparece el botón “Quitar pedido para todos”."
+    );
+  } catch (error) {
+    console.error("No se pudo confirmar el efectivo:", error);
+    alert(`No se pudo confirmar el efectivo.\n\n${error?.message || error}`);
+  } finally {
+    paymentActionLocks.delete(cleanOrderId);
+    renderPayments();
+  }
+}
+
+async function hidePaidOrder(orderId) {
+  const cleanOrderId = String(orderId || "");
+  if (paymentActionLocks.has(cleanOrderId)) return;
+
+  const order = findOrder(cleanOrderId);
+  if (!order) {
+    alert("No se encontró el pedido.");
+    return;
+  }
+
+  if (normalizePaymentStatus(order) !== "paid") {
+    alert("El pedido todavía no está marcado como cobrado.");
+    return;
+  }
+
+  if (!confirm(
+    `¿Quitar el pedido #${order.id} para todos? La venta seguirá guardada en Supabase.`
+  )) return;
+
+  paymentActionLocks.add(cleanOrderId);
+  renderPayments();
+
+  try {
+    await callProtectedAdminFunction(
+      "admin-order-payment",
+      {
+        action: "hide_for_all",
+        order_id: requireDatabaseOrderId(order)
+      }
+    );
+
+    const nextOrders = getOrders().filter(
+      (candidate) => String(candidate.id) !== cleanOrderId
+    );
+    setOrders(nextOrders);
+    renderAll();
     await syncOrdersFromBackend();
   } catch (error) {
-    console.warn("No se pudo quitar el pedido en Supabase:", error);
+    console.error("No se pudo quitar el pedido:", error);
+    alert(`No se pudo quitar el pedido.\n\n${error?.message || error}`);
+  } finally {
+    paymentActionLocks.delete(cleanOrderId);
+    renderPayments();
   }
 }
 
@@ -1386,16 +1630,23 @@ function updateCounters() {
   const orders = getOrders();
   const kitchen = kitchenOrders(orders);
   const pending = newOrders(orders);
+  const paymentsPending = orders.filter(
+    (order) => normalizePaymentStatus(order) !== "paid"
+  );
 
   const orderCount = $("#orderCount");
   const pendingCount = $("#pendingCount");
   const kitchenCount = $("#kitchenCount");
   const kitchenVisibleCount = $("#kitchenVisibleCount");
+  const paymentCount = $("#paymentCount");
+  const paymentOrderCount = $("#paymentOrderCount");
 
   if (orderCount) orderCount.textContent = orders.length;
   if (pendingCount) pendingCount.textContent = pending.length;
   if (kitchenCount) kitchenCount.textContent = kitchen.length;
   if (kitchenVisibleCount) kitchenVisibleCount.textContent = kitchen.length;
+  if (paymentCount) paymentCount.textContent = paymentsPending.length;
+  if (paymentOrderCount) paymentOrderCount.textContent = orders.length;
 }
 
 
@@ -1494,6 +1745,7 @@ function renderOrders() {
           <p class="order-fulfillment-type"><strong>Tipo de pedido:</strong> ${escapeHtml(orderTypeLabel(order))}</p>
           <p><strong>Teléfono:</strong> ${escapeHtml(order.customer?.phone || "Sin teléfono")}</p>
           <p><strong>Pago:</strong> ${escapeHtml(paymentLabel(order.paymentMethod))}</p>
+          <p><strong>Cobro:</strong> ${escapeHtml(paymentStatusLabel(order))}</p>
           <p><strong>Entrada:</strong> ${escapeHtml(new Date(order.createdAt).toLocaleString())}</p>
         </div>
 
@@ -1510,15 +1762,138 @@ function renderOrders() {
           ? `<button class="primary-btn full accept-order" data-accept-order="${escapeHtml(orderId)}" type="button">Aceptar pedido y parar sonido</button>`
           : `<p class="accepted-note">${isReady ? "Pedido listo" : "Pedido aceptado"}${order.acceptedAt ? ` · ${new Date(order.acceptedAt).toLocaleTimeString()}` : ""}</p>`}
 
-        <div class="order-actions-row">
-          ${!isNew ? `<button class="secondary-btn" data-ready-order="${escapeHtml(orderId)}" type="button">Pedido listo / Enviar WhatsApp</button>` : ""}
-          <button class="secondary-btn danger-btn" data-deliver-order="${escapeHtml(orderId)}" type="button">Entregado / quitar para todos</button>
-        </div>
+        ${!isNew ? `
+          <div class="order-actions-row">
+            <button class="secondary-btn" data-ready-order="${escapeHtml(orderId)}" type="button">Pedido listo / Enviar WhatsApp</button>
+            <button class="secondary-btn" data-admin-tab-jump="payments" type="button">Ir a Cobros</button>
+          </div>
+        ` : ""}
       </div>
     </article>`;
   }).join("") : `<p class="empty-state">No hay pedidos todavía.</p>`;
 
   updateAlarm();
+}
+
+function paymentActionHtml(order) {
+  const orderId = escapeHtml(order.id);
+  const method = String(order.paymentMethod || "").toLowerCase();
+  const status = normalizePaymentStatus(order);
+  const busy = paymentActionLocks.has(String(order.id));
+
+  if (busy) {
+    return `<button class="primary-btn full" type="button" disabled>Procesando…</button>`;
+  }
+
+  if (method === "card") {
+    if (status === "processing") {
+      return `<button class="primary-btn full" type="button" disabled>Esperando tarjeta en Clover…</button>`;
+    }
+
+    if (status === "review") {
+      return `
+        <div class="payment-review-warning">
+          Revisa este cobro en Clover antes de intentar cualquier otro pago para este pedido.
+        </div>
+      `;
+    }
+
+    if (status === "paid") {
+      return `<button class="secondary-btn danger-btn full" data-hide-paid="${orderId}" type="button">Quitar pedido para todos</button>`;
+    }
+
+    return `<button class="primary-btn full clover-pay-btn" data-clover-pay="${orderId}" type="button">${status === "failed" || status === "cancelled" ? "Reintentar con Clover" : "Cobrar con Clover"}</button>`;
+  }
+
+  if (method === "cash") {
+    if (status === "paid") {
+      return `<button class="secondary-btn danger-btn full" data-hide-paid="${orderId}" type="button">Quitar pedido para todos</button>`;
+    }
+
+    return `<button class="primary-btn full cash-pay-btn" data-cash-pay="${orderId}" type="button">Cobrar en efectivo</button>`;
+  }
+
+  return `<button class="secondary-btn full" type="button" disabled>Método de pago no indicado</button>`;
+}
+
+function paymentQueuePriority(order) {
+  const status = normalizePaymentStatus(order);
+  if (status === "processing") return 0;
+  if (status === "review") return 1;
+  if (order.status === "ready") return 2;
+  if (order.status === "accepted") return 3;
+  return 4;
+}
+
+function renderPayments() {
+  const paymentsList = $("#paymentsList");
+  if (!paymentsList) return;
+
+  const orders = getOrders()
+    .slice()
+    .sort((left, right) => {
+      const priority = paymentQueuePriority(left) - paymentQueuePriority(right);
+      if (priority) return priority;
+      return orderCreatedTimestamp(left) - orderCreatedTimestamp(right);
+    });
+
+  const activePayment = orders.find(
+    (order) => normalizePaymentStatus(order) === "processing"
+  );
+  const queueStatus = $("#cloverQueueStatus");
+
+  if (queueStatus) {
+    if (activePayment) {
+      queueStatus.className = "clover-queue-status is-busy";
+      queueStatus.textContent =
+        `Clover ocupado con el pedido #${activePayment.id}. ` +
+        "Los demás pedidos siguen disponibles, pero no pueden iniciar otro cobro con tarjeta todavía.";
+    } else {
+      queueStatus.className = "clover-queue-status is-ready";
+      queueStatus.textContent =
+        "Clover disponible. Selecciona el pedido del cliente que está frente al terminal.";
+    }
+  }
+
+  paymentsList.innerHTML = orders.length
+    ? orders.map((order) => {
+        const status = normalizePaymentStatus(order);
+        const error = String(order.paymentError || "").trim();
+        const method = paymentLabel(order.paymentMethod);
+
+        return `
+          <article class="payment-order-card payment-${paymentStatusClass(order)}">
+            <div class="payment-order-head">
+              <div>
+                <span class="payment-order-number">#${escapeHtml(order.id)}</span>
+                <h3>${escapeHtml(order.customer?.name || "Sin nombre")}</h3>
+              </div>
+              <span class="payment-state ${paymentStatusClass(order)}">${escapeHtml(paymentStatusLabel(order))}</span>
+            </div>
+
+            <div class="payment-order-summary">
+              <span>${escapeHtml(method)}</span>
+              <strong>${money(order.totals?.total)}</strong>
+            </div>
+
+            <p class="payment-order-meta">
+              ${escapeHtml(orderTypeLabel(order))} · ${escapeHtml(orderElapsedLabel(order))}
+            </p>
+
+            ${error ? `<p class="payment-error-text">${escapeHtml(error)}</p>` : ""}
+            ${status === "paid" && String(order.paymentMethod || "").toLowerCase() === "cash"
+              ? `<p class="payment-cash-confirmed">Efectivo confirmado. Ya puedes quitar el pedido para todos.</p>`
+              : ""}
+
+            <div class="payment-action-wrap">
+              ${paymentActionHtml(order)}
+            </div>
+          </article>
+        `;
+      }).join("")
+    : `<p class="empty-state">No hay pedidos pendientes en el panel.</p>`;
+
+  updateCounters();
 }
 
 function renderKitchen() {
@@ -1595,6 +1970,7 @@ function renderAvailability() {
 function renderAll() {
   renderOrders();
   renderKitchen();
+  renderPayments();
   renderAvailability();
 }
 
@@ -1975,6 +2351,9 @@ function init() {
     const tabButton = event.target.closest("[data-admin-tab]");
     if (tabButton) switchTab(tabButton.dataset.adminTab);
 
+    const tabJumpButton = event.target.closest("[data-admin-tab-jump]");
+    if (tabJumpButton) switchTab(tabJumpButton.dataset.adminTabJump);
+
     const acceptButton = event.target.closest("[data-accept-order]");
     if (acceptButton) acceptOrder(acceptButton.dataset.acceptOrder);
 
@@ -1983,6 +2362,15 @@ function init() {
 
     const kitchenDoneButton = event.target.closest("[data-kitchen-done]");
     if (kitchenDoneButton) hideKitchenOrder(kitchenDoneButton.dataset.kitchenDone);
+
+    const cloverPayButton = event.target.closest("[data-clover-pay]");
+    if (cloverPayButton) startCloverPayment(cloverPayButton.dataset.cloverPay);
+
+    const cashPayButton = event.target.closest("[data-cash-pay]");
+    if (cashPayButton) confirmCashPayment(cashPayButton.dataset.cashPay);
+
+    const hidePaidButton = event.target.closest("[data-hide-paid]");
+    if (hidePaidButton) hidePaidOrder(hidePaidButton.dataset.hidePaid);
 
     const deliverButton = event.target.closest("[data-deliver-order]");
     if (deliverButton) removeOrderEverywhere(deliverButton.dataset.deliverOrder);
