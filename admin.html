@@ -7,7 +7,7 @@
   <meta name="theme-color" content="#111111">
   <title>Panel iPad | El Fogon D' Geny</title>
   <link rel="stylesheet" href="style.css?v=67-mobile-navigation-fixed">
-  <link rel="stylesheet" href="admin-payments.css?v=71-collapsible-order-cards">
+  <link rel="stylesheet" href="admin-payments.css?v=72-management-payment-actions">
   <style>
     .admin-build-label {
       margin: 12px 0 0;
@@ -42,7 +42,7 @@
       </label>
       <button id="loginButton" class="primary-btn full" type="button">Entrar</button>
       <p id="pinError" class="error-text" hidden>PIN incorrecto.</p>
-      <p id="adminBuildLabel" class="admin-build-label">Acceso V71 · sesión de 8 horas</p>
+      <p id="adminBuildLabel" class="admin-build-label">Acceso V72 · sesión de 8 horas</p>
     </form>
   </main>
 
@@ -158,7 +158,7 @@
   <script src="supabase-client.js?v=68-payment-fields"></script>
   <script src="backend-config.js?v=18-mobile-fixed"></script>
   <script>
-  window.FOGON_ADMIN_EXPECTED_BUILD = "71-collapsible-order-cards";
+  window.FOGON_ADMIN_EXPECTED_BUILD = "72-management-payment-actions";
 
   window.reportAdminScriptLoadFailure = function () {
     var errorBox = document.getElementById("pinError");
@@ -176,7 +176,7 @@
     }
   };
   </script>
-  <script src="admin.js?v=71-collapsible-order-cards" onerror="window.reportAdminScriptLoadFailure()"></script>
+  <script src="admin.js?v=72-management-payment-actions" onerror="window.reportAdminScriptLoadFailure()"></script>
   <script>
   window.setTimeout(function () {
     if (window.FOGON_ADMIN_BUILD !== window.FOGON_ADMIN_EXPECTED_BUILD) {
