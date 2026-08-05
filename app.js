@@ -1,4 +1,4 @@
-window.FOGON_MENU_BUILD = "92-android-language-selector-fix";
+window.FOGON_MENU_BUILD = "93-clover-oauth-safety";
 
 const state = {
   lang: localStorage.getItem("fogon_lang") || "",
@@ -1574,7 +1574,13 @@ function setKioskPaymentVisual(status, message = "") {
       : "Pago fallido",
     cancelled: state.lang === "en"
       ? "Payment cancelled"
-      : "Pago cancelado"
+      : "Pago cancelado",
+    review: state.lang === "en"
+      ? "Payment needs verification"
+      : "Pago pendiente de verificación",
+    reauthorization_required: state.lang === "en"
+      ? "Clover authorization required"
+      : "Clover necesita autorización"
   };
 
   if (title) title.textContent = labels[status] || labels.waiting;
@@ -1612,7 +1618,12 @@ async function callKioskPaymentService(action, payload = {}) {
 
   const result = await response.json().catch(() => ({}));
   if (!response.ok || result?.ok !== true) {
-    throw new Error(result?.error || `HTTP ${response.status}`);
+    const error = new Error(result?.error || `HTTP ${response.status}`);
+    error.paymentStatus = String(result?.status || "failed");
+    error.retrySafe = result?.retrySafe !== false;
+    error.externalPaymentId = String(result?.externalPaymentId || "");
+    error.httpStatus = response.status;
+    throw error;
   }
   return result;
 }
@@ -1661,6 +1672,7 @@ async function cancelActiveKioskPayment() {
 
   try {
     await callKioskPaymentService("cancel", {
+      kioskId: currentKioskId(),
       externalPaymentId: payment.externalPaymentId
     });
   } catch (error) {
@@ -1754,28 +1766,39 @@ async function saveOrder(paymentMethod) {
         await startKioskBridgePayment(createdOrder);
 
       if (!isConfirmedCloverPayment(paymentResult)) {
+        const paymentStatus = String(paymentResult.status || "failed").toLowerCase();
+        const needsReview = paymentStatus === "review" || paymentStatus === "unknown";
+
         setKioskPaymentVisual(
-          paymentResult.status === "cancelled" ? "cancelled" : "failed",
+          needsReview ? "review" : (paymentStatus === "cancelled" ? "cancelled" : "failed"),
           paymentResult.error || ""
         );
+
         await db.updateKioskPayment(
           createdOrder.databaseId || createdOrder.id,
           {
-            paymentStatus: paymentResult.status || "failed",
+            paymentStatus: needsReview ? "review" : paymentStatus,
             paymentError: paymentResult.error || "",
             cloverExternalPaymentId:
               paymentResult.externalPaymentId || ""
           }
         );
 
-        throw new Error(
+        const paymentError = new Error(
           paymentResult.error ||
           (
-            state.lang === "en"
-              ? "The payment was not approved. Try another card."
-              : "El pago no fue aprobado. Prueba con otra tarjeta."
+            needsReview
+              ? (state.lang === "en"
+                  ? "Do not try to pay again. Ask staff to verify the Clover Flex."
+                  : "No vuelvas a pagar. Solicita al personal que compruebe el Clover Flex.")
+              : (state.lang === "en"
+                  ? "The payment was not approved. Try another card."
+                  : "El pago no fue aprobado. Prueba con otra tarjeta.")
           )
         );
+        paymentError.paymentStatus = needsReview ? "review" : paymentStatus;
+        paymentError.retrySafe = !needsReview;
+        throw paymentError;
       }
 
       setKioskPaymentVisual("approved");
@@ -1833,13 +1856,20 @@ async function saveOrder(paymentMethod) {
   } catch (error) {
     console.error("No se pudo completar el pedido:", error);
 
+    const errorStatus = String(error?.paymentStatus || "failed").toLowerCase();
+    const needsReview = errorStatus === "review" || errorStatus === "unknown";
+    const needsReauthorization = errorStatus === "reauthorization_required";
+    const finalFailureStatus = needsReview ? "review" : "failed";
+
     if (createdOrder && window.FOGON_DB?.isReady?.()) {
       try {
         await window.FOGON_DB.updateKioskPayment(
           createdOrder.databaseId || createdOrder.id,
           {
-            paymentStatus: "failed",
-            paymentError: error?.message || String(error)
+            paymentStatus: finalFailureStatus,
+            paymentError: error?.message || String(error),
+            cloverExternalPaymentId:
+              error?.externalPaymentId || state.activeKioskPayment?.externalPaymentId || ""
           }
         );
       } catch (_) {}
@@ -1847,8 +1877,35 @@ async function saveOrder(paymentMethod) {
 
     const kioskStep = $("#kioskPaymentStep");
     const paymentStep = $("#paymentMethodStep");
-    if (kioskStep) kioskStep.hidden = true;
-    if (paymentStep) paymentStep.hidden = false;
+    const cancelButton = $("#cancelKioskPaymentButton");
+
+    if (needsReview) {
+      if (kioskStep) kioskStep.hidden = false;
+      if (paymentStep) paymentStep.hidden = true;
+      if (cancelButton) {
+        cancelButton.disabled = true;
+        cancelButton.textContent = state.lang === "en"
+          ? "Ask staff for help"
+          : "Solicita ayuda al personal";
+      }
+      setKioskPaymentVisual(
+        "review",
+        state.lang === "en"
+          ? "Do not pay again. The transaction must be checked on the Clover Flex."
+          : "No vuelvas a pagar. La transacción debe comprobarse en el Clover Flex."
+      );
+    } else {
+      if (kioskStep) kioskStep.hidden = true;
+      if (paymentStep) paymentStep.hidden = false;
+      if (cancelButton) {
+        cancelButton.disabled = false;
+        cancelButton.textContent = state.lang === "en" ? "Cancel payment" : "Cancelar pago";
+      }
+      if (needsReauthorization) {
+        setKioskPaymentVisual("reauthorization_required", error?.message || "");
+      }
+      state.activeKioskPayment = null;
+    }
 
     alert(
       error?.message ||
