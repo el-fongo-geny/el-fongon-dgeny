@@ -4129,3 +4129,24 @@ body.language-gate-open {
   min-height: 58px;
   -webkit-tap-highlight-color: transparent;
 }
+
+/* ===== V93 · PAGO PENDIENTE DE VERIFICACIÓN ===== */
+#kioskPaymentStep[data-payment-status="review"] .kiosk-payment-spinner,
+#kioskPaymentStep[data-payment-status="reauthorization_required"] .kiosk-payment-spinner {
+  border: 0;
+  animation: none;
+  background: #fff2d7;
+  position: relative;
+}
+
+#kioskPaymentStep[data-payment-status="review"] .kiosk-payment-spinner::after,
+#kioskPaymentStep[data-payment-status="reauthorization_required"] .kiosk-payment-spinner::after {
+  content: "!";
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  color: #a85d00;
+  font-size: 2.4rem;
+  font-weight: 950;
+}
