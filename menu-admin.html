@@ -6,7 +6,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#f6f6f3">
   <title>Gestor del menú | El Fogón D' Geny</title>
-  <link rel="stylesheet" href="menu-admin.css?v=81-california-tax-toggle">
+  <link rel="stylesheet" href="menu-admin.css?v=87-kiosk-settings">
 </head>
 <body>
   <main id="loginScreen" class="login-screen">
@@ -237,7 +237,51 @@
               </label>
             </div>
 
-            <section class="tax-settings-card" aria-labelledby="taxSettingsTitle">
+            
+            <section class="kiosk-settings-card" aria-labelledby="kioskSettingsTitle">
+              <div class="kiosk-settings-copy">
+                <p class="eyebrow">Cobros y kiosco</p>
+                <h3 id="kioskSettingsTitle">Flujo de pago del menú</h3>
+                <p>El modo kiosco cobra en Clover antes de enviar el pedido a Cocina. El modo respaldo mantiene el flujo anterior.</p>
+              </div>
+
+              <label class="field">
+                <span>Modo de cobro</span>
+                <select id="businessCheckoutMode">
+                  <option value="pay_before_kitchen">Kiosco: pagar antes de Cocina</option>
+                  <option value="pay_at_counter">Respaldo: cobrar después en mostrador</option>
+                </select>
+              </label>
+
+              <div id="kioskConnectionFields" class="kiosk-connection-fields">
+                <label class="field">
+                  <span>Identificador del kiosco</span>
+                  <input id="businessKioskId" type="text" maxlength="80" value="kiosk-01" placeholder="kiosk-01">
+                </label>
+
+                <label class="field">
+                  <span>Dirección de Fogón Kiosk Bridge</span>
+                  <input id="businessKioskBridgeUrl" type="url" maxlength="500" value="http://127.0.0.1:17840" placeholder="http://127.0.0.1:17840">
+                </label>
+
+                <label class="switch-row">
+                  <span>
+                    <strong>Permitir efectivo como respaldo</strong>
+                    <small>El pedido en efectivo conserva el flujo de mostrador y entra a Cocina sin pago Clover.</small>
+                  </span>
+                  <input id="businessAllowCashBackup" type="checkbox">
+                  <span class="switch-control" aria-hidden="true"></span>
+                </label>
+
+                <div class="kiosk-status-box">
+                  <span>Estado del Bridge</span>
+                  <strong id="kioskBridgeStatus">Sin comprobar</strong>
+                  <button id="testKioskBridgeButton" class="button button-secondary" type="button">Comprobar conexión</button>
+                </div>
+              </div>
+            </section>
+
+<section class="tax-settings-card" aria-labelledby="taxSettingsTitle">
               <div class="tax-settings-copy">
                 <p class="eyebrow">Impuestos de venta</p>
                 <h3 id="taxSettingsTitle">Impuestos del pedido web</h3>
@@ -525,6 +569,6 @@
   </div>
 
   <script src="supabase-config.js?v=18-mobile-fixed"></script>
-  <script src="menu-admin.js?v=83-weekly-schedule-editor"></script>
+  <script src="menu-admin.js?v=87-kiosk-settings"></script>
 </body>
 </html>
