@@ -4107,3 +4107,25 @@ body.kiosk-payment-lock {
   font-size: 2.4rem;
   font-weight: 950;
 }
+
+
+/* ===== V92 · SELECTOR DE IDIOMA COMPATIBLE CON ANDROID KIOSK ===== */
+body.language-gate-open {
+  overflow: hidden !important;
+  touch-action: auto !important;
+}
+
+.language-gate,
+.language-gate .language-card,
+.language-gate .language-actions,
+.language-gate [data-set-lang] {
+  pointer-events: auto !important;
+  touch-action: manipulation !important;
+}
+
+.language-gate [data-set-lang] {
+  position: relative;
+  z-index: 1002;
+  min-height: 58px;
+  -webkit-tap-highlight-color: transparent;
+}
