@@ -1,4 +1,4 @@
-window.FOGON_MENU_BUILD = "85-no-zoom-locked-product";
+window.FOGON_MENU_BUILD = "86-language-gate-10-minutes";
 
 const state = {
   lang: localStorage.getItem("fogon_lang") || "",
@@ -712,10 +712,77 @@ function refreshAvailabilityIfChanged(force = false) {
   return true;
 }
 
+
+const LANGUAGE_GATE_INTERVAL_MS = 10 * 60 * 1000;
+const LANGUAGE_GATE_SELECTED_AT_KEY = "fogon_language_selected_at";
+let languageGateTimer = null;
+
+function languageSelectionTimestamp() {
+  const value = Number(localStorage.getItem(LANGUAGE_GATE_SELECTED_AT_KEY) || 0);
+  return Number.isFinite(value) ? value : 0;
+}
+
+function markLanguageSelectedNow() {
+  const selectedAt = Date.now();
+  localStorage.setItem(LANGUAGE_GATE_SELECTED_AT_KEY, String(selectedAt));
+  return selectedAt;
+}
+
+function showLanguageGate() {
+  const gate = $("#languageGate");
+  if (!gate) return;
+
+  gate.classList.remove("hidden");
+  gate.setAttribute("aria-hidden", "false");
+  document.body.classList.add("language-gate-open");
+
+  const firstButton = gate.querySelector("[data-set-lang]");
+  requestAnimationFrame(() => firstButton?.focus());
+}
+
+function hideLanguageGate() {
+  const gate = $("#languageGate");
+  if (!gate) return;
+
+  gate.classList.add("hidden");
+  gate.setAttribute("aria-hidden", "true");
+  document.body.classList.remove("language-gate-open");
+}
+
+function scheduleLanguageGate() {
+  if (languageGateTimer) {
+    clearTimeout(languageGateTimer);
+    languageGateTimer = null;
+  }
+
+  const selectedAt = languageSelectionTimestamp();
+  const elapsed = selectedAt ? Date.now() - selectedAt : LANGUAGE_GATE_INTERVAL_MS;
+  const remaining = Math.max(0, LANGUAGE_GATE_INTERVAL_MS - elapsed);
+
+  languageGateTimer = setTimeout(() => {
+    languageGateTimer = null;
+    showLanguageGate();
+  }, remaining);
+}
+
+function initializeLanguageGateTimer() {
+  const selectedAt = languageSelectionTimestamp();
+
+  if (!state.lang || !selectedAt || Date.now() - selectedAt >= LANGUAGE_GATE_INTERVAL_MS) {
+    showLanguageGate();
+    return;
+  }
+
+  hideLanguageGate();
+  scheduleLanguageGate();
+}
+
 function setLanguage(lang) {
   state.lang = lang;
   localStorage.setItem("fogon_lang", lang);
-  $("#languageGate").classList.add("hidden");
+  markLanguageSelectedNow();
+  hideLanguageGate();
+  scheduleLanguageGate();
   document.documentElement.lang = lang;
   applyText();
   renderCategories();
@@ -1724,9 +1791,9 @@ async function init() {
     setInterval(syncAvailabilityFromBackend, 6000);
   }
   if (state.lang) {
-    $("#languageGate").classList.add("hidden");
     document.documentElement.lang = state.lang;
   }
+  initializeLanguageGateTimer();
   applyText();
   renderCategories();
   renderMenu();
@@ -1742,6 +1809,13 @@ async function init() {
 
   document.addEventListener("visibilitychange", () => {
     if (document.visibilityState === "visible") {
+      const selectedAt = languageSelectionTimestamp();
+      if (!selectedAt || Date.now() - selectedAt >= LANGUAGE_GATE_INTERVAL_MS) {
+        showLanguageGate();
+      } else {
+        scheduleLanguageGate();
+      }
+
       loadPublicCatalog({ render: true }).catch((error) => {
         console.warn("No se pudo refrescar el catálogo al volver a la página:", error);
       });
