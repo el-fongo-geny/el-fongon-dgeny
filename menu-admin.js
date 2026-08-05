@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-window.FOGON_MENU_ADMIN_BUILD = "87-kiosk-settings";
+window.FOGON_MENU_ADMIN_BUILD = "88-android-kiosk-settings";
 
   const $ = (selector) => document.querySelector(selector);
   const $$ = (selector) => Array.from(document.querySelectorAll(selector));
@@ -618,7 +618,7 @@ window.FOGON_MENU_ADMIN_BUILD = "87-kiosk-settings";
     tax_only_taxable: true,
     checkout_mode: "pay_before_kitchen",
     kiosk_id: "kiosk-01",
-    kiosk_bridge_url: "http://127.0.0.1:17840",
+    kiosk_payment_function: "clover-kiosk-payment",
     allow_cash_backup: false
   };
 
@@ -645,7 +645,7 @@ window.FOGON_MENU_ADMIN_BUILD = "87-kiosk-settings";
     $("#businessTaxOnlyTaxable").checked = settings.tax_only_taxable !== false;
     $("#businessCheckoutMode").value = settings.checkout_mode || "pay_before_kitchen";
     $("#businessKioskId").value = settings.kiosk_id || "kiosk-01";
-    $("#businessKioskBridgeUrl").value = settings.kiosk_bridge_url || "http://127.0.0.1:17840";
+    $("#businessKioskPaymentFunction").value = settings.kiosk_payment_function || "clover-kiosk-payment";
     $("#businessAllowCashBackup").checked = settings.allow_cash_backup === true;
     updateTaxSettingsUi();
     updateKioskSettingsUi();
@@ -668,13 +668,15 @@ window.FOGON_MENU_ADMIN_BUILD = "87-kiosk-settings";
     if (fields) fields.hidden = mode !== "pay_before_kitchen";
   }
 
-  async function testKioskBridgeConnection() {
-    const button = $("#testKioskBridgeButton");
-    const status = $("#kioskBridgeStatus");
-    const baseUrl = String($("#businessKioskBridgeUrl")?.value || "").trim().replace(/\/$/, "");
+  async function testKioskPaymentServiceConnection() {
+    const button = $("#testKioskPaymentServiceButton");
+    const status = $("#kioskPaymentServiceStatus");
+    const functionName = String(
+      $("#businessKioskPaymentFunction")?.value || "clover-kiosk-payment"
+    ).trim();
 
-    if (!baseUrl) {
-      if (status) status.textContent = "Falta la dirección";
+    if (!functionName) {
+      if (status) status.textContent = "Falta el nombre de la función";
       return;
     }
 
@@ -682,13 +684,23 @@ window.FOGON_MENU_ADMIN_BUILD = "87-kiosk-settings";
     if (status) status.textContent = "Comprobando…";
 
     try {
-      const response = await fetch(`${baseUrl}/health`, {
-        method: "GET",
-        cache: "no-store"
+      const cfg = window.FOGON_SUPABASE || {};
+      const url = String(cfg.url || "").replace(/\/$/, "");
+      const anonKey = String(cfg.anonKey || "").trim();
+      if (!url || !anonKey) throw new Error("Supabase no está configurado.");
+
+      const headers = { "Content-Type": "application/json", apikey: anonKey };
+      if (anonKey.startsWith("eyJ") && anonKey.split(".").length === 3) {
+        headers.Authorization = `Bearer ${anonKey}`;
+      }
+
+      const response = await fetch(`${url}/functions/v1/${functionName}`, {
+        method: "POST",
+        cache: "no-store",
+        headers,
+        body: JSON.stringify({ action: "health" })
       });
-
       const result = await response.json().catch(() => ({}));
-
       if (!response.ok || result?.ok !== true) {
         throw new Error(result?.error || `HTTP ${response.status}`);
       }
@@ -700,7 +712,7 @@ window.FOGON_MENU_ADMIN_BUILD = "87-kiosk-settings";
       }
     } catch (error) {
       if (status) status.textContent = "No conectado";
-      toast(`No se pudo conectar con Fogón Kiosk Bridge. ${error?.message || error}`, "error");
+      toast(`No se pudo conectar con el servicio de pago. ${error?.message || error}`, "error");
     } finally {
       if (button) button.disabled = false;
     }
@@ -722,7 +734,7 @@ window.FOGON_MENU_ADMIN_BUILD = "87-kiosk-settings";
       tax_only_taxable: Boolean($("#businessTaxOnlyTaxable")?.checked),
       checkout_mode: String($("#businessCheckoutMode")?.value || "pay_before_kitchen"),
       kiosk_id: String($("#businessKioskId")?.value || "kiosk-01").trim() || "kiosk-01",
-      kiosk_bridge_url: String($("#businessKioskBridgeUrl")?.value || "http://127.0.0.1:17840").trim().replace(/\/$/, ""),
+      kiosk_payment_function: String($("#businessKioskPaymentFunction")?.value || "clover-kiosk-payment").trim() || "clover-kiosk-payment",
       allow_cash_backup: Boolean($("#businessAllowCashBackup")?.checked)
     };
 
@@ -2415,7 +2427,7 @@ window.FOGON_MENU_ADMIN_BUILD = "87-kiosk-settings";
     });
     $("#businessTaxEnabled")?.addEventListener("change", updateTaxSettingsUi);
     $("#businessCheckoutMode")?.addEventListener("change", updateKioskSettingsUi);
-    $("#testKioskBridgeButton")?.addEventListener("click", testKioskBridgeConnection);
+    $("#testKioskPaymentServiceButton")?.addEventListener("click", testKioskPaymentServiceConnection);
     $("#resetBusinessSettingsButton")?.addEventListener("click", () => {
       state.businessSettings = { ...BUSINESS_DEFAULTS };
       const form = $("#businessSettingsForm");
