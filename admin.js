@@ -76,7 +76,7 @@ function showLoginRuntimeError(error) {
   console.error("Error del administrador:", error);
 }
 
-window.FOGON_ADMIN_BUILD = "84-kitchen-whatsapp-premium";
+window.FOGON_ADMIN_BUILD = "87-kiosk-clover-b";
 
 if (!window.CSS) window.CSS = {};
 if (!window.CSS.escape) {
@@ -876,7 +876,19 @@ function newOrders(orders = getOrders()) {
 
 function kitchenOrders(orders = getOrders()) {
   const hidden = new Set(getKitchenHiddenIds());
-  return orders.filter((order) => !hidden.has(order.id));
+
+  return orders.filter((order) => {
+    if (hidden.has(order.id)) return false;
+
+    const checkoutMode = String(order.checkoutMode || "pay_at_counter");
+    const paymentStatus = String(order.paymentStatus || "pending");
+
+    if (checkoutMode === "pay_before_kitchen") {
+      return paymentStatus === "paid";
+    }
+
+    return true;
+  });
 }
 
 function setSoundBanner(message = "", forceVisible = null) {
@@ -1918,6 +1930,7 @@ function paymentLabel(method) {
 
 function statusLabel(order) {
   const status = order.status || "new";
+  if (status === "awaiting_payment") return "Esperando pago";
   if (status === "ready") return "Listo";
   if (status === "accepted") return "Aceptado";
   return "Nuevo";
