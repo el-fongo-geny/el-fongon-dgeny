@@ -1,4 +1,4 @@
-window.FOGON_MENU_BUILD = "87-pay-before-kitchen";
+window.FOGON_MENU_BUILD = "88-android-kiosk-clover-cloud";
 
 const state = {
   lang: localStorage.getItem("fogon_lang") || "",
@@ -1527,11 +1527,28 @@ function isKioskCheckoutMode() {
   return String(publicBusinessSettings.checkout_mode || "pay_before_kitchen") === "pay_before_kitchen";
 }
 
-function kioskBridgeBaseUrl() {
+function kioskPaymentFunctionName() {
   return String(
-    publicBusinessSettings.kiosk_bridge_url ||
-    "http://127.0.0.1:17840"
-  ).trim().replace(/\/$/, "");
+    publicBusinessSettings.kiosk_payment_function ||
+    "clover-kiosk-payment"
+  ).trim() || "clover-kiosk-payment";
+}
+
+async function callKioskPaymentService(action, payload = {}) {
+  const { supabaseUrl, anonKey } = publicCatalogFunctionConfig();
+  const functionName = kioskPaymentFunctionName();
+  const response = await fetch(`${supabaseUrl}/functions/v1/${functionName}`, {
+    method: "POST",
+    cache: "no-store",
+    headers: publicCatalogHeaders(anonKey),
+    body: JSON.stringify({ action, ...payload })
+  });
+
+  const result = await response.json().catch(() => ({}));
+  if (!response.ok || result?.ok !== true) {
+    throw new Error(result?.error || `HTTP ${response.status}`);
+  }
+  return result;
 }
 
 function setKioskPaymentStepVisible(visible, total = 0) {
@@ -1550,7 +1567,6 @@ function setKioskPaymentStepVisible(visible, total = 0) {
 }
 
 async function startKioskBridgePayment(order) {
-  const bridgeUrl = kioskBridgeBaseUrl();
   const externalPaymentId = [
     String(publicBusinessSettings.kiosk_id || "kiosk-01"),
     String(order.publicId || order.public_id || order.id || Date.now()),
@@ -1563,36 +1579,15 @@ async function startKioskBridgePayment(order) {
     externalPaymentId
   };
 
-  const response = await fetch(`${bridgeUrl}/payment/start`, {
-    method: "POST",
-    cache: "no-store",
-    headers: {
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify({
-      amount: Math.round(Number(order.totals?.total || 0) * 100),
-      externalPaymentId,
-      kioskId: publicBusinessSettings.kiosk_id || "kiosk-01",
-      orderNumber: order.publicId || order.public_id || order.id,
-      order
-    })
+  const result = await callKioskPaymentService("start", {
+    amount: Math.round(Number(order.totals?.total || 0) * 100),
+    externalPaymentId,
+    kioskId: publicBusinessSettings.kiosk_id || "kiosk-01",
+    orderNumber: order.publicId || order.public_id || order.id,
+    order
   });
 
-  const result = await response.json().catch(() => ({}));
-
-  if (!response.ok || result?.ok !== true) {
-    throw new Error(
-      result?.error ||
-      (state.lang === "en"
-        ? "The Clover payment could not be started."
-        : "No se pudo iniciar el pago en Clover.")
-    );
-  }
-
-  return {
-    ...result,
-    externalPaymentId
-  };
+  return { ...result, externalPaymentId };
 }
 
 async function cancelActiveKioskPayment() {
@@ -1603,16 +1598,11 @@ async function cancelActiveKioskPayment() {
   }
 
   try {
-    await fetch(`${kioskBridgeBaseUrl()}/payment/cancel`, {
-      method: "POST",
-      cache: "no-store",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        externalPaymentId: payment.externalPaymentId
-      })
+    await callKioskPaymentService("cancel", {
+      externalPaymentId: payment.externalPaymentId
     });
   } catch (error) {
-    console.warn("No se pudo cancelar el pago en Bridge:", error);
+    console.warn("No se pudo cancelar el pago Clover:", error);
   }
 
   state.activeKioskPayment = null;
