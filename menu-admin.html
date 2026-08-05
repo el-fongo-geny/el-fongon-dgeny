@@ -6,7 +6,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#f6f6f3">
   <title>Gestor del menú | El Fogón D' Geny</title>
-  <link rel="stylesheet" href="menu-admin.css?v=88-android-kiosk-settings">
+  <link rel="stylesheet" href="menu-admin.css?v=91-clover-device-mapping">
 </head>
 <body>
   <main id="loginScreen" class="login-screen">
@@ -262,7 +262,7 @@
                 <label class="field">
                   <span>Función de pago en Supabase</span>
                   <input id="businessKioskPaymentFunction" type="text" maxlength="120" value="clover-kiosk-payment" placeholder="clover-kiosk-payment">
-                  <small>Compatible con Android y Kiosk Browser mediante HTTPS. No requiere instalar programas en la pantalla.</small>
+                  <small>Compatible con Android y Kiosk Browser mediante HTTPS. Cada pantalla debe abrir el menú con ?kiosk=kiosk-01, ?kiosk=kiosk-02, etc.</small>
                 </label>
 
                 <label class="switch-row">
@@ -279,6 +279,18 @@
                   <strong id="kioskPaymentServiceStatus">Sin comprobar</strong>
                   <button id="testKioskPaymentServiceButton" class="button button-secondary" type="button">Comprobar conexión</button>
                 </div>
+                <section class="clover-device-map-card">
+                  <div>
+                    <strong>Asignación de pantallas a Clover Flex</strong>
+                    <p>Cada pantalla Android usa un kiosk_id y la función busca el número de serie del Flex correspondiente.</p>
+                  </div>
+                  <div class="clover-device-map-example">
+                    <code>kiosk-01 → Flex principal</code>
+                    <code>kiosk-02 → Flex secundario</code>
+                  </div>
+                  <small>La tabla se administra en Supabase: <code>clover_kiosk_devices</code>. El ZIP incluye el SQL y ejemplos.</small>
+                </section>
+
               </div>
             </section>
 
@@ -570,6 +582,6 @@
   </div>
 
   <script src="supabase-config.js?v=18-mobile-fixed"></script>
-  <script src="menu-admin.js?v=88-android-kiosk-settings"></script>
+  <script src="menu-admin.js?v=91-clover-device-mapping"></script>
 </body>
 </html>
