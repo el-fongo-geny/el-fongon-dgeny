@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-window.FOGON_MENU_ADMIN_BUILD = "83-weekly-schedule-editor";
+window.FOGON_MENU_ADMIN_BUILD = "87-kiosk-settings";
 
   const $ = (selector) => document.querySelector(selector);
   const $$ = (selector) => Array.from(document.querySelectorAll(selector));
@@ -615,7 +615,11 @@ window.FOGON_MENU_ADMIN_BUILD = "83-weekly-schedule-editor";
     maps_url: "https://www.google.com/maps/search/?api=1&query=El+Fogon+D%27+Geny+796+S+1st+St+San+Jose+CA+95113",
     tax_enabled: false,
     tax_rate: 10,
-    tax_only_taxable: true
+    tax_only_taxable: true,
+    checkout_mode: "pay_before_kitchen",
+    kiosk_id: "kiosk-01",
+    kiosk_bridge_url: "http://127.0.0.1:17840",
+    allow_cash_backup: false
   };
 
   function currentBusinessSettings() {
@@ -639,7 +643,12 @@ window.FOGON_MENU_ADMIN_BUILD = "83-weekly-schedule-editor";
     $("#businessTaxEnabled").checked = settings.tax_enabled === true;
     $("#businessTaxRate").value = Number(settings.tax_rate || 10).toFixed(3);
     $("#businessTaxOnlyTaxable").checked = settings.tax_only_taxable !== false;
+    $("#businessCheckoutMode").value = settings.checkout_mode || "pay_before_kitchen";
+    $("#businessKioskId").value = settings.kiosk_id || "kiosk-01";
+    $("#businessKioskBridgeUrl").value = settings.kiosk_bridge_url || "http://127.0.0.1:17840";
+    $("#businessAllowCashBackup").checked = settings.allow_cash_backup === true;
     updateTaxSettingsUi();
+    updateKioskSettingsUi();
     form.dataset.loaded = "true";
   }
 
@@ -650,6 +659,51 @@ window.FOGON_MENU_ADMIN_BUILD = "83-weekly-schedule-editor";
 
     if (fields) fields.hidden = !enabled;
     if (status) status.textContent = enabled ? "Activado" : "Desactivado";
+  }
+
+
+  function updateKioskSettingsUi() {
+    const mode = String($("#businessCheckoutMode")?.value || "pay_before_kitchen");
+    const fields = $("#kioskConnectionFields");
+    if (fields) fields.hidden = mode !== "pay_before_kitchen";
+  }
+
+  async function testKioskBridgeConnection() {
+    const button = $("#testKioskBridgeButton");
+    const status = $("#kioskBridgeStatus");
+    const baseUrl = String($("#businessKioskBridgeUrl")?.value || "").trim().replace(/\/$/, "");
+
+    if (!baseUrl) {
+      if (status) status.textContent = "Falta la dirección";
+      return;
+    }
+
+    if (button) button.disabled = true;
+    if (status) status.textContent = "Comprobando…";
+
+    try {
+      const response = await fetch(`${baseUrl}/health`, {
+        method: "GET",
+        cache: "no-store"
+      });
+
+      const result = await response.json().catch(() => ({}));
+
+      if (!response.ok || result?.ok !== true) {
+        throw new Error(result?.error || `HTTP ${response.status}`);
+      }
+
+      if (status) {
+        status.textContent = result.mode === "simulator"
+          ? "Conectado · simulador"
+          : "Conectado · Clover";
+      }
+    } catch (error) {
+      if (status) status.textContent = "No conectado";
+      toast(`No se pudo conectar con Fogón Kiosk Bridge. ${error?.message || error}`, "error");
+    } finally {
+      if (button) button.disabled = false;
+    }
   }
 
   async function saveBusinessSettings(event) {
@@ -665,7 +719,11 @@ window.FOGON_MENU_ADMIN_BUILD = "83-weekly-schedule-editor";
       maps_url: String($("#businessMapsUrl")?.value || "").trim(),
       tax_enabled: Boolean($("#businessTaxEnabled")?.checked),
       tax_rate: Math.max(0, Math.min(20, Number($("#businessTaxRate")?.value || 10))),
-      tax_only_taxable: Boolean($("#businessTaxOnlyTaxable")?.checked)
+      tax_only_taxable: Boolean($("#businessTaxOnlyTaxable")?.checked),
+      checkout_mode: String($("#businessCheckoutMode")?.value || "pay_before_kitchen"),
+      kiosk_id: String($("#businessKioskId")?.value || "kiosk-01").trim() || "kiosk-01",
+      kiosk_bridge_url: String($("#businessKioskBridgeUrl")?.value || "http://127.0.0.1:17840").trim().replace(/\/$/, ""),
+      allow_cash_backup: Boolean($("#businessAllowCashBackup")?.checked)
     };
 
     setBusy(true);
@@ -2356,6 +2414,8 @@ window.FOGON_MENU_ADMIN_BUILD = "83-weekly-schedule-editor";
         "Horario recomendado cargado. Pulsa Guardar para aplicarlo.";
     });
     $("#businessTaxEnabled")?.addEventListener("change", updateTaxSettingsUi);
+    $("#businessCheckoutMode")?.addEventListener("change", updateKioskSettingsUi);
+    $("#testKioskBridgeButton")?.addEventListener("click", testKioskBridgeConnection);
     $("#resetBusinessSettingsButton")?.addEventListener("click", () => {
       state.businessSettings = { ...BUSINESS_DEFAULTS };
       const form = $("#businessSettingsForm");
