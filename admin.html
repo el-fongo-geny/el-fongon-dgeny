@@ -42,7 +42,7 @@
       </label>
       <button id="loginButton" class="primary-btn full" type="button">Entrar</button>
       <p id="pinError" class="error-text" hidden>PIN incorrecto.</p>
-      <p id="adminBuildLabel" class="admin-build-label">Acceso V87 · sesión de 8 horas</p>
+      <p id="adminBuildLabel" class="admin-build-label">Acceso V88 · sesión de 8 horas</p>
     </form>
   </main>
 
@@ -158,7 +158,7 @@
   <script src="supabase-client.js?v=75-hide-order-fallback"></script>
   <script src="backend-config.js?v=18-mobile-fixed"></script>
   <script>
-  window.FOGON_ADMIN_EXPECTED_BUILD = "87-kiosk-clover-b";
+  window.FOGON_ADMIN_EXPECTED_BUILD = "88-android-kiosk-clover";
 
   window.reportAdminScriptLoadFailure = function () {
     var errorBox = document.getElementById("pinError");
@@ -176,7 +176,7 @@
     }
   };
   </script>
-  <script src="admin.js?v=87-kiosk-clover-b" onerror="window.reportAdminScriptLoadFailure()"></script>
+  <script src="admin.js?v=88-android-kiosk-clover" onerror="window.reportAdminScriptLoadFailure()"></script>
   <script>
   window.setTimeout(function () {
     if (window.FOGON_ADMIN_BUILD !== window.FOGON_ADMIN_EXPECTED_BUILD) {
