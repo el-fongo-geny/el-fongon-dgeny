@@ -4003,3 +4003,48 @@ body.language-gate-open {
 .language-gate .language-card {
   touch-action: manipulation;
 }
+
+
+/* ===== V87 · PAGO CLOVER EN KIOSCO ===== */
+.kiosk-payment-step {
+  display: grid;
+  justify-items: center;
+  gap: 14px;
+  text-align: center;
+}
+
+.kiosk-payment-step[hidden] {
+  display: none !important;
+}
+
+.kiosk-payment-step h2,
+.kiosk-payment-step p {
+  margin: 0;
+}
+
+.kiosk-payment-step > strong {
+  font-size: clamp(1.8rem, 7vw, 3rem);
+  font-weight: 950;
+}
+
+.kiosk-payment-spinner {
+  width: 66px;
+  height: 66px;
+  border: 7px solid color-mix(in srgb, var(--accent) 20%, transparent);
+  border-top-color: var(--accent);
+  border-radius: 999px;
+  animation: kioskPaymentSpin .9s linear infinite;
+}
+
+@keyframes kioskPaymentSpin {
+  to { transform: rotate(360deg); }
+}
+
+#paymentMethodStep [data-payment="card"] {
+  min-height: 62px;
+  font-size: 1.05rem;
+}
+
+#paymentMethodStep [data-payment][hidden] {
+  display: none !important;
+}
