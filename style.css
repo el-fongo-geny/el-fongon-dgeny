@@ -3988,3 +3988,18 @@ body.modal-open {
   -webkit-user-drag: none !important;
   user-select: none !important;
 }
+
+
+/* ===== V86 · SELECCIÓN DE IDIOMA CADA 10 MINUTOS ===== */
+.language-gate {
+  z-index: 1000 !important;
+}
+
+body.language-gate-open {
+  overflow: hidden !important;
+  touch-action: none;
+}
+
+.language-gate .language-card {
+  touch-action: manipulation;
+}
