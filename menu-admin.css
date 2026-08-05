@@ -1067,3 +1067,32 @@ body.image-crop-open { overflow: hidden; }
     grid-template-columns: 1fr;
   }
 }
+
+
+/* ===== V91 · MAPEO CLOVER FLEX ===== */
+.clover-device-map-card {
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+  border: 1px solid color-mix(in srgb, var(--accent) 25%, var(--line));
+  border-radius: 16px;
+  background: color-mix(in srgb, var(--surface) 94%, #e9efff 6%);
+}
+
+.clover-device-map-card p {
+  margin: 5px 0 0;
+  color: var(--muted);
+}
+
+.clover-device-map-example {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.clover-device-map-example code {
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface);
+}
