@@ -1,4 +1,4 @@
-window.FOGON_MENU_BUILD = "89-tax-label-clean";
+window.FOGON_MENU_BUILD = "90-payment-confirmation-fixes";
 
 const state = {
   lang: localStorage.getItem("fogon_lang") || "",
@@ -1342,9 +1342,7 @@ function renderCart() {
   if (totalValue) totalValue.textContent = money(totals.total);
   if (taxSummaryRow) taxSummaryRow.hidden = publicBusinessSettings.tax_enabled !== true;
   if (taxSummaryLabel) {
-    taxSummaryLabel.textContent = state.lang === "en"
-      ? `Tax (${Number(publicBusinessSettings.tax_rate || 0).toFixed(3)}%)`
-      : `Impuesto (${Number(publicBusinessSettings.tax_rate || 0).toFixed(3)}%)`;
+    taxSummaryLabel.textContent = state.lang === "en" ? "Tax" : "Impuesto";
   }
 }
 
@@ -1429,10 +1427,12 @@ function openPayment(order) {
 function showOrderThanks(orderNumber, activeOrderCount = 0) {
   const orderTypeStep = $("#orderTypeStep");
   const paymentMethodStep = $("#paymentMethodStep");
+  const kioskPaymentStep = $("#kioskPaymentStep");
   const orderThanksStep = $("#orderThanksStep");
 
   if (orderTypeStep) orderTypeStep.hidden = true;
   if (paymentMethodStep) paymentMethodStep.hidden = true;
+  if (kioskPaymentStep) kioskPaymentStep.hidden = true;
   if (orderThanksStep) orderThanksStep.hidden = false;
 
   const isEnglish = state.lang === "en";
@@ -1612,6 +1612,15 @@ async function cancelActiveKioskPayment() {
   if (paymentStep) paymentStep.hidden = false;
 }
 
+function isConfirmedCloverPayment(result) {
+  return Boolean(
+    result &&
+    String(result.status || "").toLowerCase() === "approved" &&
+    String(result.cloverPaymentId || "").trim() &&
+    String(result.completedAt || "").trim()
+  );
+}
+
 async function saveOrder(paymentMethod) {
   if (!state.pendingOrder || orderSubmissionInProgress) return;
 
@@ -1681,7 +1690,7 @@ async function saveOrder(paymentMethod) {
       const paymentResult =
         await startKioskBridgePayment(createdOrder);
 
-      if (paymentResult.status !== "approved") {
+      if (!isConfirmedCloverPayment(paymentResult)) {
         await db.updateKioskPayment(
           createdOrder.databaseId || createdOrder.id,
           {
@@ -1705,7 +1714,7 @@ async function saveOrder(paymentMethod) {
       createdOrder = await db.updateKioskPayment(
         createdOrder.databaseId || createdOrder.id,
         {
-          status: "accepted",
+          status: "new",
           paymentStatus: "paid",
           paymentStartedAt:
             paymentResult.startedAt || new Date().toISOString(),
