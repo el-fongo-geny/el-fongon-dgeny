@@ -1,4 +1,4 @@
-window.FOGON_MENU_BUILD = "86-language-gate-10-minutes";
+window.FOGON_MENU_BUILD = "87-pay-before-kitchen";
 
 const state = {
   lang: localStorage.getItem("fogon_lang") || "",
@@ -7,6 +7,7 @@ const state = {
   currentProduct: null,
   pendingOrder: null,
   orderType: "",
+  activeKioskPayment: null,
   theme: localStorage.getItem("fogon_theme") || "light",
   cartFabCompact: false
 };
@@ -1415,10 +1416,12 @@ function openPayment(order) {
   const orderTypeStep = $("#orderTypeStep");
   const paymentMethodStep = $("#paymentMethodStep");
   const orderThanksStep = $("#orderThanksStep");
+  const kioskPaymentStep = $("#kioskPaymentStep");
 
   if (orderTypeStep) orderTypeStep.hidden = false;
   if (paymentMethodStep) paymentMethodStep.hidden = true;
   if (orderThanksStep) orderThanksStep.hidden = true;
+  if (kioskPaymentStep) kioskPaymentStep.hidden = true;
 
   $("#paymentModal").setAttribute("aria-hidden", "false");
 }
@@ -1519,6 +1522,106 @@ async function countActiveOrders() {
   }
 }
 
+
+function isKioskCheckoutMode() {
+  return String(publicBusinessSettings.checkout_mode || "pay_before_kitchen") === "pay_before_kitchen";
+}
+
+function kioskBridgeBaseUrl() {
+  return String(
+    publicBusinessSettings.kiosk_bridge_url ||
+    "http://127.0.0.1:17840"
+  ).trim().replace(/\/$/, "");
+}
+
+function setKioskPaymentStepVisible(visible, total = 0) {
+  const orderTypeStep = $("#orderTypeStep");
+  const paymentMethodStep = $("#paymentMethodStep");
+  const kioskStep = $("#kioskPaymentStep");
+  const thanksStep = $("#orderThanksStep");
+
+  if (orderTypeStep) orderTypeStep.hidden = true;
+  if (paymentMethodStep) paymentMethodStep.hidden = true;
+  if (thanksStep) thanksStep.hidden = true;
+  if (kioskStep) kioskStep.hidden = !visible;
+
+  const totalNode = $("#kioskPaymentTotal");
+  if (totalNode) totalNode.textContent = money(total);
+}
+
+async function startKioskBridgePayment(order) {
+  const bridgeUrl = kioskBridgeBaseUrl();
+  const externalPaymentId = [
+    String(publicBusinessSettings.kiosk_id || "kiosk-01"),
+    String(order.publicId || order.public_id || order.id || Date.now()),
+    String(Date.now())
+  ].join("-");
+
+  state.activeKioskPayment = {
+    orderId: order.databaseId || order.id,
+    publicId: order.publicId || order.public_id || order.id,
+    externalPaymentId
+  };
+
+  const response = await fetch(`${bridgeUrl}/payment/start`, {
+    method: "POST",
+    cache: "no-store",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({
+      amount: Math.round(Number(order.totals?.total || 0) * 100),
+      externalPaymentId,
+      kioskId: publicBusinessSettings.kiosk_id || "kiosk-01",
+      orderNumber: order.publicId || order.public_id || order.id,
+      order
+    })
+  });
+
+  const result = await response.json().catch(() => ({}));
+
+  if (!response.ok || result?.ok !== true) {
+    throw new Error(
+      result?.error ||
+      (state.lang === "en"
+        ? "The Clover payment could not be started."
+        : "No se pudo iniciar el pago en Clover.")
+    );
+  }
+
+  return {
+    ...result,
+    externalPaymentId
+  };
+}
+
+async function cancelActiveKioskPayment() {
+  const payment = state.activeKioskPayment;
+  if (!payment) {
+    closePayment();
+    return;
+  }
+
+  try {
+    await fetch(`${kioskBridgeBaseUrl()}/payment/cancel`, {
+      method: "POST",
+      cache: "no-store",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        externalPaymentId: payment.externalPaymentId
+      })
+    });
+  } catch (error) {
+    console.warn("No se pudo cancelar el pago en Bridge:", error);
+  }
+
+  state.activeKioskPayment = null;
+  const kioskStep = $("#kioskPaymentStep");
+  const paymentStep = $("#paymentMethodStep");
+  if (kioskStep) kioskStep.hidden = true;
+  if (paymentStep) paymentStep.hidden = false;
+}
+
 async function saveOrder(paymentMethod) {
   if (!state.pendingOrder || orderSubmissionInProgress) return;
 
@@ -1533,6 +1636,8 @@ async function saveOrder(paymentMethod) {
     button.setAttribute("aria-disabled", "true");
   });
 
+  let createdOrder = null;
+
   try {
     if (!currentOrderingState().open) {
       closePayment();
@@ -1542,12 +1647,21 @@ async function saveOrder(paymentMethod) {
     }
 
     const originalPendingId = state.pendingOrder.id;
+    const kioskMode = isKioskCheckoutMode();
+    const cashBackup =
+      paymentMethod === "cash" &&
+      publicBusinessSettings.allow_cash_backup === true;
 
     let order = {
       ...state.pendingOrder,
       paymentMethod,
       orderType: state.orderType,
-      status: "new"
+      checkoutMode: kioskMode && !cashBackup
+        ? "pay_before_kitchen"
+        : "pay_at_counter",
+      kioskId: publicBusinessSettings.kiosk_id || "kiosk-01",
+      paymentStatus: kioskMode && !cashBackup ? "pending" : "pending",
+      status: kioskMode && !cashBackup ? "awaiting_payment" : "new"
     };
 
     order.items = (order.items || []).map((item, index) => (
@@ -1558,25 +1672,73 @@ async function saveOrder(paymentMethod) {
 
     const db = window.FOGON_DB;
 
-    if (db?.isReady()) {
-      order = await db.createOrder(order);
-      order.orderType = state.orderType;
-    } else if (BACKEND_URL) {
-      const result = await postOrderToBackend(order);
-      if (result?.orderId) order.backendOrderId = result.orderId;
-    } else {
+    if (!db?.isReady()) {
       throw new Error(
         state.lang === "en"
-          ? "The ordering service is temporarily unavailable. Please try again."
-          : "El servicio de pedidos no está disponible ahora mismo. Inténtalo otra vez."
+          ? "The ordering service is temporarily unavailable."
+          : "El servicio de pedidos no está disponible ahora mismo."
       );
+    }
+
+    createdOrder = await db.createOrder(order);
+    createdOrder.orderType = state.orderType;
+    createdOrder.checkoutMode = order.checkoutMode;
+    createdOrder.kioskId = order.kioskId;
+
+    if (kioskMode && !cashBackup) {
+      setKioskPaymentStepVisible(true, createdOrder.totals?.total);
+
+      const paymentResult =
+        await startKioskBridgePayment(createdOrder);
+
+      if (paymentResult.status !== "approved") {
+        await db.updateKioskPayment(
+          createdOrder.databaseId || createdOrder.id,
+          {
+            paymentStatus: paymentResult.status || "failed",
+            paymentError: paymentResult.error || "",
+            cloverExternalPaymentId:
+              paymentResult.externalPaymentId || ""
+          }
+        );
+
+        throw new Error(
+          paymentResult.error ||
+          (
+            state.lang === "en"
+              ? "The payment was not approved. Try another card."
+              : "El pago no fue aprobado. Prueba con otra tarjeta."
+          )
+        );
+      }
+
+      createdOrder = await db.updateKioskPayment(
+        createdOrder.databaseId || createdOrder.id,
+        {
+          status: "accepted",
+          paymentStatus: "paid",
+          paymentStartedAt:
+            paymentResult.startedAt || new Date().toISOString(),
+          paymentCompletedAt:
+            paymentResult.completedAt || new Date().toISOString(),
+          cloverPaymentId:
+            paymentResult.cloverPaymentId || "",
+          cloverExternalPaymentId:
+            paymentResult.externalPaymentId || "",
+          kioskId:
+            publicBusinessSettings.kiosk_id || "kiosk-01",
+          checkoutMode: "pay_before_kitchen"
+        }
+      );
+
+      state.activeKioskPayment = null;
     }
 
     const orders = JSON.parse(
       localStorage.getItem(STORAGE_ORDERS) || "[]"
     );
 
-    orders.unshift(order);
+    orders.push(createdOrder);
     localStorage.setItem(STORAGE_ORDERS, JSON.stringify(orders));
 
     const activeOrderCount = await countActiveOrders();
@@ -1593,22 +1755,39 @@ async function saveOrder(paymentMethod) {
     closeCart();
 
     const displayOrderNumber =
-      order.publicId ||
-      order.public_id ||
-      order.id ||
+      createdOrder.publicId ||
+      createdOrder.public_id ||
+      createdOrder.id ||
       originalPendingId ||
       "";
 
     showOrderThanks(displayOrderNumber, activeOrderCount);
   } catch (error) {
-    console.error("No se pudo guardar el pedido:", error);
+    console.error("No se pudo completar el pedido:", error);
+
+    if (createdOrder && window.FOGON_DB?.isReady?.()) {
+      try {
+        await window.FOGON_DB.updateKioskPayment(
+          createdOrder.databaseId || createdOrder.id,
+          {
+            paymentStatus: "failed",
+            paymentError: error?.message || String(error)
+          }
+        );
+      } catch (_) {}
+    }
+
+    const kioskStep = $("#kioskPaymentStep");
+    const paymentStep = $("#paymentMethodStep");
+    if (kioskStep) kioskStep.hidden = true;
+    if (paymentStep) paymentStep.hidden = false;
 
     alert(
       error?.message ||
       (
         state.lang === "en"
-          ? "The order could not be sent. Please try again."
-          : "No se pudo enviar el pedido. Inténtalo otra vez."
+          ? "The payment or order could not be completed."
+          : "No se pudo completar el pago o el pedido."
       )
     );
   } finally {
@@ -1719,6 +1898,36 @@ function initEvents() {
       state.orderType = orderTypeButton.dataset.orderType;
       $("#orderTypeStep").hidden = true;
       $("#paymentMethodStep").hidden = false;
+
+      const kioskMode = isKioskCheckoutMode();
+      const cardButton = document.querySelector('[data-payment="card"]');
+      const cashButton = document.querySelector('[data-payment="cash"]');
+      const subtitle = document.querySelector('#paymentMethodStep [data-i18n="paymentSubtitle"]');
+
+      if (cardButton) {
+        cardButton.textContent = kioskMode
+          ? `${state.lang === "en" ? "Pay" : "Pagar"} ${money(state.pendingOrder.totals?.total)}`
+          : (state.lang === "en" ? "Card at counter" : "Tarjeta en ventanilla");
+      }
+
+      if (cashButton) {
+        cashButton.hidden = kioskMode && publicBusinessSettings.allow_cash_backup !== true;
+      }
+
+      if (subtitle) {
+        subtitle.textContent = kioskMode
+          ? (state.lang === "en"
+              ? "Pay now on the Clover device."
+              : "Paga ahora en el dispositivo Clover.")
+          : (state.lang === "en"
+              ? "Payment is completed at the counter."
+              : "El pago se realiza en la ventanilla.");
+      }
+    }
+
+    if (event.target.closest("#cancelKioskPaymentButton")) {
+      void cancelActiveKioskPayment();
+      return;
     }
 
     const paymentButton = event.target.closest("[data-payment]");
