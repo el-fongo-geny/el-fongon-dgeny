@@ -1,4 +1,4 @@
-window.FOGON_MENU_BUILD = "88-android-kiosk-clover-cloud";
+window.FOGON_MENU_BUILD = "89-tax-label-clean";
 
 const state = {
   lang: localStorage.getItem("fogon_lang") || "",
