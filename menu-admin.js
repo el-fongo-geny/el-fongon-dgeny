@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-window.FOGON_MENU_ADMIN_BUILD = "88-android-kiosk-settings";
+window.FOGON_MENU_ADMIN_BUILD = "91-clover-device-mapping";
 
   const $ = (selector) => document.querySelector(selector);
   const $$ = (selector) => Array.from(document.querySelectorAll(selector));
