@@ -4067,3 +4067,43 @@ body.kiosk-payment-lock {
   overflow: hidden !important;
   touch-action: none;
 }
+
+
+/* ===== V91 · ESTADOS VISUALES DE PAGO ===== */
+#kioskPaymentStep[data-payment-status="approved"] .kiosk-payment-spinner {
+  border: 0;
+  animation: none;
+  background: #e4f7ed;
+  position: relative;
+}
+
+#kioskPaymentStep[data-payment-status="approved"] .kiosk-payment-spinner::after {
+  content: "✓";
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  color: #13864f;
+  font-size: 2.4rem;
+  font-weight: 950;
+}
+
+#kioskPaymentStep[data-payment-status="failed"] .kiosk-payment-spinner,
+#kioskPaymentStep[data-payment-status="cancelled"] .kiosk-payment-spinner {
+  border: 0;
+  animation: none;
+  background: #fde9e6;
+  position: relative;
+}
+
+#kioskPaymentStep[data-payment-status="failed"] .kiosk-payment-spinner::after,
+#kioskPaymentStep[data-payment-status="cancelled"] .kiosk-payment-spinner::after {
+  content: "!";
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  color: #c43624;
+  font-size: 2.4rem;
+  font-weight: 950;
+}
