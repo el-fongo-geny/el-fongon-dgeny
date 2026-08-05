@@ -42,7 +42,7 @@
       </label>
       <button id="loginButton" class="primary-btn full" type="button">Entrar</button>
       <p id="pinError" class="error-text" hidden>PIN incorrecto.</p>
-      <p id="adminBuildLabel" class="admin-build-label">Acceso V84 · sesión de 8 horas</p>
+      <p id="adminBuildLabel" class="admin-build-label">Acceso V87 · sesión de 8 horas</p>
     </form>
   </main>
 
@@ -50,7 +50,7 @@
     <header class="admin-header">
       <div>
         <p class="eyebrow">Panel iPad</p>
-        <h1>Pedidos, cocina, cobros y disponibilidad</h1>
+        <h1>Pedidos, cocina, cobros e inventario</h1>
         <div class="admin-stats">
           <span class="admin-pill">Pendientes: <strong id="pendingCount">0</strong></span>
           <span class="admin-pill">En cocina: <strong id="kitchenCount">0</strong></span>
@@ -84,7 +84,7 @@
       <button class="admin-tab active" type="button" data-admin-tab="orders">Pedidos</button>
       <button class="admin-tab" type="button" data-admin-tab="kitchen">Cocina</button>
       <button class="admin-tab" type="button" data-admin-tab="payments">Cobros</button>
-      <button class="admin-tab" type="button" data-admin-tab="availability">Disponibilidad</button>
+      <button class="admin-tab" type="button" data-admin-tab="availability">Inventario</button>
     </nav>
 
     <section id="ordersTab" class="admin-tab-panel active" data-admin-panel="orders">
@@ -131,7 +131,7 @@
     <section id="availabilityTab" class="admin-tab-panel" data-admin-panel="availability" hidden>
       <div class="admin-card wide">
         <div class="section-title">
-          <h2>Disponibilidad</h2>
+          <h2>Inventario</h2>
         </div>
         <div style="display:flex; gap:10px; flex-wrap:wrap; margin:0 0 14px;">
           <button id="sendDailyMissingBtn" class="primary-btn" type="button">
@@ -158,7 +158,7 @@
   <script src="supabase-client.js?v=75-hide-order-fallback"></script>
   <script src="backend-config.js?v=18-mobile-fixed"></script>
   <script>
-  window.FOGON_ADMIN_EXPECTED_BUILD = "84-kitchen-whatsapp-premium";
+  window.FOGON_ADMIN_EXPECTED_BUILD = "87-kiosk-clover-b";
 
   window.reportAdminScriptLoadFailure = function () {
     var errorBox = document.getElementById("pinError");
@@ -176,7 +176,7 @@
     }
   };
   </script>
-  <script src="admin.js?v=84-kitchen-whatsapp-premium" onerror="window.reportAdminScriptLoadFailure()"></script>
+  <script src="admin.js?v=87-kiosk-clover-b" onerror="window.reportAdminScriptLoadFailure()"></script>
   <script>
   window.setTimeout(function () {
     if (window.FOGON_ADMIN_BUILD !== window.FOGON_ADMIN_EXPECTED_BUILD) {
