@@ -71,6 +71,9 @@
       paymentError: row.payment_error || row.raw?.paymentError || "",
       cloverPaymentId: row.clover_payment_id || row.raw?.cloverPaymentId || null,
       cloverExternalPaymentId: row.clover_external_payment_id || row.raw?.cloverExternalPaymentId || null,
+      checkoutMode: row.checkout_mode || row.raw?.checkoutMode || "pay_at_counter",
+      kioskId: row.kiosk_id || row.raw?.kioskId || "",
+      kitchenVisible: row.kitchen_visible !== false,
       hiddenForAll: Boolean(row.hidden_for_all),
       hiddenAt: row.hidden_at || row.raw?.hiddenAt || null,
       status,
@@ -115,6 +118,12 @@
       language: order.language || "es",
       payment_method: order.paymentMethod || order.payment_method || "",
       status: order.status || "new",
+      payment_status: order.paymentStatus || "pending",
+      checkout_mode: order.checkoutMode || "pay_at_counter",
+      kiosk_id: order.kioskId || "",
+      kitchen_visible: order.checkoutMode === "pay_before_kitchen"
+        ? order.paymentStatus === "paid"
+        : true,
       subtotal: moneyNumber(totals.subtotal),
       tax: moneyNumber(totals.tax),
       total: moneyNumber(totals.total),
@@ -159,6 +168,40 @@
     const { data, error } = await query;
     if (error) throw error;
     return (data || []).map(toOrder).filter(Boolean)[0] || null;
+  }
+
+
+  async function updateKioskPayment(orderId, details = {}) {
+    if (!client) throw new Error("Supabase no está configurado.");
+
+    const payload = {
+      updated_at: new Date().toISOString()
+    };
+
+    if (details.status != null) payload.status = String(details.status);
+    if (details.paymentStatus != null) payload.payment_status = String(details.paymentStatus);
+    if (details.paymentStartedAt != null) payload.payment_started_at = details.paymentStartedAt;
+    if (details.paymentCompletedAt != null) payload.payment_completed_at = details.paymentCompletedAt;
+    if (details.paymentError != null) payload.payment_error = String(details.paymentError || "");
+    if (details.cloverPaymentId != null) payload.clover_payment_id = String(details.cloverPaymentId || "");
+    if (details.cloverExternalPaymentId != null) payload.clover_external_payment_id = String(details.cloverExternalPaymentId || "");
+    if (details.kioskId != null) payload.kiosk_id = String(details.kioskId || "");
+    if (details.checkoutMode != null) payload.checkout_mode = String(details.checkoutMode || "");
+
+    const finalPaymentStatus =
+      String(details.paymentStatus || "").toLowerCase();
+
+    if (details.checkoutMode === "pay_before_kitchen" || finalPaymentStatus) {
+      payload.kitchen_visible = finalPaymentStatus === "paid";
+    }
+
+    let query = client.from(tables.orders).update(payload).select("*");
+    const publicId = numericOrderId(orderId);
+    query = publicId ? query.eq("public_id", publicId) : query.eq("id", orderId);
+
+    const { data, error } = await query.single();
+    if (error) throw error;
+    return toOrder(data);
   }
 
   async function deleteOrder(orderId) {
@@ -279,6 +322,7 @@
     createOrder,
     fetchOrders,
     updateOrderStatus,
+    updateKioskPayment,
     deleteOrder,
     clearOrders,
     hideOrderForAll,
