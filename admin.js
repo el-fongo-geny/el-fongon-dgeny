@@ -76,7 +76,7 @@ function showLoginRuntimeError(error) {
   console.error("Error del administrador:", error);
 }
 
-window.FOGON_ADMIN_BUILD = "87-kiosk-clover-b";
+window.FOGON_ADMIN_BUILD = "88-android-kiosk-clover";
 
 if (!window.CSS) window.CSS = {};
 if (!window.CSS.escape) {
