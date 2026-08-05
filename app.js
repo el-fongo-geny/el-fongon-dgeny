@@ -1,4 +1,4 @@
-window.FOGON_MENU_BUILD = "90-payment-confirmation-fixes";
+window.FOGON_MENU_BUILD = "91-real-clover-flex-routing";
 
 const state = {
   lang: localStorage.getItem("fogon_lang") || "",
@@ -1523,6 +1523,71 @@ async function countActiveOrders() {
 }
 
 
+
+function currentKioskId() {
+  const params = new URLSearchParams(window.location.search);
+  const fromUrl = String(params.get("kiosk") || "").trim();
+
+  if (fromUrl) {
+    try {
+      localStorage.setItem("fogon_kiosk_id", fromUrl);
+    } catch (_) {}
+    return fromUrl;
+  }
+
+  try {
+    const stored = String(localStorage.getItem("fogon_kiosk_id") || "").trim();
+    if (stored) return stored;
+  } catch (_) {}
+
+  return String(publicBusinessSettings.kiosk_id || "kiosk-01").trim() || "kiosk-01";
+}
+
+function buildExternalPaymentId(order) {
+  const kiosk = currentKioskId()
+    .replace(/[^a-zA-Z0-9]/g, "")
+    .slice(0, 8) || "KIOSK";
+  const orderNo = String(order.publicId || order.public_id || order.id || Date.now())
+    .replace(/[^a-zA-Z0-9]/g, "")
+    .slice(-8);
+  const stamp = Date.now().toString(36).slice(-10);
+  return `${kiosk}-${orderNo}-${stamp}`.slice(0, 32);
+}
+
+function setKioskPaymentVisual(status, message = "") {
+  const title = $("#kioskPaymentTitle");
+  const text = $("#kioskPaymentMessage");
+  const step = $("#kioskPaymentStep");
+
+  if (step) step.dataset.paymentStatus = status;
+
+  const labels = {
+    waiting: state.lang === "en"
+      ? "Waiting for payment on Clover"
+      : "Esperando el pago en Clover",
+    approved: state.lang === "en"
+      ? "Payment approved"
+      : "Pago aprobado",
+    failed: state.lang === "en"
+      ? "Payment failed"
+      : "Pago fallido",
+    cancelled: state.lang === "en"
+      ? "Payment cancelled"
+      : "Pago cancelado"
+  };
+
+  if (title) title.textContent = labels[status] || labels.waiting;
+  if (text) {
+    text.textContent = message || (
+      status === "waiting"
+        ? (state.lang === "en"
+            ? "Use the assigned Clover Flex to complete the transaction."
+            : "Completa la transacción en el Clover Flex asignado.")
+        : ""
+    );
+  }
+}
+
 function isKioskCheckoutMode() {
   return String(publicBusinessSettings.checkout_mode || "pay_before_kitchen") === "pay_before_kitchen";
 }
@@ -1567,11 +1632,7 @@ function setKioskPaymentStepVisible(visible, total = 0) {
 }
 
 async function startKioskBridgePayment(order) {
-  const externalPaymentId = [
-    String(publicBusinessSettings.kiosk_id || "kiosk-01"),
-    String(order.publicId || order.public_id || order.id || Date.now()),
-    String(Date.now())
-  ].join("-");
+  const externalPaymentId = buildExternalPaymentId(order);
 
   state.activeKioskPayment = {
     orderId: order.databaseId || order.id,
@@ -1582,7 +1643,7 @@ async function startKioskBridgePayment(order) {
   const result = await callKioskPaymentService("start", {
     amount: Math.round(Number(order.totals?.total || 0) * 100),
     externalPaymentId,
-    kioskId: publicBusinessSettings.kiosk_id || "kiosk-01",
+    kioskId: currentKioskId(),
     orderNumber: order.publicId || order.public_id || order.id,
     order
   });
@@ -1658,7 +1719,7 @@ async function saveOrder(paymentMethod) {
       checkoutMode: kioskMode && !cashBackup
         ? "pay_before_kitchen"
         : "pay_at_counter",
-      kioskId: publicBusinessSettings.kiosk_id || "kiosk-01",
+      kioskId: currentKioskId(),
       paymentStatus: kioskMode && !cashBackup ? "pending" : "pending",
       status: kioskMode && !cashBackup ? "awaiting_payment" : "new"
     };
@@ -1686,11 +1747,16 @@ async function saveOrder(paymentMethod) {
 
     if (kioskMode && !cashBackup) {
       setKioskPaymentStepVisible(true, createdOrder.totals?.total);
+      setKioskPaymentVisual("waiting");
 
       const paymentResult =
         await startKioskBridgePayment(createdOrder);
 
       if (!isConfirmedCloverPayment(paymentResult)) {
+        setKioskPaymentVisual(
+          paymentResult.status === "cancelled" ? "cancelled" : "failed",
+          paymentResult.error || ""
+        );
         await db.updateKioskPayment(
           createdOrder.databaseId || createdOrder.id,
           {
@@ -1711,6 +1777,8 @@ async function saveOrder(paymentMethod) {
         );
       }
 
+      setKioskPaymentVisual("approved");
+
       createdOrder = await db.updateKioskPayment(
         createdOrder.databaseId || createdOrder.id,
         {
@@ -1725,7 +1793,7 @@ async function saveOrder(paymentMethod) {
           cloverExternalPaymentId:
             paymentResult.externalPaymentId || "",
           kioskId:
-            publicBusinessSettings.kiosk_id || "kiosk-01",
+            currentKioskId(),
           checkoutMode: "pay_before_kitchen"
         }
       );
