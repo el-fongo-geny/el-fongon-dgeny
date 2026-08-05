@@ -76,7 +76,7 @@ function showLoginRuntimeError(error) {
   console.error("Error del administrador:", error);
 }
 
-window.FOGON_ADMIN_BUILD = "88-android-kiosk-clover";
+window.FOGON_ADMIN_BUILD = "90-paid-awaiting-acceptance";
 
 if (!window.CSS) window.CSS = {};
 if (!window.CSS.escape) {
@@ -648,6 +648,9 @@ function orderFromBackend(row) {
     paymentError: row.payment_error || row.raw?.paymentError || "",
     cloverPaymentId: row.clover_payment_id || row.raw?.cloverPaymentId || null,
     cloverExternalPaymentId: row.clover_external_payment_id || row.raw?.cloverExternalPaymentId || null,
+    checkoutMode: row.checkout_mode || row.raw?.checkoutMode || "pay_at_counter",
+    kioskId: row.kiosk_id || row.raw?.kioskId || "",
+    kitchenVisible: row.kitchen_visible !== false,
     hiddenForAll: Boolean(row.hidden_for_all || row.raw?.hiddenForAll),
     hiddenAt: row.hidden_at || row.raw?.hiddenAt || null,
     orderType: row.order_type || row.raw?.orderType || (Array.isArray(row.items) && row.items[0]?.orderType) || "",
@@ -879,9 +882,10 @@ function kitchenOrders(orders = getOrders()) {
 
   return orders.filter((order) => {
     if (hidden.has(order.id)) return false;
+    if (order.kitchenVisible === false) return false;
 
     const checkoutMode = String(order.checkoutMode || "pay_at_counter");
-    const paymentStatus = String(order.paymentStatus || "pending");
+    const paymentStatus = String(order.paymentStatus || "pending").toLowerCase();
 
     if (checkoutMode === "pay_before_kitchen") {
       return paymentStatus === "paid";
