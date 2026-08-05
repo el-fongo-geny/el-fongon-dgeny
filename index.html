@@ -28,7 +28,7 @@
   <meta name="twitter:description" content="Autentica comida dominicana en San Jose, California.">
   <meta name="twitter:image" content="https://el-fongo-geny.github.io/el-fongon-dgeny/assets/images/logo.png">
 
-  <link rel="stylesheet" href="style.css?v=86-language-gate-10-minutes">
+  <link rel="stylesheet" href="style.css?v=87-kiosk-payment">
 
   <script type="application/ld+json">
   {
@@ -322,8 +322,8 @@
         <span data-i18n="phone">Teléfono</span>
         <input id="customerPhone" type="tel" inputmode="tel" autocomplete="tel" placeholder="(650) 000-0000" required>
       </label>
-      <p class="form-note" data-i18n="phoneNote">Te avisaremos por WhatsApp o mensaje cuando tu pedido esté listo.</p>
-      <button class="primary-btn full" type="submit" data-i18n="sendOrder">Enviar pedido</button>
+      <p class="form-note" data-i18n="phoneNote">El teléfono es obligatorio. Te avisaremos por WhatsApp cuando tu pedido esté listo.</p>
+      <button class="primary-btn full" type="submit" data-i18n="sendOrder">Continuar al pago</button>
     </form>
   </aside>
 
@@ -340,15 +340,25 @@
         </div>
       </div>
       <div id="paymentMethodStep" hidden>
-        <h2 data-i18n="paymentTitle">¿Cómo pagarás?</h2>
-        <p data-i18n="paymentSubtitle">El pago se realiza en la ventanilla.</p>
+        <h2 data-i18n="paymentTitle">Elige cómo pagar</h2>
+        <p data-i18n="paymentSubtitle">La tarjeta se cobrará ahora en Clover.</p>
         <div class="payment-step-actions">
-          <button class="primary-btn full" type="button" data-payment="card" data-i18n="cardAtWindow">Tarjeta en ventanilla</button>
-          <button class="secondary-btn full" type="button" data-payment="cash" data-i18n="cashAtWindow">Efectivo en ventanilla</button>
+          <button class="primary-btn full" type="button" data-payment="card" data-i18n="cardAtWindow">Pagar con tarjeta</button>
+          <button class="secondary-btn full" type="button" data-payment="cash" data-i18n="cashAtWindow">Pagar en efectivo en ventanilla</button>
         </div>
       </div>
 
-      <div id="orderThanksStep" class="order-thanks-step" hidden>
+      
+      <div id="kioskPaymentStep" class="kiosk-payment-step" hidden>
+        <div class="kiosk-payment-spinner" aria-hidden="true"></div>
+        <p class="eyebrow">Clover</p>
+        <h2 id="kioskPaymentTitle">Realiza el pago en el dispositivo Clover</h2>
+        <p id="kioskPaymentMessage">Acerca, inserta o desliza tu tarjeta. No cierres esta pantalla.</p>
+        <strong id="kioskPaymentTotal">$0.00</strong>
+        <button id="cancelKioskPaymentButton" class="secondary-btn full" type="button">Cancelar pago</button>
+      </div>
+
+<div id="orderThanksStep" class="order-thanks-step" hidden>
         <div class="order-thanks-icon" aria-hidden="true">✓</div>
         <h2 id="orderThanksTitle">Gracias por tu pedido</h2>
         <p id="orderThanksMessage">
@@ -369,9 +379,9 @@
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="supabase-config.js?v=18-mobile-fixed"></script>
-  <script src="supabase-client.js?v=30-order-fix"></script>
+  <script src="supabase-client.js?v=87-kiosk-payment"></script>
   <script src="backend-config.js?v=18-mobile-fixed"></script>
   <script src="menu-data.js?v=60-public-catalog"></script>
-  <script src="app.js?v=86-language-gate-10-minutes"></script>
+  <script src="app.js?v=87-pay-before-kitchen"></script>
 </body>
 </html>
