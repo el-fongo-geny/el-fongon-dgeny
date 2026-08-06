@@ -76,7 +76,7 @@ function showLoginRuntimeError(error) {
   console.error("Error del administrador:", error);
 }
 
-window.FOGON_ADMIN_BUILD = "91-real-clover-flex-routing";
+window.FOGON_ADMIN_BUILD = "94-accept-fallback-orders";
 
 if (!window.CSS) window.CSS = {};
 if (!window.CSS.escape) {
@@ -1149,6 +1149,9 @@ async function acceptOrder(orderId) {
   const button = document.querySelector(
     `[data-accept-order="${CSS.escape(cleanOrderId)}"]`
   );
+  const currentOrder = getOrders().find(
+    (order) => String(order.id) === cleanOrderId
+  );
 
   if (button) {
     button.disabled = true;
@@ -1156,18 +1159,49 @@ async function acceptOrder(orderId) {
   }
 
   try {
-    await updateOrderStatusBackend(
-      cleanOrderId,
-      "accepted",
-      { acceptedAt }
+    const unpaidKioskFallback = Boolean(
+      currentOrder &&
+      String(currentOrder.checkoutMode || "") === "pay_before_kitchen" &&
+      normalizePaymentStatus(currentOrder) !== "paid"
     );
+
+    if (unpaidKioskFallback) {
+      const db = window.FOGON_DB;
+
+      if (!db?.isReady?.()) {
+        throw new Error("Supabase no está disponible.");
+      }
+
+      await db.updateKioskPayment(cleanOrderId, {
+        status: "accepted",
+        paymentStatus: "pending",
+        paymentError: "",
+        checkoutMode: "pay_at_counter"
+      });
+    } else {
+      await updateOrderStatusBackend(
+        cleanOrderId,
+        "accepted",
+        { acceptedAt }
+      );
+    }
 
     const orders = getOrders().map((order) => (
       String(order.id) === cleanOrderId
         ? {
             ...order,
             status: "accepted",
-            acceptedAt
+            acceptedAt,
+            checkoutMode: unpaidKioskFallback
+              ? "pay_at_counter"
+              : order.checkoutMode,
+            kitchenVisible: true,
+            paymentStatus: unpaidKioskFallback
+              ? "pending"
+              : order.paymentStatus,
+            paymentError: unpaidKioskFallback
+              ? ""
+              : order.paymentError
           }
         : order
     ));
@@ -1935,6 +1969,8 @@ function paymentLabel(method) {
 function statusLabel(order) {
   const status = order.status || "new";
   if (status === "awaiting_payment") return "Esperando pago";
+  if (status === "payment_cancelled") return "Pago cancelado";
+  if (status === "payment_failed") return "Pago fallido";
   if (status === "ready") return "Listo";
   if (status === "accepted") return "Aceptado";
   return "Nuevo";
@@ -2189,7 +2225,7 @@ function compactCardActionHtml(order) {
     }
   }
 
-  if (status === "new" || !status) {
+  if (!["accepted", "ready"].includes(status)) {
     return `<button class="primary-btn full compact-card-action-btn compact-accept-btn" data-accept-order="${orderId}" type="button">Aceptar pedido</button>`;
   }
 
@@ -2228,7 +2264,7 @@ function expandedWorkflowActionsHtml(order) {
   const accepted = status === "accepted" || status === "ready";
   const ready = status === "ready";
 
-  const acceptButton = status === "new"
+  const acceptButton = !["accepted", "ready"].includes(status)
     ? `<button class="primary-btn full workflow-accept-btn" data-accept-order="${orderId}" type="button">Aceptar pedido</button>`
     : "";
 
