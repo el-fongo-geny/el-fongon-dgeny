@@ -337,6 +337,7 @@
         <div class="payment-step-actions">
           <button class="primary-btn full" type="button" data-order-type="dine-in" data-i18n="dineIn">Para aquí</button>
           <button class="secondary-btn full" type="button" data-order-type="takeout" data-i18n="takeout">Para llevar</button>
+          <button class="secondary-btn full" type="button" data-close-payment-menu>Volver al menú</button>
         </div>
       </div>
       <div id="paymentMethodStep" hidden>
@@ -345,6 +346,7 @@
         <div class="payment-step-actions">
           <button class="primary-btn full" type="button" data-payment="card" data-i18n="cardAtWindow">Pagar con tarjeta</button>
           <button class="secondary-btn full" type="button" data-payment="cash" data-i18n="cashAtWindow">Pagar en efectivo en ventanilla</button>
+          <button class="secondary-btn full" type="button" data-close-payment-menu>Volver al menú</button>
         </div>
       </div>
 
@@ -355,7 +357,7 @@
         <h2 id="kioskPaymentTitle">Realiza el pago en el dispositivo Clover</h2>
         <p id="kioskPaymentMessage">Acerca, inserta o desliza tu tarjeta. No cierres esta pantalla.</p>
         <strong id="kioskPaymentTotal">$0.00</strong>
-        <button id="cancelKioskPaymentButton" class="secondary-btn full" type="button">Cancelar pago</button>
+        <button id="cancelKioskPaymentButton" class="secondary-btn full" type="button">Cancelar pago y volver al menú</button>
       </div>
 
 <div id="orderThanksStep" class="order-thanks-step" hidden>
@@ -379,9 +381,9 @@
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="supabase-config.js?v=18-mobile-fixed"></script>
-  <script src="supabase-client.js?v=89-tax-label-clean"></script>
+  <script src="supabase-client.js?v=94-kiosk-counter-flows"></script>
   <script src="backend-config.js?v=18-mobile-fixed"></script>
   <script src="menu-data.js?v=60-public-catalog"></script>
-  <script src="app.js?v=93-clover-oauth-safety"></script>
+  <script src="app.js?v=94-kiosk-counter-flows"></script>
 </body>
 </html>
