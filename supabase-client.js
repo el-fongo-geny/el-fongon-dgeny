@@ -191,8 +191,15 @@
     const finalPaymentStatus =
       String(details.paymentStatus || "").toLowerCase();
 
-    if (details.checkoutMode === "pay_before_kitchen" || finalPaymentStatus) {
-      payload.kitchen_visible = finalPaymentStatus === "paid";
+    if (details.checkoutMode != null || details.paymentStatus != null) {
+      const finalCheckoutMode = String(
+        details.checkoutMode || "pay_before_kitchen"
+      ).toLowerCase();
+
+      payload.kitchen_visible =
+        finalCheckoutMode === "pay_before_kitchen"
+          ? finalPaymentStatus === "paid"
+          : true;
     }
 
     let query = client.from(tables.orders).update(payload).select("*");
