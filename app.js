@@ -1,4 +1,4 @@
-window.FOGON_MENU_BUILD = "93-clover-oauth-safety";
+window.FOGON_MENU_BUILD = "94-kiosk-counter-flows";
 
 const state = {
   lang: localStorage.getItem("fogon_lang") || "",
@@ -1665,25 +1665,81 @@ async function startKioskBridgePayment(order) {
 
 async function cancelActiveKioskPayment() {
   const payment = state.activeKioskPayment;
+
   if (!payment) {
     closePayment();
     return;
   }
 
+  const cancelButton = $("#cancelKioskPaymentButton");
+  if (cancelButton) {
+    cancelButton.disabled = true;
+    cancelButton.textContent = state.lang === "en"
+      ? "Cancelling payment…"
+      : "Cancelando pago…";
+  }
+
   try {
-    await callKioskPaymentService("cancel", {
+    const result = await callKioskPaymentService("cancel", {
       kioskId: currentKioskId(),
       externalPaymentId: payment.externalPaymentId
     });
-  } catch (error) {
-    console.warn("No se pudo cancelar el pago Clover:", error);
-  }
 
-  state.activeKioskPayment = null;
-  const kioskStep = $("#kioskPaymentStep");
-  const paymentStep = $("#paymentMethodStep");
-  if (kioskStep) kioskStep.hidden = true;
-  if (paymentStep) paymentStep.hidden = false;
+    if (String(result?.status || "").toLowerCase() !== "cancelled") {
+      throw new Error(
+        state.lang === "en"
+          ? "Clover did not confirm the cancellation."
+          : "Clover no confirmó la cancelación."
+      );
+    }
+
+    const db = window.FOGON_DB;
+    if (db?.isReady?.() && payment.orderId) {
+      try {
+        await db.deleteOrder(payment.orderId);
+      } catch (deleteError) {
+        console.warn(
+          "El pago fue cancelado, pero no se pudo borrar el pedido temporal:",
+          deleteError
+        );
+
+        try {
+          await db.updateKioskPayment(payment.orderId, {
+            status: "payment_cancelled",
+            paymentStatus: "cancelled",
+            paymentError: "cancelled_by_customer",
+            cloverExternalPaymentId: payment.externalPaymentId,
+            checkoutMode: "pay_before_kitchen"
+          });
+        } catch (_) {}
+      }
+    }
+
+    state.activeKioskPayment = null;
+    closePayment();
+  } catch (error) {
+    console.error("No se pudo confirmar la cancelación en Clover:", error);
+
+    setKioskPaymentVisual(
+      "review",
+      state.lang === "en"
+        ? "The payment result is uncertain. Ask staff for help before trying again."
+        : "El resultado del pago es incierto. Solicita ayuda antes de volver a intentarlo."
+    );
+
+    alert(
+      state.lang === "en"
+        ? "The payment window cannot be closed until Clover confirms the cancellation."
+        : "No se puede cerrar la ventana hasta que Clover confirme la cancelación."
+    );
+  } finally {
+    if (cancelButton) {
+      cancelButton.disabled = false;
+      cancelButton.textContent = state.lang === "en"
+        ? "Cancel payment and return to menu"
+        : "Cancelar pago y volver al menú";
+    }
+  }
 }
 
 function isConfirmedCloverPayment(result) {
@@ -1721,20 +1777,19 @@ async function saveOrder(paymentMethod) {
 
     const originalPendingId = state.pendingOrder.id;
     const kioskMode = isKioskCheckoutMode();
-    const cashBackup =
-      paymentMethod === "cash" &&
-      publicBusinessSettings.allow_cash_backup === true;
+    const payWithCloverNow =
+      kioskMode && paymentMethod === "card";
 
     let order = {
       ...state.pendingOrder,
       paymentMethod,
       orderType: state.orderType,
-      checkoutMode: kioskMode && !cashBackup
+      checkoutMode: payWithCloverNow
         ? "pay_before_kitchen"
         : "pay_at_counter",
       kioskId: currentKioskId(),
-      paymentStatus: kioskMode && !cashBackup ? "pending" : "pending",
-      status: kioskMode && !cashBackup ? "awaiting_payment" : "new"
+      paymentStatus: "pending",
+      status: payWithCloverNow ? "awaiting_payment" : "new"
     };
 
     order.items = (order.items || []).map((item, index) => (
@@ -1758,7 +1813,7 @@ async function saveOrder(paymentMethod) {
     createdOrder.checkoutMode = order.checkoutMode;
     createdOrder.kioskId = order.kioskId;
 
-    if (kioskMode && !cashBackup) {
+    if (payWithCloverNow) {
       setKioskPaymentStepVisible(true, createdOrder.totals?.total);
       setKioskPaymentVisual("waiting");
 
@@ -2053,23 +2108,33 @@ function initEvents() {
 
       if (cardButton) {
         cardButton.textContent = kioskMode
-          ? `${state.lang === "en" ? "Pay" : "Pagar"} ${money(state.pendingOrder.totals?.total)}`
-          : (state.lang === "en" ? "Card at counter" : "Tarjeta en ventanilla");
+          ? `${state.lang === "en" ? "Pay by card" : "Pagar con tarjeta"} · ${money(state.pendingOrder.totals?.total)}`
+          : (state.lang === "en"
+              ? "Card at the counter"
+              : "Tarjeta en ventanilla");
       }
 
       if (cashButton) {
-        cashButton.hidden = kioskMode && publicBusinessSettings.allow_cash_backup !== true;
+        cashButton.hidden = false;
+        cashButton.textContent = state.lang === "en"
+          ? "Cash at the counter"
+          : "Efectivo en ventanilla";
       }
 
       if (subtitle) {
         subtitle.textContent = kioskMode
           ? (state.lang === "en"
-              ? "Pay now on the Clover device."
-              : "Paga ahora en el dispositivo Clover.")
+              ? "Pay by card now on Clover, or choose cash at the counter."
+              : "Paga ahora con tarjeta en Clover o elige efectivo en ventanilla.")
           : (state.lang === "en"
-              ? "Payment is completed at the counter."
-              : "El pago se realiza en la ventanilla.");
+              ? "Choose card or cash. The order will be sent immediately."
+              : "Elige tarjeta o efectivo. El pedido se enviará inmediatamente.");
       }
+    }
+
+    if (event.target.closest("[data-close-payment-menu]")) {
+      closePayment();
+      return;
     }
 
     if (event.target.closest("#cancelKioskPaymentButton")) {
