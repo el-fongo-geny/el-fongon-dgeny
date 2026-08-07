@@ -464,623 +464,80 @@ body.admin-body .order-card.is-expanded .order-card-toggle {
 }
 
 
-/* ===== V72 · ACCIONES CENTRADAS, VERTICALES Y DIFERENCIADAS ===== */
-body.admin-body .order-primary-actions,
-body.admin-body .order-inline-payment-actions,
-body.admin-body .payment-action-wrap {
-  display: grid !important;
-  grid-template-columns: minmax(220px, 1fr) !important;
-  justify-items: center !important;
-  gap: 10px !important;
-  width: min(100%, 744px) !important;
-  margin-left: auto !important;
-  margin-right: auto !important;
-}
-
-body.admin-body .order-primary-actions > button,
-body.admin-body .order-inline-payment-actions > button,
-body.admin-body .payment-action-wrap > button {
-  width: 100% !important;
-  min-height: 56px !important;
-  margin: 0 auto !important;
-  border-radius: 14px !important;
-  text-align: center !important;
-}
-
-body.admin-body [data-ready-order] {
-  border-color: #4c74c9 !important;
-  background: #244d9b !important;
-  color: #fff !important;
-}
-
-body.admin-body .clover-pay-btn {
-  border: 0 !important;
-  background: #1f8b4c !important;
-  color: #fff !important;
-}
-
-body.admin-body .cash-pay-btn {
-  border: 0 !important;
-  background: #d69a22 !important;
-  color: #211603 !important;
-}
-
-body.admin-body .remove-order-btn,
-body.admin-body [data-hide-paid] {
-  border: 1px solid #d84c42 !important;
-  background: #8f261f !important;
-  color: #fff !important;
-}
-
-@media (max-width: 720px) {
-  body.admin-body .order-primary-actions,
-  body.admin-body .order-inline-payment-actions,
-  body.admin-body .payment-action-wrap {
-    width: 100% !important;
-  }
-}
-
-
-/* ===== V73 · TARJETAS MINIMIZADAS CON INFORMACIÓN COMPLETA ===== */
-body.admin-body .orders-list {
-  display: grid !important;
-  grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
-  align-items: start !important;
-  gap: 16px !important;
-}
-
-body.admin-body .order-card.is-collapsed {
-  grid-column: auto !important;
-}
-
-body.admin-body .order-card.is-expanded {
-  grid-column: 1 / -1 !important;
-}
-
-body.admin-body .order-card-toggle {
-  min-height: 0 !important;
-  height: auto !important;
-  gap: 10px !important;
-  padding: 17px 16px 15px !important;
-}
-
-body.admin-body .compact-order-service {
-  display: grid;
-  gap: 4px;
-  border-top: 1px solid var(--line);
-  border-bottom: 1px solid var(--line);
-  padding: 10px 0;
-  color: var(--muted);
-  font-size: .78rem;
-  line-height: 1.35;
-}
-
-body.admin-body .compact-order-service > span {
-  display: block;
-}
-
-body.admin-body .compact-order-service strong {
-  color: var(--ink);
-}
-
-body.admin-body .compact-order-items {
-  display: grid;
-  gap: 8px;
-}
-
-body.admin-body .compact-order-item {
-  display: grid;
-  gap: 3px;
-  border: 1px solid var(--line);
-  border-radius: 11px;
-  padding: 9px 10px;
-  background: color-mix(in srgb, var(--surface) 86%, var(--bg));
-  color: var(--muted);
-  font-size: .76rem;
-  line-height: 1.32;
-}
-
-body.admin-body .compact-order-item-head {
+/* ===== V95 · INVENTARIO DISPONIBLE / FALTANTES ===== */
+.inventory-view-tabs {
   display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
+  flex-wrap: wrap;
   gap: 10px;
-  color: var(--ink);
+  margin: 0 0 14px;
+  padding: 5px;
+  border: 1px solid color-mix(in srgb, var(--accent) 22%, var(--line));
+  border-radius: 16px;
+  background: color-mix(in srgb, var(--surface) 94%, #2c3149 6%);
 }
 
-body.admin-body .compact-order-item-head strong {
-  min-width: 0;
-  font-size: .86rem;
-  line-height: 1.25;
-}
-
-body.admin-body .compact-order-item-head b {
-  flex: 0 0 auto;
-  white-space: nowrap;
-  color: var(--ink);
-  font-size: .82rem;
-}
-
-body.admin-body .compact-order-total {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  border-top: 1px solid var(--line);
-  padding-top: 10px;
-  color: var(--muted);
-  font-size: .78rem;
+.inventory-view-tab {
+  min-height: 46px;
+  padding: 10px 15px;
+  border: 1px solid transparent;
+  border-radius: 12px;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
   font-weight: 800;
-}
-
-body.admin-body .compact-order-total strong {
-  color: var(--ink);
-  font-size: .95rem;
-}
-
-body.admin-body .order-card-summary {
-  justify-content: center !important;
-  margin-top: 0 !important;
-  border: 1px solid color-mix(in srgb, var(--accent) 46%, var(--line)) !important;
-  border-radius: 11px !important;
-  padding: 10px 12px !important;
-  background: color-mix(in srgb, var(--accent) 10%, var(--surface));
-}
-
-body.admin-body .order-card-open-label {
-  margin-left: 0 !important;
-  color: var(--accent) !important;
-  font-size: .8rem !important;
-}
-
-body.admin-body .order-card-summary .order-chevron {
-  margin-left: 8px;
-}
-
-/* El botón de pedido listo ahora comparte el mismo recuadro y alineación. */
-body.admin-body .order-inline-payment-actions {
-  grid-template-columns: minmax(220px, 800px) !important;
-  justify-content: center !important;
-  justify-items: stretch !important;
-  width: 100% !important;
-  max-width: none !important;
-  margin: 0 auto !important;
-}
-
-body.admin-body .order-inline-payment-actions > button {
-  width: 100% !important;
-  max-width: 800px !important;
-  margin: 0 auto !important;
-}
-
-body.admin-body .ready-order-btn {
-  border: 0 !important;
-  background: #2858ad !important;
-  color: #fff !important;
-}
-
-body.admin-body .clover-pay-btn {
-  background: #20924f !important;
-}
-
-body.admin-body .cash-pay-btn {
-  background: #dba32f !important;
-}
-
-body.admin-body .remove-order-btn,
-body.admin-body [data-hide-paid] {
-  background: #992f28 !important;
-  color: #fff !important;
-}
-
-@media (min-width: 1100px) {
-  body.admin-body .orders-list {
-    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
-  }
-}
-
-@media (min-width: 720px) and (max-width: 1099px) {
-  body.admin-body .orders-list {
-    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
-  }
-}
-
-@media (max-width: 719px) {
-  body.admin-body .orders-list {
-    grid-template-columns: 1fr !important;
-  }
-
-  body.admin-body .compact-order-item-head {
-    gap: 7px;
-  }
-
-  body.admin-body .order-inline-payment-actions {
-    grid-template-columns: 1fr !important;
-  }
-}
-
-
-/* ===== V74 · SIN BOTÓN VISUAL DE MINIMIZAR + TIPO EN COCINA ===== */
-body.admin-body .order-card-summary.order-card-toggle-hint {
-  border: 0 !important;
-  border-top: 1px solid var(--line) !important;
-  border-radius: 0 !important;
-  padding: 10px 0 0 !important;
-  background: transparent !important;
-  color: var(--muted) !important;
-  font-size: .74rem !important;
-  font-weight: 800 !important;
-}
-
-body.admin-body .order-card-summary.order-card-toggle-hint > span:first-child,
-body.admin-body .order-card-summary.order-card-toggle-hint .order-chevron {
-  color: var(--muted) !important;
-}
-
-body.admin-body .kitchen-order-identity {
-  display: grid;
-  gap: 7px;
-}
-
-body.admin-body .kitchen-fulfillment-type {
-  display: inline-flex;
-  align-items: center;
-  width: fit-content;
-  min-height: 32px;
-  border: 1px solid color-mix(in srgb, var(--accent) 45%, var(--line));
-  border-radius: 999px;
-  padding: 5px 11px;
-  background: rgba(255,255,255,.09);
-  color: #fff;
-  font-size: .82rem;
-  font-weight: 950;
-}
-
-body.admin-body.light-mode .kitchen-order-card .kitchen-fulfillment-type {
-  background: color-mix(in srgb, var(--accent) 10%, #fff);
-  color: var(--ink);
-}
-
-@media (max-width: 720px) {
-  body.admin-body .kitchen-order-identity {
-    width: 100%;
-  }
-
-  body.admin-body .kitchen-fulfillment-type {
-    font-size: .78rem;
-  }
-}
-
-
-/* ===== V75 · PEDIDO ABIERTO SIN DUPLICAR TARJETA ===== */
-body.admin-body .order-card.is-expanded > .order-card-toggle {
-  display: none !important;
-}
-
-body.admin-body .order-card.is-expanded .order-card-body {
-  border-top: 0 !important;
-  padding-top: 0 !important;
-}
-
-body.admin-body .expanded-order-close {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 14px;
-  width: calc(100% + 32px);
-  min-height: 58px;
-  margin: 0 -16px 16px;
-  border: 0;
-  border-bottom: 1px solid var(--line);
-  padding: 12px 16px;
-  background:
-    linear-gradient(
-      90deg,
-      color-mix(in srgb, var(--accent) 14%, var(--surface)),
-      var(--surface)
-    );
-  color: var(--ink);
-  text-align: left;
   cursor: pointer;
-  touch-action: manipulation;
 }
 
-body.admin-body .expanded-order-close span {
-  min-width: 0;
-  overflow: hidden;
-  font-weight: 900;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-body.admin-body .expanded-order-close strong {
-  flex: 0 0 auto;
-  border-radius: 999px;
-  padding: 8px 12px;
-  background: color-mix(in srgb, var(--accent) 14%, var(--surface));
-  color: var(--accent);
-  font-size: .8rem;
-}
-
-body.admin-body .expanded-order-close:hover {
-  filter: brightness(1.05);
-}
-
-body.admin-body .expanded-order-close:active {
-  transform: scale(.996);
-}
-
-@media (max-width: 720px) {
-  body.admin-body .expanded-order-close {
-    width: calc(100% + 24px);
-    margin-left: -12px;
-    margin-right: -12px;
-    padding-left: 12px;
-    padding-right: 12px;
-  }
-
-  body.admin-body .expanded-order-close strong {
-    padding: 7px 10px;
-  }
-}
-
-
-/* ===== V76 · ACCIONES EN TARJETA MINIMIZADA Y POSICIÓN ESTABLE ===== */
-body.admin-body .compact-order-actions {
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: 10px;
-  padding: 0 16px 16px;
-}
-
-body.admin-body .compact-card-action-btn {
-  width: 100% !important;
-  min-height: 52px !important;
-}
-
-body.admin-body .compact-ready-btn {
-  border: 0 !important;
-  background: #2956ad !important;
-  color: #fff !important;
-}
-
-body.admin-body .accept-order-btn,
-body.admin-body .compact-order-actions [data-accept-order] {
-  border: 0 !important;
-  background: #1d7f4a !important;
-  color: #fff !important;
-}
-
-body.admin-body .order-card.is-collapsed .order-card-toggle {
-  border-bottom-left-radius: 0 !important;
-  border-bottom-right-radius: 0 !important;
-}
-
-body.admin-body .order-card.is-collapsed .compact-order-actions {
-  border: 1px solid var(--line);
-  border-top: 0;
-  border-bottom-left-radius: 18px;
-  border-bottom-right-radius: 18px;
-  background: color-mix(in srgb, var(--surface) 88%, var(--bg));
-}
-
-body.admin-body .order-card.is-expanded .compact-order-actions {
-  display: none !important;
-}
-
-body.admin-body .orders-list,
-body.admin-body .kitchen-list {
-  align-items: start !important;
-}
-
-@media (min-width: 1100px) {
-  body.admin-body .orders-list,
-  body.admin-body .kitchen-list {
-    display: grid !important;
-    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
-    gap: 16px !important;
-  }
-
-  body.admin-body .order-card.is-expanded {
-    grid-column: 1 / -1 !important;
-  }
-}
-
-@media (min-width: 720px) and (max-width: 1099px) {
-  body.admin-body .orders-list,
-  body.admin-body .kitchen-list {
-    display: grid !important;
-    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
-    gap: 16px !important;
-  }
-
-  body.admin-body .order-card.is-expanded {
-    grid-column: 1 / -1 !important;
-  }
-}
-
-@media (max-width: 719px) {
-  body.admin-body .orders-list,
-  body.admin-body .kitchen-list {
-    display: grid !important;
-    grid-template-columns: 1fr !important;
-    gap: 14px !important;
-  }
-
-  body.admin-body .compact-order-actions {
-    padding-left: 12px;
-    padding-right: 12px;
-    padding-bottom: 12px;
-  }
-}
-
-/* V77 botones compactos siempre visibles */
-body.admin-body .order-card.is-collapsed{display:flex!important;flex-direction:column!important}
-body.admin-body .order-card.is-collapsed .compact-order-actions{position:relative!important;z-index:20!important;display:grid!important;visibility:visible!important;opacity:1!important;pointer-events:auto!important;width:100%!important;margin-top:auto!important;padding:12px 14px 14px!important}
-body.admin-body .order-card.is-collapsed .compact-order-actions button{display:block!important;visibility:visible!important;opacity:1!important;pointer-events:auto!important;width:100%!important;min-height:54px!important}
-body.admin-body .compact-accept-btn{border:0!important;background:#1d8b4d!important;color:#fff!important}
-body.admin-body .compact-ready-btn{border:0!important;background:#285bb5!important;color:#fff!important}
-
-
-/* ===== V78 · FLUJO COMPLETO EN TARJETA ABIERTA ===== */
-body.admin-body .expanded-workflow-actions {
-  display: grid !important;
-  grid-template-columns: minmax(220px, 800px) !important;
-  justify-content: center !important;
-  gap: 10px !important;
-  width: 100% !important;
-  margin-top: 16px !important;
-}
-
-body.admin-body .expanded-workflow-actions > button {
-  width: 100% !important;
-  min-height: 56px !important;
-  margin: 0 auto !important;
-}
-
-body.admin-body .workflow-complete-btn {
-  border-color: #3c8e62 !important;
-  background: rgba(42,139,80,.16) !important;
-  color: #7bdd9f !important;
-  opacity: 1 !important;
-}
-
-body.admin-body.light-mode .workflow-complete-btn {
-  color: #17683a !important;
-}
-
-
-/* ===== V83 · TIPO DE PEDIDO COMO ESTADO PRINCIPAL EN COCINA ===== */
-body.admin-body .kitchen-order-head {
-  align-items: flex-start !important;
-}
-
-body.admin-body .kitchen-order-head > .kitchen-fulfillment-type {
-  flex: 0 0 auto;
-  margin-left: auto;
-  background: color-mix(in srgb, var(--accent) 18%, var(--surface));
-  border-color: color-mix(in srgb, var(--accent) 52%, var(--line));
-  color: var(--ink);
-  font-size: .88rem;
-  font-weight: 950;
-}
-
-body.admin-body.dark-mode .kitchen-order-head > .kitchen-fulfillment-type {
+.inventory-view-tab.active {
+  border-color: color-mix(in srgb, var(--accent) 56%, var(--line));
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--accent) 84%, #ff806b 16%),
+    color-mix(in srgb, var(--accent) 76%, #765bd6 24%)
+  );
   color: #fff;
+  box-shadow: 0 8px 22px rgba(0, 0, 0, .16);
+}
+
+.inventory-view-count {
+  display: inline-grid;
+  min-width: 24px;
+  height: 24px;
+  margin-left: 7px;
+  padding: 0 6px;
+  place-items: center;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, .16);
+  font-size: .82rem;
+}
+
+.inventory-missing-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  margin: 0 0 14px;
+}
+
+.inventory-send-status {
+  color: var(--muted);
+  font-size: .9rem;
+  overflow-wrap: anywhere;
+}
+
+.availability-row.is-missing {
+  border-color: color-mix(in srgb, #e05b4e 42%, var(--line)) !important;
+  background: color-mix(in srgb, var(--surface) 91%, #9a342d 9%) !important;
 }
 
 @media (max-width: 720px) {
-  body.admin-body .kitchen-order-head {
-    display: flex !important;
-    flex-direction: row !important;
-    align-items: flex-start !important;
+  .inventory-view-tabs,
+  .inventory-missing-actions {
+    display: grid;
+    grid-template-columns: 1fr;
   }
 
-  body.admin-body .kitchen-order-head > .kitchen-fulfillment-type {
-    max-width: 52%;
-    text-align: center;
-  }
-}
-
-
-/* ===== V84 · MATIZ PREMIUM EN TARJETAS Y BORDES ===== */
-body.admin-body .order-card {
-  border-color: color-mix(in srgb, var(--accent) 26%, var(--line)) !important;
-  box-shadow:
-    0 14px 34px rgba(0, 0, 0, .16),
-    inset 0 1px 0 rgba(255, 255, 255, .035) !important;
-}
-
-body.admin-body .order-card-toggle {
-  background:
-    radial-gradient(
-      circle at 96% 0%,
-      color-mix(in srgb, #7867d9 17%, transparent),
-      transparent 38%
-    ),
-    linear-gradient(
-      145deg,
-      color-mix(in srgb, var(--surface) 82%, #5e2637 18%),
-      color-mix(in srgb, var(--surface) 91%, #243b69 9%)
-    ) !important;
-}
-
-body.admin-body .order-card-accent {
-  height: 8px !important;
-  background:
-    linear-gradient(
-      90deg,
-      #ff6a55 0%,
-      #bf547e 48%,
-      #6b66dc 100%
-    ) !important;
-}
-
-body.admin-body .order-card.is-accepted .order-card-accent {
-  background:
-    linear-gradient(
-      90deg,
-      #34c77b 0%,
-      #36a7bf 50%,
-      #536fe1 100%
-    ) !important;
-}
-
-body.admin-body .compact-order-service,
-body.admin-body .compact-order-total,
-body.admin-body .order-card-body {
-  border-color: color-mix(in srgb, var(--accent) 20%, var(--line)) !important;
-}
-
-body.admin-body .compact-order-item,
-body.admin-body .order-items article,
-body.admin-body .order-inline-payment,
-body.admin-body .payment-order-card,
-body.admin-body .kitchen-order-card {
-  border-color: color-mix(in srgb, var(--accent) 24%, var(--line)) !important;
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, .025),
-    0 7px 20px rgba(0, 0, 0, .08) !important;
-}
-
-body.admin-body .kitchen-order-card {
-  background:
-    linear-gradient(
-      145deg,
-      color-mix(in srgb, var(--surface) 91%, #244963 9%),
-      color-mix(in srgb, var(--surface) 95%, #543047 5%)
-    ) !important;
-}
-
-body.admin-body .compact-order-actions,
-body.admin-body .expanded-workflow-actions {
-  border-color: color-mix(in srgb, var(--accent) 22%, var(--line)) !important;
-}
-
-body.admin-body .kitchen-done-btn {
-  border: 1px solid color-mix(in srgb, #32b978 68%, var(--line)) !important;
-  background:
-    linear-gradient(135deg, #1f7c4b, #2c9a63) !important;
-  color: #fff !important;
-  box-shadow: 0 9px 22px rgba(31, 124, 75, .20) !important;
-}
-
-body.admin-body.light-mode .order-card-toggle {
-  background:
-    radial-gradient(
-      circle at 96% 0%,
-      rgba(107, 102, 220, .12),
-      transparent 38%
-    ),
-    linear-gradient(
-      145deg,
-      color-mix(in srgb, #fff 94%, #ffe0e5 6%),
-      color-mix(in srgb, #fff 96%, #dce6ff 4%)
-    ) !important;
-}
-
-@media (max-width: 720px) {
-  body.admin-body .order-card {
-    border-width: 1px !important;
+  .inventory-view-tab {
+    width: 100%;
   }
 }
