@@ -121,9 +121,10 @@
       payment_status: order.paymentStatus || "pending",
       checkout_mode: order.checkoutMode || "pay_at_counter",
       kiosk_id: order.kioskId || "",
-      kitchen_visible: order.checkoutMode === "pay_before_kitchen"
-        ? order.paymentStatus === "paid"
-        : true,
+      kitchen_visible:
+        order.checkoutMode === "pay_at_counter"
+          ? true
+          : order.paymentStatus === "paid",
       subtotal: moneyNumber(totals.subtotal),
       tax: moneyNumber(totals.tax),
       total: moneyNumber(totals.total),
