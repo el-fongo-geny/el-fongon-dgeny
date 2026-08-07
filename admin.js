@@ -76,7 +76,7 @@ function showLoginRuntimeError(error) {
   console.error("Error del administrador:", error);
 }
 
-window.FOGON_ADMIN_BUILD = "94-accept-fallback-orders";
+window.FOGON_ADMIN_BUILD = "95-inventory-missing-whatsapp";
 
 if (!window.CSS) window.CSS = {};
 if (!window.CSS.escape) {
@@ -231,6 +231,7 @@ async function cycleOrderMode() {
 }
 
 let availabilityQuery = "";
+let availabilityView = "available";
 let alarmTimer = null;
 let audioCtx = null;
 let soundUnlocked = false;
@@ -1768,28 +1769,83 @@ async function sendReadyNotification(orderId) {
 
 async function sendDailyMissingReport() {
   const button = $("#sendDailyMissingBtn");
+  const statusNode = $("#dailyMissingSendStatus");
+
   if (button?.disabled) return;
+
   try {
     button.disabled = true;
     button.textContent = "Enviando faltantes…";
+    if (statusNode) statusNode.textContent = "Conectando con WhatsApp…";
+
     const { supabaseUrl, anonKey } = getSupabaseFunctionConfig();
-    const response = await fetch(`${supabaseUrl}/functions/v1/send-daily-missing`, {
-      method: "POST",
-      mode: "cors",
-      cache: "no-store",
-      headers: buildEdgeFunctionHeaders(anonKey),
-      body: JSON.stringify({ action: "send_now", adminPin: getAdminPinOrThrow() })
-    });
+    const response = await fetch(
+      `${supabaseUrl}/functions/v1/send-daily-missing`,
+      {
+        method: "POST",
+        mode: "cors",
+        cache: "no-store",
+        headers: buildEdgeFunctionHeaders(anonKey),
+        body: JSON.stringify({
+          action: "send_now",
+          adminPin: getAdminPinOrThrow()
+        })
+      }
+    );
+
     const raw = await response.text();
     let result = {};
-    try { result = raw ? JSON.parse(raw) : {}; } catch (_) { result = { detail: raw }; }
-    if (!response.ok || !result?.ok) {
-      throw new Error([`HTTP ${response.status}`, result?.error, result?.detail].filter(Boolean).join(" · "));
+
+    try {
+      result = raw ? JSON.parse(raw) : {};
+    } catch (_) {
+      result = { detail: raw };
     }
-    alert(`Faltantes enviados a +1 650-722-4407. ${Number(result.count || 0)} elemento(s).`);
+
+    if (!response.ok || result?.ok !== true) {
+      throw new Error(
+        [
+          `HTTP ${response.status}`,
+          result?.error,
+          result?.detail
+        ].filter(Boolean).join(" · ")
+      );
+    }
+
+    if (!result?.messageId) {
+      throw new Error(
+        "Meta no devolvió un ID de mensaje. No se puede confirmar el envío."
+      );
+    }
+
+    const count = Number(result.count || 0);
+    const destination = String(
+      result.destinationMasked || "número configurado"
+    );
+
+    if (statusNode) {
+      statusNode.textContent =
+        `Enviado: ${count} faltante(s) · ID ${result.messageId}`;
+    }
+
+    alert(
+      `WhatsApp confirmado por Meta.\n\n` +
+      `Destino: ${destination}\n` +
+      `Faltantes: ${count}\n` +
+      `ID del mensaje: ${result.messageId}`
+    );
   } catch (error) {
-    console.error(error);
-    alert(`No se pudieron enviar los faltantes.\n\n${error?.message || error}`);
+    console.error("sendDailyMissingReport:", error);
+
+    if (statusNode) {
+      statusNode.textContent =
+        `No enviado: ${error?.message || error}`;
+    }
+
+    alert(
+      `No se pudieron enviar los faltantes.\n\n` +
+      `${error?.message || error}`
+    );
   } finally {
     if (button) {
       button.disabled = false;
@@ -2633,7 +2689,45 @@ function renderAvailability() {
     group: item.group || "Inventario"
   }));
 
-  const items = [...menuItems, ...inventoryItems]
+  const allItems = [...menuItems, ...inventoryItems];
+
+  const availableCount = allItems.filter(
+    (item) => availability[item.id] !== false
+  ).length;
+
+  const missingCount = allItems.filter(
+    (item) => availability[item.id] === false
+  ).length;
+
+  const availableCountNode = $("#availableInventoryCount");
+  const missingCountNode = $("#missingInventoryCount");
+
+  if (availableCountNode) {
+    availableCountNode.textContent = String(availableCount);
+  }
+
+  if (missingCountNode) {
+    missingCountNode.textContent = String(missingCount);
+  }
+
+  $$("[data-inventory-view]").forEach((button) => {
+    const active = button.dataset.inventoryView === availabilityView;
+    button.classList.toggle("active", active);
+    button.setAttribute("aria-selected", active ? "true" : "false");
+  });
+
+  const help = $("#inventoryViewHelp");
+  if (help) {
+    help.textContent = availabilityView === "missing"
+      ? "Estos son los artículos desmarcados y no disponibles. Esta es exactamente la lista que se envía en Faltantes del día."
+      : "Aquí aparecen los productos y artículos disponibles. Desmarca cualquiera para moverlo automáticamente a No disponibles / Faltantes.";
+  }
+
+  const items = allItems
+    .filter((item) => {
+      const available = availability[item.id] !== false;
+      return availabilityView === "missing" ? !available : available;
+    })
     .filter((item) => {
       const haystack = [
         item.es,
@@ -2665,6 +2759,18 @@ function renderAvailability() {
   const availabilityList = $("#availabilityList");
   if (!availabilityList) return;
 
+  if (!items.length) {
+    availabilityList.innerHTML = `
+      <p class="empty-state">
+        ${availabilityView === "missing"
+          ? "No hay artículos marcados como no disponibles."
+          : "No hay artículos disponibles que coincidan con la búsqueda."}
+      </p>
+    `;
+    renderOrderModeButton();
+    return;
+  }
+
   const groups = Array.from(
     new Set(items.map((item) => item.group || "Inventario"))
   );
@@ -2684,7 +2790,7 @@ function renderAvailability() {
           const available = availability[item.id] !== false;
 
           return `
-            <label class="availability-row">
+            <label class="availability-row ${available ? "" : "is-missing"}">
               <span>${escapeHtml(item.es || item.id)}</span>
 
               <input
@@ -3082,8 +3188,20 @@ function init() {
   }
 
   document.addEventListener("change", (event) => {
+    const inventoryViewButton = event.target.closest("[data-inventory-view]");
+    if (inventoryViewButton) {
+      availabilityView =
+        inventoryViewButton.dataset.inventoryView === "missing"
+          ? "missing"
+          : "available";
+      renderAvailability();
+      return;
+    }
+
     const input = event.target.closest("[data-availability]");
-    if (input) setAvailability(input.dataset.availability, input.checked);
+    if (input) {
+      setAvailability(input.dataset.availability, input.checked);
+    }
   });
 
   document.addEventListener("click", (event) => {
