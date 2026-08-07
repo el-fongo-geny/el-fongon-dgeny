@@ -1,4 +1,4 @@
-window.FOGON_MENU_BUILD = "94-kiosk-counter-flows";
+window.FOGON_MENU_BUILD = "96-counter-flow-fix";
 
 const state = {
   lang: localStorage.getItem("fogon_lang") || "",
@@ -1776,9 +1776,17 @@ async function saveOrder(paymentMethod) {
     }
 
     const originalPendingId = state.pendingOrder.id;
-    const kioskMode = isKioskCheckoutMode();
+    const checkoutMode = String(
+      publicBusinessSettings.checkout_mode || "pay_before_kitchen"
+    );
+
+    const kioskMode = checkoutMode === "pay_before_kitchen";
     const payWithCloverNow =
       kioskMode && paymentMethod === "card";
+
+    const counterOrder =
+      checkoutMode === "pay_at_counter" ||
+      (kioskMode && paymentMethod === "cash");
 
     let order = {
       ...state.pendingOrder,
@@ -1789,7 +1797,8 @@ async function saveOrder(paymentMethod) {
         : "pay_at_counter",
       kioskId: currentKioskId(),
       paymentStatus: "pending",
-      status: payWithCloverNow ? "awaiting_payment" : "new"
+      status: payWithCloverNow ? "awaiting_payment" : "new",
+      kitchenVisible: counterOrder
     };
 
     order.items = (order.items || []).map((item, index) => (
@@ -2107,18 +2116,19 @@ function initEvents() {
       const subtitle = document.querySelector('#paymentMethodStep [data-i18n="paymentSubtitle"]');
 
       if (cardButton) {
+        cardButton.hidden = false;
         cardButton.textContent = kioskMode
           ? `${state.lang === "en" ? "Pay by card" : "Pagar con tarjeta"} · ${money(state.pendingOrder.totals?.total)}`
           : (state.lang === "en"
-              ? "Card at the counter"
-              : "Tarjeta en ventanilla");
+              ? "Pay by card at the counter"
+              : "Pagar con tarjeta en ventanilla");
       }
 
       if (cashButton) {
         cashButton.hidden = false;
         cashButton.textContent = state.lang === "en"
-          ? "Cash at the counter"
-          : "Efectivo en ventanilla";
+          ? "Pay cash at the counter"
+          : "Pagar en efectivo en ventanilla";
       }
 
       if (subtitle) {
@@ -2127,8 +2137,8 @@ function initEvents() {
               ? "Pay by card now on Clover, or choose cash at the counter."
               : "Paga ahora con tarjeta en Clover o elige efectivo en ventanilla.")
           : (state.lang === "en"
-              ? "Choose card or cash. The order will be sent immediately."
-              : "Elige tarjeta o efectivo. El pedido se enviará inmediatamente.");
+              ? "Choose card or cash at the counter. In both cases your order is sent to the kitchen now."
+              : "Elige tarjeta o efectivo en ventanilla. En ambos casos tu pedido entra ahora a Cocina.");
       }
     }
 
