@@ -1,13 +1,13 @@
 (() => {
   "use strict";
 
-window.FOGON_MENU_ADMIN_BUILD = "91-clover-device-mapping";
+window.FOGON_MENU_ADMIN_BUILD = "98-security-checkout";
 
   const $ = (selector) => document.querySelector(selector);
   const $$ = (selector) => Array.from(document.querySelectorAll(selector));
   const money = (value) => `$${Number(value || 0).toFixed(2)}`;
 
-  window.FOGON_MENU_ADMIN_BUILD = "72-availability-business";
+  window.FOGON_MENU_ADMIN_BUILD = "98-security-checkout";
 
   const state = {
     pin: "",
@@ -750,6 +750,147 @@ window.FOGON_MENU_ADMIN_BUILD = "91-clover-device-mapping";
     }
   }
 
+
+  function securityPinValue(id) {
+    return String($(id)?.value || "").trim();
+  }
+
+  function securityStatusLabel(customized) {
+    return customized ? "Personalizada" : "Original";
+  }
+
+  function renderSecurityStatus(status = {}) {
+    const adminStatus = $("#adminPanelPinStatus");
+    const menuStatus = $("#menuAdminPinStatus");
+
+    if (adminStatus) {
+      adminStatus.textContent = securityStatusLabel(
+        status.adminPanelCustomized === true
+      );
+      adminStatus.classList.toggle(
+        "is-custom",
+        status.adminPanelCustomized === true
+      );
+    }
+
+    if (menuStatus) {
+      menuStatus.textContent = securityStatusLabel(
+        status.menuAdminCustomized === true
+      );
+      menuStatus.classList.toggle(
+        "is-custom",
+        status.menuAdminCustomized === true
+      );
+    }
+  }
+
+  async function loadSecurityStatus() {
+    try {
+      const result = await callAdminCatalog("security_status");
+      renderSecurityStatus(result.security || {});
+    } catch (error) {
+      console.error("No se pudo leer el estado de seguridad:", error);
+      toast(
+        `No se pudo cargar Seguridad. ${menuAdminErrorMessage(error)}`,
+        "error"
+      );
+    }
+  }
+
+  async function changeSecurityPin(target, newPin, confirmPin) {
+    const cleanNewPin = String(newPin || "").trim();
+    const cleanConfirm = String(confirmPin || "").trim();
+
+    if (cleanNewPin.length < 4 || cleanNewPin.length > 64) {
+      throw new Error("La contraseña debe tener entre 4 y 64 caracteres.");
+    }
+
+    if (cleanNewPin !== cleanConfirm) {
+      throw new Error("Las dos contraseñas no coinciden.");
+    }
+
+    const result = await callAdminCatalog("change_security_pin", {
+      target,
+      newPin: cleanNewPin
+    });
+
+    if (target === "menu-admin") {
+      /*
+        La contraseña con la que se autentican las siguientes operaciones
+        cambia inmediatamente. Mantenerla solo en memoria evita cerrar
+        la sesión durante el cambio.
+      */
+      state.pin = cleanNewPin;
+    }
+
+    renderSecurityStatus(result.security || {});
+    return result;
+  }
+
+  async function restoreSecurityPin(target) {
+    const result = await callAdminCatalog("reset_security_pin", { target });
+    renderSecurityStatus(result.security || {});
+
+    if (target === "menu-admin") {
+      /*
+        El valor original vive únicamente en Supabase Secret y nunca se
+        devuelve al navegador, por lo que hay que volver a iniciar sesión.
+      */
+      toast("Contraseña original restaurada. Vuelve a entrar con la contraseña original.");
+      setTimeout(() => logout(), 450);
+    }
+
+    return result;
+  }
+
+  async function submitAdminPanelPin(event) {
+    event.preventDefault();
+
+    try {
+      setBusy(true);
+      await changeSecurityPin(
+        "ipad",
+        securityPinValue("#adminPanelNewPin"),
+        securityPinValue("#adminPanelConfirmPin")
+      );
+
+      event.currentTarget.reset();
+      toast("Contraseña del Admin Panel actualizada.");
+    } catch (error) {
+      console.error(error);
+      toast(
+        `No se pudo cambiar la contraseña. ${menuAdminErrorMessage(error)}`,
+        "error"
+      );
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function submitMenuAdminPin(event) {
+    event.preventDefault();
+
+    try {
+      setBusy(true);
+      await changeSecurityPin(
+        "menu-admin",
+        securityPinValue("#menuAdminNewPin"),
+        securityPinValue("#menuAdminConfirmPin")
+      );
+
+      event.currentTarget.reset();
+      toast("Contraseña del Admin Menu actualizada.");
+    } catch (error) {
+      console.error(error);
+      toast(
+        `No se pudo cambiar la contraseña. ${menuAdminErrorMessage(error)}`,
+        "error"
+      );
+    } finally {
+      setBusy(false);
+    }
+  }
+
   function renderAll() {
     renderProducts();
     renderCategories();
@@ -1051,7 +1192,8 @@ window.FOGON_MENU_ADMIN_BUILD = "91-clover-device-mapping";
       categories: "categoriesView",
       schedule: "scheduleView",
       "availability-items": "availabilityItemsView",
-      business: "businessView"
+      business: "businessView",
+      security: "securityView"
     };
 
     Object.entries(viewIds).forEach(([key, id]) => {
@@ -1064,7 +1206,8 @@ window.FOGON_MENU_ADMIN_BUILD = "91-clover-device-mapping";
       categories: "Categorías",
       schedule: "Horario semanal",
       "availability-items": "Inventario",
-      business: "Datos del menú"
+      business: "Datos del menú",
+      security: "Seguridad"
     };
 
     const pageTitle = $("#pageTitle");
@@ -1074,6 +1217,7 @@ window.FOGON_MENU_ADMIN_BUILD = "91-clover-device-mapping";
     if (view === "schedule") renderWeeklySchedule();
     if (view === "availability-items") renderAvailabilityItems();
     if (view === "business") fillBusinessSettingsForm(true);
+    if (view === "security") void loadSecurityStatus();
 
     closeMobileSidebar();
   }
@@ -2410,6 +2554,41 @@ window.FOGON_MENU_ADMIN_BUILD = "91-clover-device-mapping";
       renderAvailabilityItems();
     });
     $("#businessSettingsForm")?.addEventListener("submit", saveBusinessSettings);
+    $("#adminPanelPinForm")?.addEventListener("submit", submitAdminPanelPin);
+    $("#menuAdminPinForm")?.addEventListener("submit", submitMenuAdminPin);
+
+    $("#restoreAdminPanelPinButton")?.addEventListener("click", async () => {
+      if (!confirm("¿Restaurar la contraseña original del Admin Panel?")) return;
+
+      try {
+        setBusy(true);
+        await restoreSecurityPin("ipad");
+        toast("Contraseña original del Admin Panel restaurada.");
+      } catch (error) {
+        toast(
+          `No se pudo restaurar. ${menuAdminErrorMessage(error)}`,
+          "error"
+        );
+      } finally {
+        setBusy(false);
+      }
+    });
+
+    $("#restoreMenuAdminPinButton")?.addEventListener("click", async () => {
+      if (!confirm("¿Restaurar la contraseña original del Admin Menu? Tendrás que iniciar sesión de nuevo.")) return;
+
+      try {
+        setBusy(true);
+        await restoreSecurityPin("menu-admin");
+      } catch (error) {
+        toast(
+          `No se pudo restaurar. ${menuAdminErrorMessage(error)}`,
+          "error"
+        );
+        setBusy(false);
+      }
+    });
+
     $("#weeklyScheduleForm")?.addEventListener("submit", saveWeeklySchedule);
     $("#weeklyScheduleRows")?.addEventListener("change", (event) => {
       const input = event.target.closest("[data-schedule-open]");
