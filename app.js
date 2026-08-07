@@ -1,4 +1,4 @@
-window.FOGON_MENU_BUILD = "96-counter-flow-fix";
+window.FOGON_MENU_BUILD = "97-counter-mode-authoritative";
 
 const state = {
   lang: localStorage.getItem("fogon_lang") || "",
@@ -506,7 +506,8 @@ const DEFAULT_PUBLIC_SETTINGS = {
   maps_url: "https://www.google.com/maps/search/?api=1&query=El+Fogon+D%27+Geny+796+S+1st+St+San+Jose+CA+95113",
   tax_enabled: false,
   tax_rate: 10,
-  tax_only_taxable: true
+  tax_only_taxable: true,
+  checkout_mode: "pay_at_counter"
 };
 
 let publicBusinessSettings = { ...DEFAULT_PUBLIC_SETTINGS };
@@ -543,15 +544,17 @@ async function loadPublicBusinessSettings() {
     const db = window.FOGON_DB;
     if (!db?.isReady?.() || typeof db.fetchMenuSettings !== "function") {
       applyPublicBusinessSettings();
-      return;
+      return publicBusinessSettings;
     }
 
     const settings = await db.fetchMenuSettings();
     applyPublicBusinessSettings(settings);
     renderCart();
+    return publicBusinessSettings;
   } catch (error) {
     console.warn("No se pudieron cargar los datos públicos del negocio:", error);
     applyPublicBusinessSettings();
+    return publicBusinessSettings;
   }
 }
 
@@ -1596,7 +1599,9 @@ function setKioskPaymentVisual(status, message = "") {
 }
 
 function isKioskCheckoutMode() {
-  return String(publicBusinessSettings.checkout_mode || "pay_before_kitchen") === "pay_before_kitchen";
+  return String(publicBusinessSettings.checkout_mode || "pay_at_counter")
+    .trim()
+    .toLowerCase() === "pay_before_kitchen";
 }
 
 function kioskPaymentFunctionName() {
@@ -1776,17 +1781,20 @@ async function saveOrder(paymentMethod) {
     }
 
     const originalPendingId = state.pendingOrder.id;
+
+    // El modo guardado en Supabase manda. Nunca se inicia Clover por un valor
+    // predeterminado o una configuración antigua en memoria.
+    await loadPublicBusinessSettings();
+
     const checkoutMode = String(
-      publicBusinessSettings.checkout_mode || "pay_before_kitchen"
-    );
+      publicBusinessSettings.checkout_mode || "pay_at_counter"
+    ).trim().toLowerCase();
 
     const kioskMode = checkoutMode === "pay_before_kitchen";
     const payWithCloverNow =
       kioskMode && paymentMethod === "card";
 
-    const counterOrder =
-      checkoutMode === "pay_at_counter" ||
-      (kioskMode && paymentMethod === "cash");
+    const counterOrder = !payWithCloverNow;
 
     let order = {
       ...state.pendingOrder,
@@ -1925,7 +1933,14 @@ async function saveOrder(paymentMethod) {
     const needsReauthorization = errorStatus === "reauthorization_required";
     const finalFailureStatus = needsReview ? "review" : "failed";
 
-    if (createdOrder && window.FOGON_DB?.isReady?.()) {
+    const createdAsKioskPayment =
+      String(createdOrder?.checkoutMode || "") === "pay_before_kitchen";
+
+    if (
+      createdAsKioskPayment &&
+      createdOrder &&
+      window.FOGON_DB?.isReady?.()
+    ) {
       try {
         await window.FOGON_DB.updateKioskPayment(
           createdOrder.databaseId || createdOrder.id,
@@ -2040,7 +2055,7 @@ function bindLanguageButtons() {
 }
 
 function initEvents() {
-  document.addEventListener("click", (event) => {
+  document.addEventListener("click", async (event) => {
     const langButton = event.target.closest("[data-set-lang]");
     if (langButton) {
       event.preventDefault();
@@ -2107,6 +2122,10 @@ function initEvents() {
     const orderTypeButton = event.target.closest("[data-order-type]");
     if (orderTypeButton && state.pendingOrder) {
       state.orderType = orderTypeButton.dataset.orderType;
+
+      // Releer la configuración justo antes de mostrar las formas de pago.
+      await loadPublicBusinessSettings();
+
       $("#orderTypeStep").hidden = true;
       $("#paymentMethodStep").hidden = false;
 
@@ -2121,14 +2140,14 @@ function initEvents() {
           ? `${state.lang === "en" ? "Pay by card" : "Pagar con tarjeta"} · ${money(state.pendingOrder.totals?.total)}`
           : (state.lang === "en"
               ? "Pay by card at the counter"
-              : "Pagar con tarjeta en ventanilla");
+              : "Pagar con tarjeta por ventanilla");
       }
 
       if (cashButton) {
         cashButton.hidden = false;
         cashButton.textContent = state.lang === "en"
           ? "Pay cash at the counter"
-          : "Pagar en efectivo en ventanilla";
+          : "Pagar con efectivo por ventanilla";
       }
 
       if (subtitle) {
@@ -2138,7 +2157,7 @@ function initEvents() {
               : "Paga ahora con tarjeta en Clover o elige efectivo en ventanilla.")
           : (state.lang === "en"
               ? "Choose card or cash at the counter. In both cases your order is sent to the kitchen now."
-              : "Elige tarjeta o efectivo en ventanilla. En ambos casos tu pedido entra ahora a Cocina.");
+              : "Elige tarjeta o efectivo por ventanilla. En ambos casos tu pedido se envía ahora a Cocina.");
       }
     }
 
@@ -2208,7 +2227,7 @@ function initEvents() {
 
 async function init() {
   applyTheme();
-  void loadPublicBusinessSettings();
+  await loadPublicBusinessSettings();
   preventMenuZoomGestures();
   initEvents();
   bindLanguageButtons();
