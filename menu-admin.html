@@ -6,7 +6,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#f6f6f3">
   <title>Gestor del menú | El Fogón D' Geny</title>
-  <link rel="stylesheet" href="menu-admin.css?v=91-clover-device-mapping">
+  <link rel="stylesheet" href="menu-admin.css?v=98-security-checkout">
 </head>
 <body>
   <main id="loginScreen" class="login-screen">
@@ -50,6 +50,10 @@
         <button class="nav-item" type="button" data-view="business">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 10h16M6 10v10h12V10M8 10V6h8v4M9 14h6M9 17h4"/></svg>
           <span>Datos del menú</span>
+        </button>
+        <button class="nav-item" type="button" data-view="security">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l7 3v5c0 4.6-2.8 8.2-7 10-4.2-1.8-7-5.4-7-10V6l7-3zM9 12l2 2 4-4"/></svg>
+          <span>Seguridad</span>
         </button>
       </nav>
 
@@ -335,6 +339,87 @@
           </form>
         </section>
       </section>
+
+      <section id="securityView" class="view" hidden>
+        <section class="content-card security-settings-card">
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow">Accesos</p>
+              <h2>Seguridad</h2>
+              <p>
+                Cambia las contraseñas del panel de pedidos y de la gestión del menú.
+                Las contraseñas originales permanecen guardadas en Supabase Secrets y
+                pueden restaurarse en cualquier momento.
+              </p>
+            </div>
+          </div>
+
+          <div class="security-grid">
+            <article class="security-access-card">
+              <div class="security-access-heading">
+                <div>
+                  <span class="security-access-kicker">Panel de pedidos</span>
+                  <h3>Contraseña del Admin Panel</h3>
+                  <p>Es la contraseña utilizada para entrar a pedidos, cocina, cobros e inventario.</p>
+                </div>
+                <span id="adminPanelPinStatus" class="security-status-pill">Comprobando…</span>
+              </div>
+
+              <form id="adminPanelPinForm" class="security-pin-form">
+                <label class="field">
+                  <span>Nueva contraseña</span>
+                  <input id="adminPanelNewPin" type="password" minlength="4" maxlength="64" autocomplete="new-password" required>
+                </label>
+                <label class="field">
+                  <span>Confirmar nueva contraseña</span>
+                  <input id="adminPanelConfirmPin" type="password" minlength="4" maxlength="64" autocomplete="new-password" required>
+                </label>
+                <div class="security-form-actions">
+                  <button class="button button-primary" type="submit">Cambiar contraseña</button>
+                  <button id="restoreAdminPanelPinButton" class="button button-secondary security-danger-button" type="button">
+                    Restaurar contraseña original
+                  </button>
+                </div>
+              </form>
+            </article>
+
+            <article class="security-access-card">
+              <div class="security-access-heading">
+                <div>
+                  <span class="security-access-kicker">Gestión del menú</span>
+                  <h3>Contraseña del Admin Menu</h3>
+                  <p>Es la contraseña utilizada para entrar a esta página de gestión.</p>
+                </div>
+                <span id="menuAdminPinStatus" class="security-status-pill">Comprobando…</span>
+              </div>
+
+              <form id="menuAdminPinForm" class="security-pin-form">
+                <label class="field">
+                  <span>Nueva contraseña</span>
+                  <input id="menuAdminNewPin" type="password" minlength="4" maxlength="64" autocomplete="new-password" required>
+                </label>
+                <label class="field">
+                  <span>Confirmar nueva contraseña</span>
+                  <input id="menuAdminConfirmPin" type="password" minlength="4" maxlength="64" autocomplete="new-password" required>
+                </label>
+                <div class="security-form-actions">
+                  <button class="button button-primary" type="submit">Cambiar contraseña</button>
+                  <button id="restoreMenuAdminPinButton" class="button button-secondary security-danger-button" type="button">
+                    Restaurar contraseña original
+                  </button>
+                </div>
+              </form>
+            </article>
+          </div>
+
+          <div class="security-note">
+            <strong>Importante:</strong>
+            restaurar no muestra ni envía la contraseña original al navegador.
+            Simplemente elimina la contraseña personalizada y vuelve a usar
+            <code>ADMIN_PIN</code> o <code>MENU_ADMIN_PIN</code> guardados en Supabase.
+          </div>
+        </section>
+      </section>
     </main>
 
     <div id="mobileSidebarBackdrop" class="mobile-sidebar-backdrop" hidden></div>
@@ -582,6 +667,6 @@
   </div>
 
   <script src="supabase-config.js?v=18-mobile-fixed"></script>
-  <script src="menu-admin.js?v=91-clover-device-mapping"></script>
+  <script src="menu-admin.js?v=98-security-checkout"></script>
 </body>
 </html>
