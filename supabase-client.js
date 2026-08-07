@@ -119,10 +119,13 @@
       payment_method: order.paymentMethod || order.payment_method || "",
       status: order.status || "new",
       payment_status: order.paymentStatus || "pending",
-      checkout_mode: order.checkoutMode || "pay_at_counter",
+      checkout_mode:
+        String(order.checkoutMode || "pay_at_counter") === "pay_before_kitchen"
+          ? "pay_before_kitchen"
+          : "pay_at_counter",
       kiosk_id: order.kioskId || "",
       kitchen_visible:
-        order.checkoutMode === "pay_at_counter"
+        String(order.checkoutMode || "pay_at_counter") !== "pay_before_kitchen"
           ? true
           : order.paymentStatus === "paid",
       subtotal: moneyNumber(totals.subtotal),
