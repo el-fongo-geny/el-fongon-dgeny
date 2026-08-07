@@ -541,3 +541,105 @@ body.admin-body .order-card.is-expanded .order-card-toggle {
     width: 100%;
   }
 }
+
+
+/* ===== V97 · TARJETAS DE PEDIDO MÁS LEGIBLES ===== */
+body.admin-body .order-card.is-collapsed .order-card-toggle {
+  min-height: 300px !important;
+  align-content: start !important;
+  gap: 10px !important;
+  padding: 18px 18px 16px !important;
+}
+
+body.admin-body .order-card.is-expanded .order-card-toggle {
+  min-height: 238px !important;
+}
+
+body.admin-body .compact-order-service {
+  display: grid !important;
+  grid-template-columns: 1fr !important;
+  gap: 5px !important;
+  width: 100% !important;
+  padding: 10px 0 !important;
+  border-top: 1px solid var(--line) !important;
+  border-bottom: 1px solid var(--line) !important;
+  line-height: 1.35 !important;
+}
+
+body.admin-body .compact-order-service > span {
+  display: block !important;
+  width: 100% !important;
+  min-width: 0 !important;
+  white-space: normal !important;
+}
+
+body.admin-body .compact-order-items {
+  display: grid !important;
+  grid-template-columns: 1fr !important;
+  gap: 9px !important;
+  width: 100% !important;
+}
+
+body.admin-body .compact-order-item {
+  display: grid !important;
+  grid-template-columns: 1fr !important;
+  gap: 4px !important;
+  width: 100% !important;
+  padding: 9px 10px !important;
+  border: 1px solid color-mix(in srgb, var(--line) 88%, transparent) !important;
+  border-radius: 10px !important;
+  background: color-mix(in srgb, var(--surface) 94%, var(--bg)) !important;
+}
+
+body.admin-body .compact-order-item > span {
+  display: block !important;
+  width: 100% !important;
+  line-height: 1.35 !important;
+  white-space: normal !important;
+}
+
+body.admin-body .compact-order-item-head {
+  display: flex !important;
+  justify-content: space-between !important;
+  align-items: flex-start !important;
+  gap: 12px !important;
+}
+
+body.admin-body .compact-order-total {
+  display: flex !important;
+  justify-content: space-between !important;
+  align-items: center !important;
+  width: 100% !important;
+  padding-top: 9px !important;
+  border-top: 1px solid var(--line) !important;
+}
+
+body.admin-body .compact-order-actions {
+  padding: 0 16px 16px !important;
+}
+
+body.admin-body .compact-order-actions[hidden],
+body.admin-body .order-card.is-expanded .compact-order-actions {
+  display: none !important;
+}
+
+body.admin-body .order-card-body .order-contact {
+  display: grid !important;
+  grid-template-columns: 1fr !important;
+  gap: 7px !important;
+}
+
+body.admin-body .order-card-body .order-contact p {
+  margin: 0 !important;
+  width: 100% !important;
+}
+
+@media (max-width: 719px) {
+  body.admin-body .order-card.is-collapsed .order-card-toggle {
+    min-height: 285px !important;
+  }
+
+  body.admin-body .order-card.is-expanded .order-card-toggle {
+    min-height: 225px !important;
+  }
+}
