@@ -7,7 +7,7 @@
   <meta name="theme-color" content="#111111">
   <title>Panel iPad | El Fogon D' Geny</title>
   <link rel="stylesheet" href="style.css?v=67-mobile-navigation-fixed">
-  <link rel="stylesheet" href="admin-payments.css?v=84-premium-cards">
+  <link rel="stylesheet" href="admin-payments.css?v=95-inventory-missing-whatsapp">
   <style>
     .admin-build-label {
       margin: 12px 0 0;
@@ -42,7 +42,7 @@
       </label>
       <button id="loginButton" class="primary-btn full" type="button">Entrar</button>
       <p id="pinError" class="error-text" hidden>PIN incorrecto.</p>
-      <p id="adminBuildLabel" class="admin-build-label">Acceso V94 · sesión de 8 horas</p>
+      <p id="adminBuildLabel" class="admin-build-label">Acceso V95 · sesión de 8 horas</p>
     </form>
   </main>
 
@@ -133,14 +133,41 @@
         <div class="section-title">
           <h2>Inventario</h2>
         </div>
-        <div style="display:flex; gap:10px; flex-wrap:wrap; margin:0 0 14px;">
+        <div class="inventory-view-tabs" role="tablist" aria-label="Categorías de inventario">
+          <button
+            class="inventory-view-tab active"
+            type="button"
+            data-inventory-view="available"
+            role="tab"
+            aria-selected="true"
+          >
+            Inventario disponible
+            <span id="availableInventoryCount" class="inventory-view-count">0</span>
+          </button>
+
+          <button
+            class="inventory-view-tab"
+            type="button"
+            data-inventory-view="missing"
+            role="tab"
+            aria-selected="false"
+          >
+            No disponibles / Faltantes
+            <span id="missingInventoryCount" class="inventory-view-count">0</span>
+          </button>
+        </div>
+
+        <div class="inventory-missing-actions">
           <button id="sendDailyMissingBtn" class="primary-btn" type="button">
             Enviar faltantes del día por WhatsApp
           </button>
+          <span id="dailyMissingSendStatus" class="inventory-send-status" role="status" aria-live="polite"></span>
         </div>
-        <p class="admin-help">
-          Apaga productos completos o subopciones internas como proteínas, acompañamientos y extras. Los cambios se reflejan en el menú público.
+
+        <p id="inventoryViewHelp" class="admin-help">
+          Aquí aparecen los productos y artículos disponibles. Desmarca cualquiera para moverlo automáticamente a No disponibles / Faltantes.
         </p>
+
         <input id="availabilitySearch" class="search-input" type="search" placeholder="Buscar producto, proteína, extra o subopción...">
         <div id="availabilityList" class="availability-list"></div>
       </div>
@@ -158,7 +185,7 @@
   <script src="supabase-client.js?v=75-hide-order-fallback"></script>
   <script src="backend-config.js?v=18-mobile-fixed"></script>
   <script>
-  window.FOGON_ADMIN_EXPECTED_BUILD = "94-accept-fallback-orders";
+  window.FOGON_ADMIN_EXPECTED_BUILD = "95-inventory-missing-whatsapp";
 
   window.reportAdminScriptLoadFailure = function () {
     var errorBox = document.getElementById("pinError");
@@ -176,7 +203,7 @@
     }
   };
   </script>
-  <script src="admin.js?v=94-accept-fallback-orders" onerror="window.reportAdminScriptLoadFailure()"></script>
+  <script src="admin.js?v=95-inventory-missing-whatsapp" onerror="window.reportAdminScriptLoadFailure()"></script>
   <script>
   window.setTimeout(function () {
     if (window.FOGON_ADMIN_BUILD !== window.FOGON_ADMIN_EXPECTED_BUILD) {
