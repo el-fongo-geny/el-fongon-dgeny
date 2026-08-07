@@ -76,7 +76,7 @@ function showLoginRuntimeError(error) {
   console.error("Error del administrador:", error);
 }
 
-window.FOGON_ADMIN_BUILD = "95-inventory-missing-whatsapp";
+window.FOGON_ADMIN_BUILD = "97-card-layout-clean";
 
 if (!window.CSS) window.CSS = {};
 if (!window.CSS.escape) {
@@ -1273,9 +1273,17 @@ function normalizePaymentStatus(order) {
 
 function paymentStatusLabel(order) {
   const status = normalizePaymentStatus(order);
+  const checkoutMode = String(
+    order?.checkoutMode || "pay_at_counter"
+  ).toLowerCase();
+
+  if (status === "paid") return "Cobrado";
+
+  if (checkoutMode !== "pay_before_kitchen") {
+    return "Pendiente en ventanilla";
+  }
 
   if (status === "processing") return "Cobrando en Clover";
-  if (status === "paid") return "Cobrado";
   if (status === "failed") return "Cobro fallido";
   if (status === "cancelled") return "Cobro cancelado";
   if (status === "review") return "Revisar en Clover";
@@ -2186,6 +2194,8 @@ function toggleOrderCard(orderId) {
     card?.classList.add("is-collapsed");
     if (body) body.hidden = true;
     if (button) button.setAttribute("aria-expanded", "false");
+    const compactActions = card?.querySelector(".compact-order-actions");
+    if (compactActions) compactActions.hidden = false;
     if (hint) hint.textContent = "Pulsa la cabecera para abrir";
     return;
   }
@@ -2195,6 +2205,8 @@ function toggleOrderCard(orderId) {
   card?.classList.add("is-expanded");
   if (body) body.hidden = false;
   if (button) button.setAttribute("aria-expanded", "true");
+  const compactActions = card?.querySelector(".compact-order-actions");
+  if (compactActions) compactActions.hidden = true;
   if (hint) hint.textContent = "Pedido abierto";
 }
 
@@ -2419,9 +2431,10 @@ function renderOrders() {
           <span class="order-customer-name">${escapeHtml(order.customer?.name || "Sin nombre")}</span>
           <span class="order-card-meta">
             <span data-order-elapsed="${escapeHtml(orderId)}">${escapeHtml(orderElapsedLabel(order))}</span>
-            <span>${escapeHtml(orderTypeLabel(order))}</span>
           </span>
+
           <span class="compact-order-service">
+            <span><strong>Tipo:</strong> ${escapeHtml(orderTypeLabel(order))}</span>
             <span><strong>Teléfono:</strong> ${escapeHtml(order.customer?.phone || "Sin teléfono")}</span>
             <span><strong>Pago:</strong> ${escapeHtml(paymentLabel(order.paymentMethod))}</span>
             <span><strong>Cobro:</strong> ${escapeHtml(paymentStatusLabel(order))}</span>
