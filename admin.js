@@ -76,7 +76,7 @@ function showLoginRuntimeError(error) {
   console.error("Error del administrador:", error);
 }
 
-window.FOGON_ADMIN_BUILD = "97-card-layout-clean";
+window.FOGON_ADMIN_BUILD = "98-clean-cards-security";
 
 if (!window.CSS) window.CSS = {};
 if (!window.CSS.escape) {
@@ -1425,7 +1425,12 @@ function automaticCloverCandidates() {
       const status = normalizePaymentStatus(order);
       const accepted = order.status === "accepted" || order.status === "ready";
 
+      const checkoutMode = String(
+        order.checkoutMode || "pay_at_counter"
+      ).toLowerCase();
+
       return (
+        checkoutMode === "pay_before_kitchen" &&
         method === "card" &&
         accepted &&
         !order.hiddenForAll &&
@@ -2480,9 +2485,15 @@ function renderOrders() {
             <p><strong>Entrada:</strong> ${escapeHtml(new Date(order.createdAt).toLocaleString())}</p>
           </div>
 
-          <div class="order-items">
-            ${aggregateOrderItems(order.items).map((item) => itemDetailsHtml(item)).join("")}
-          </div>
+          <section class="order-food-section" aria-label="Platos del pedido">
+            <div class="order-food-heading">
+              <span>Platos del pedido</span>
+              <strong>${totalQuantity} artículo${totalQuantity === 1 ? "" : "s"}</strong>
+            </div>
+            <div class="order-items">
+              ${aggregateOrderItems(order.items).map((item) => itemDetailsHtml(item)).join("")}
+            </div>
+          </section>
 
           <div class="order-total">
             <span>Total</span>
@@ -2501,8 +2512,20 @@ function paymentActionHtml(order) {
   const orderId = escapeHtml(order.id);
   const method = String(order.paymentMethod || "").toLowerCase();
   const status = normalizePaymentStatus(order);
+  const checkoutMode = String(
+    order.checkoutMode || "pay_at_counter"
+  ).toLowerCase();
   const busy = paymentActionLocks.has(String(order.id));
   const removeButton = `<button class="secondary-btn danger-btn full remove-order-btn" data-hide-paid="${orderId}" type="button">Quitar pedido para todos</button>`;
+
+  if (checkoutMode !== "pay_before_kitchen") {
+    return `
+      <button class="primary-btn full" data-mark-paid="${orderId}" type="button">
+        Cobrar en ventanilla
+      </button>
+      ${removeButton}
+    `;
+  }
 
   if (busy) {
     return `
