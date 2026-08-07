@@ -76,7 +76,7 @@ function showLoginRuntimeError(error) {
   console.error("Error del administrador:", error);
 }
 
-window.FOGON_ADMIN_BUILD = "98-clean-cards-security";
+window.FOGON_ADMIN_BUILD = "98.1-inventory-tabs-fix";
 
 if (!window.CSS) window.CSS = {};
 if (!window.CSS.escape) {
@@ -3224,16 +3224,6 @@ function init() {
   }
 
   document.addEventListener("change", (event) => {
-    const inventoryViewButton = event.target.closest("[data-inventory-view]");
-    if (inventoryViewButton) {
-      availabilityView =
-        inventoryViewButton.dataset.inventoryView === "missing"
-          ? "missing"
-          : "available";
-      renderAvailability();
-      return;
-    }
-
     const input = event.target.closest("[data-availability]");
     if (input) {
       setAvailability(input.dataset.availability, input.checked);
@@ -3241,6 +3231,19 @@ function init() {
   });
 
   document.addEventListener("click", (event) => {
+    const inventoryViewButton = event.target.closest("[data-inventory-view]");
+    if (inventoryViewButton) {
+      event.preventDefault();
+
+      availabilityView =
+        inventoryViewButton.dataset.inventoryView === "missing"
+          ? "missing"
+          : "available";
+
+      renderAvailability();
+      return;
+    }
+
     const orderToggle = event.target.closest("[data-toggle-order]");
     if (orderToggle) {
       event.preventDefault();
