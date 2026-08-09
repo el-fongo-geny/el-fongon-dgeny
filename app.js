@@ -1,4 +1,4 @@
-window.FOGON_MENU_BUILD = "97-counter-mode-authoritative";
+window.FOGON_MENU_BUILD = "101-secure-kiosk-orders";
 
 const state = {
   lang: localStorage.getItem("fogon_lang") || "",
@@ -503,6 +503,20 @@ const DEFAULT_PUBLIC_SETTINGS = {
   footer_paragraph_2: "Si buscas comida dominicana sabrosa, comida latina o un restaurante dominicano en San Jose, visita El Fogon D' Geny.",
   address: "796 S 1st St, San Jose, CA 95113",
   maps_label: "Ver ubicación en Google Maps",
+  menu_title_es: "Haz tu pedido desde aquí",
+  menu_title_en: "Order your favorites",
+  menu_subtitle_es: "Elige tus platos, personalízalos, añádelos al carrito y completa tu pedido con tu nombre y teléfono.",
+  menu_subtitle_en: "Choose your dishes, customize them, add them to the cart and complete your order with your name and phone number.",
+  footer_title_es: "Comida dominicana y latina en San Jose, California",
+  footer_title_en: "Dominican and Latin food in San Jose, California",
+  footer_paragraph_1_es: "El Fogon D' Geny prepara autentica comida dominicana, latina y caribeña en el centro de San Jose.",
+  footer_paragraph_1_en: "El Fogon D' Geny serves authentic Dominican, Latin and Caribbean food in downtown San Jose.",
+  footer_paragraph_2_es: "Si buscas comida dominicana sabrosa, comida latina o un restaurante dominicano en San Jose, visita El Fogon D' Geny.",
+  footer_paragraph_2_en: "If you are looking for flavorful Dominican food, Latin food or a Dominican restaurant in San Jose, visit El Fogon D' Geny.",
+  address_es: "796 S 1st St, San Jose, CA 95113",
+  address_en: "796 S 1st St, San Jose, CA 95113",
+  maps_label_es: "Ver ubicación en Google Maps",
+  maps_label_en: "View location on Google Maps",
   maps_url: "https://www.google.com/maps/search/?api=1&query=El+Fogon+D%27+Geny+796+S+1st+St+San+Jose+CA+95113",
   tax_enabled: false,
   tax_rate: 10,
@@ -512,24 +526,41 @@ const DEFAULT_PUBLIC_SETTINGS = {
 
 let publicBusinessSettings = { ...DEFAULT_PUBLIC_SETTINGS };
 
-function applyPublicBusinessSettings(settings = {}) {
-  publicBusinessSettings = { ...DEFAULT_PUBLIC_SETTINGS, ...(settings || {}) };
-  publicWeeklySchedule = normalizeWeeklySchedule(
-    publicBusinessSettings.weekly_schedule
-  );
 
+function localizedBusinessSetting(key, fallback = "") {
+  const lang = state.lang === "en" ? "en" : "es";
+  const localizedKey = `${key}_${lang}`;
+
+  return (
+    publicBusinessSettings[localizedKey] ||
+    publicBusinessSettings[key] ||
+    fallback
+  );
+}
+
+function applyLocalizedBusinessText() {
   const heroTitle = document.querySelector('[data-i18n="heroTitle"]');
   const heroSubtitle = document.querySelector('[data-i18n="heroSubtitle"]');
-  if (heroTitle && publicBusinessSettings.menu_title) {
-    heroTitle.textContent = publicBusinessSettings.menu_title;
+
+  if (heroTitle) {
+    heroTitle.textContent = localizedBusinessSetting(
+      "menu_title",
+      state.lang === "en" ? "Order your favorites" : "Haz tu pedido desde aquí"
+    );
   }
-  if (heroSubtitle && publicBusinessSettings.menu_subtitle) {
-    heroSubtitle.textContent = publicBusinessSettings.menu_subtitle;
+
+  if (heroSubtitle) {
+    heroSubtitle.textContent = localizedBusinessSetting(
+      "menu_subtitle",
+      state.lang === "en"
+        ? "Choose your dishes, customize them, add them to the cart and complete your order with your name and phone number."
+        : "Elige tus platos, personalízalos, añádelos al carrito y completa tu pedido con tu nombre y teléfono."
+    );
   }
 
   document.querySelectorAll("[data-business-setting]").forEach((node) => {
     const key = node.dataset.businessSetting;
-    const value = publicBusinessSettings[key];
+    const value = localizedBusinessSetting(key);
     if (value) node.textContent = value;
   });
 
@@ -537,6 +568,15 @@ function applyPublicBusinessSettings(settings = {}) {
   if (mapsLink && publicBusinessSettings.maps_url) {
     mapsLink.href = publicBusinessSettings.maps_url;
   }
+}
+
+function applyPublicBusinessSettings(settings = {}) {
+  publicBusinessSettings = { ...DEFAULT_PUBLIC_SETTINGS, ...(settings || {}) };
+  publicWeeklySchedule = normalizeWeeklySchedule(
+    publicBusinessSettings.weekly_schedule
+  );
+
+  applyLocalizedBusinessText();
 }
 
 async function loadPublicBusinessSettings() {
@@ -803,20 +843,7 @@ function applyText() {
   $$(".lang-switch button").forEach((button) => {
     button.classList.toggle("active", button.dataset.setLang === state.lang);
   });
-  const heroTitle = document.querySelector('[data-i18n="heroTitle"]');
-  const heroSubtitle = document.querySelector('[data-i18n="heroSubtitle"]');
-
-  if (heroTitle) {
-    heroTitle.textContent = publicBusinessSettings.menu_title ||
-      (state.lang === "en" ? "Order your favorites" : "Haz tu pedido desde aquí");
-  }
-
-  if (heroSubtitle) {
-    heroSubtitle.textContent = publicBusinessSettings.menu_subtitle ||
-      (state.lang === "en"
-        ? "Choose your dishes, customize them, add them to the cart and complete your order with your name and phone number."
-        : "Elige tus platos, personalízalos, añádelos al carrito y completa tu pedido con tu nombre y teléfono.");
-  }
+  applyLocalizedBusinessText();
 
   const trustLabels = state.lang === "en"
     ? ["Made to order", "Direct ordering", "Easy pickup"]
@@ -1169,6 +1196,8 @@ function buildCartItem(form) {
       if (!option) return;
       lineTotal += Number(option.price || 0);
       selections.push({
+        groupId: group.id,
+        optionId: option.id,
         group: group[state.lang] || group.es,
         name: option[state.lang] || option.es,
         groupEs: group.es,
@@ -1184,6 +1213,7 @@ function buildCartItem(form) {
     if (!extra) return;
     lineTotal += Number(extra.price || 0);
     extras.push({
+      id: extra.id,
       name: extra[state.lang] || extra.es,
       nameEs: extra.es,
       price: Number(extra.price || 0)
@@ -1195,6 +1225,7 @@ function buildCartItem(form) {
     const remove = (item.removables || []).find((candidate) => candidate.id === input.value);
     if (remove) {
       removables.push({
+        id: remove.id,
         name: remove[state.lang] || remove.es,
         nameEs: remove.es
       });
@@ -1611,14 +1642,192 @@ function kioskPaymentFunctionName() {
   ).trim() || "clover-kiosk-payment";
 }
 
+
+const KIOSK_DEVICE_CREDENTIAL_PREFIX = "fogon_kiosk_device_credential_";
+const KIOSK_SESSION_PREFIX = "fogon_kiosk_session_";
+const KIOSK_SESSION_EXPIRY_PREFIX = "fogon_kiosk_session_expiry_";
+
+function kioskCredentialStorageKey(kioskId) {
+  return `${KIOSK_DEVICE_CREDENTIAL_PREFIX}${kioskId}`;
+}
+
+function kioskSessionStorageKey(kioskId) {
+  return `${KIOSK_SESSION_PREFIX}${kioskId}`;
+}
+
+function kioskSessionExpiryStorageKey(kioskId) {
+  return `${KIOSK_SESSION_EXPIRY_PREFIX}${kioskId}`;
+}
+
+function storedKioskCredential(kioskId) {
+  try {
+    return String(
+      localStorage.getItem(kioskCredentialStorageKey(kioskId)) || ""
+    ).trim();
+  } catch (_) {
+    return "";
+  }
+}
+
+function storedKioskSession(kioskId) {
+  try {
+    const token = String(
+      sessionStorage.getItem(kioskSessionStorageKey(kioskId)) || ""
+    ).trim();
+
+    const expiresAt = Number(
+      sessionStorage.getItem(kioskSessionExpiryStorageKey(kioskId)) || 0
+    );
+
+    if (!token || !expiresAt || expiresAt <= Date.now() + 30_000) {
+      return "";
+    }
+
+    return token;
+  } catch (_) {
+    return "";
+  }
+}
+
+function saveKioskIdentity(kioskId, credential, sessionToken, expiresAt) {
+  try {
+    if (credential) {
+      localStorage.setItem(
+        kioskCredentialStorageKey(kioskId),
+        credential
+      );
+    }
+
+    if (sessionToken) {
+      sessionStorage.setItem(
+        kioskSessionStorageKey(kioskId),
+        sessionToken
+      );
+    }
+
+    if (expiresAt) {
+      sessionStorage.setItem(
+        kioskSessionExpiryStorageKey(kioskId),
+        String(Date.parse(expiresAt) || 0)
+      );
+    }
+  } catch (_) {}
+}
+
+async function callKioskSessionService(action, payload = {}) {
+  const { supabaseUrl, anonKey } = publicCatalogFunctionConfig();
+
+  const response = await fetch(
+    `${supabaseUrl}/functions/v1/kiosk-device-session`,
+    {
+      method: "POST",
+      cache: "no-store",
+      headers: publicCatalogHeaders(anonKey),
+      body: JSON.stringify({
+        action,
+        kioskId: currentKioskId(),
+        ...payload
+      })
+    }
+  );
+
+  const result = await response.json().catch(() => ({}));
+
+  if (!response.ok || result?.ok !== true) {
+    const error = new Error(
+      result?.error || `HTTP ${response.status}`
+    );
+    error.httpStatus = response.status;
+    throw error;
+  }
+
+  return result;
+}
+
+async function ensureKioskSession() {
+  const kioskId = currentKioskId();
+  const currentSession = storedKioskSession(kioskId);
+
+  if (currentSession) {
+    return currentSession;
+  }
+
+  const credential = storedKioskCredential(kioskId);
+
+  if (credential) {
+    try {
+      const result = await callKioskSessionService("start", {
+        deviceSecret: credential
+      });
+
+      saveKioskIdentity(
+        kioskId,
+        "",
+        result.sessionToken,
+        result.expiresAt
+      );
+
+      return result.sessionToken;
+    } catch (error) {
+      if (error?.httpStatus !== 401 && error?.httpStatus !== 403) {
+        throw error;
+      }
+    }
+  }
+
+  const pairingCode = window.prompt(
+    state.lang === "en"
+      ? "This kiosk is not activated. Enter the 8-digit pairing code generated in Admin Menu → Data → Kiosks."
+      : "Este kiosco no está activado. Introduce el código de 8 dígitos generado en Gestionar menú → Datos del menú → Kioscos."
+  );
+
+  if (!pairingCode) {
+    throw new Error(
+      state.lang === "en"
+        ? "Kiosk activation is required."
+        : "Es necesario activar este kiosco."
+    );
+  }
+
+  const result = await callKioskSessionService("pair", {
+    pairingCode: String(pairingCode).replace(/\D/g, "").slice(0, 8)
+  });
+
+  saveKioskIdentity(
+    kioskId,
+    result.deviceCredential,
+    result.sessionToken,
+    result.expiresAt
+  );
+
+  return result.sessionToken;
+}
+
 async function callKioskPaymentService(action, payload = {}) {
   const { supabaseUrl, anonKey } = publicCatalogFunctionConfig();
   const functionName = kioskPaymentFunctionName();
+
+  const sessionToken = action === "health"
+    ? ""
+    : await ensureKioskSession();
+
+  const headers = {
+    ...publicCatalogHeaders(anonKey)
+  };
+
+  if (sessionToken) {
+    headers["x-kiosk-session"] = sessionToken;
+  }
+
   const response = await fetch(`${supabaseUrl}/functions/v1/${functionName}`, {
     method: "POST",
     cache: "no-store",
-    headers: publicCatalogHeaders(anonKey),
-    body: JSON.stringify({ action, ...payload })
+    headers,
+    body: JSON.stringify({
+      action,
+      kioskId: currentKioskId(),
+      ...payload
+    })
   });
 
   const result = await response.json().catch(() => ({}));
@@ -1648,6 +1857,61 @@ function setKioskPaymentStepVisible(visible, total = 0) {
   if (totalNode) totalNode.textContent = money(total);
 }
 
+
+async function createSecureKioskOrder(order) {
+  const { supabaseUrl, anonKey } = publicCatalogFunctionConfig();
+  const sessionToken = await ensureKioskSession();
+
+  const response = await fetch(
+    `${supabaseUrl}/functions/v1/kiosk-order-create`,
+    {
+      method: "POST",
+      cache: "no-store",
+      headers: {
+        ...publicCatalogHeaders(anonKey),
+        "x-kiosk-session": sessionToken
+      },
+      body: JSON.stringify({
+        kioskId: currentKioskId(),
+        customer: {
+          name: order.customer?.name || "",
+          phone: order.customer?.phone || ""
+        },
+        language: order.language || state.lang || "es",
+        orderType: order.orderType || state.orderType || "takeout",
+        paymentMethod: order.paymentMethod || "card",
+        items: (order.items || []).map((item) => ({
+          productId: item.productId,
+          quantity: Number(item.quantity || 1),
+          notes: String(item.notes || "").slice(0, 500),
+          selections: (item.selections || []).map((selection) => ({
+            groupId: selection.groupId || "",
+            optionId: selection.optionId || ""
+          })),
+          extras: (item.extras || []).map((extra) => ({
+            id: extra.id || ""
+          })),
+          removables: (item.removables || []).map((remove) => ({
+            id: remove.id || ""
+          }))
+        }))
+      })
+    }
+  );
+
+  const result = await response.json().catch(() => ({}));
+
+  if (!response.ok || result?.ok !== true || !result?.order) {
+    const error = new Error(
+      result?.detail || result?.error || `HTTP ${response.status}`
+    );
+    error.httpStatus = response.status;
+    throw error;
+  }
+
+  return result.order;
+}
+
 async function startKioskBridgePayment(order) {
   const externalPaymentId = buildExternalPaymentId(order);
 
@@ -1658,11 +1922,8 @@ async function startKioskBridgePayment(order) {
   };
 
   const result = await callKioskPaymentService("start", {
-    amount: Math.round(Number(order.totals?.total || 0) * 100),
     externalPaymentId,
-    kioskId: currentKioskId(),
-    orderNumber: order.publicId || order.public_id || order.id,
-    order
+    orderId: order.databaseId || order.id
   });
 
   return { ...result, externalPaymentId };
@@ -1698,28 +1959,7 @@ async function cancelActiveKioskPayment() {
       );
     }
 
-    const db = window.FOGON_DB;
-    if (db?.isReady?.() && payment.orderId) {
-      try {
-        await db.deleteOrder(payment.orderId);
-      } catch (deleteError) {
-        console.warn(
-          "El pago fue cancelado, pero no se pudo borrar el pedido temporal:",
-          deleteError
-        );
-
-        try {
-          await db.updateKioskPayment(payment.orderId, {
-            status: "payment_cancelled",
-            paymentStatus: "cancelled",
-            paymentError: "cancelled_by_customer",
-            cloverExternalPaymentId: payment.externalPaymentId,
-            checkoutMode: "pay_before_kitchen"
-          });
-        } catch (_) {}
-      }
-    }
-
+    // clover-kiosk-payment registra la cancelación del pedido desde servidor.
     state.activeKioskPayment = null;
     closePayment();
   } catch (error) {
@@ -1825,7 +2065,10 @@ async function saveOrder(paymentMethod) {
       );
     }
 
-    createdOrder = await db.createOrder(order);
+    createdOrder = kioskMode
+      ? await createSecureKioskOrder(order)
+      : await db.createOrder(order);
+
     createdOrder.orderType = state.orderType;
     createdOrder.checkoutMode = order.checkoutMode;
     createdOrder.kioskId = order.kioskId;
@@ -1846,15 +2089,8 @@ async function saveOrder(paymentMethod) {
           paymentResult.error || ""
         );
 
-        await db.updateKioskPayment(
-          createdOrder.databaseId || createdOrder.id,
-          {
-            paymentStatus: needsReview ? "review" : paymentStatus,
-            paymentError: paymentResult.error || "",
-            cloverExternalPaymentId:
-              paymentResult.externalPaymentId || ""
-          }
-        );
+        // El servidor registra el estado del intento y del pedido.
+
 
         const paymentError = new Error(
           paymentResult.error ||
@@ -1933,26 +2169,7 @@ async function saveOrder(paymentMethod) {
     const needsReauthorization = errorStatus === "reauthorization_required";
     const finalFailureStatus = needsReview ? "review" : "failed";
 
-    const createdAsKioskPayment =
-      String(createdOrder?.checkoutMode || "") === "pay_before_kitchen";
-
-    if (
-      createdAsKioskPayment &&
-      createdOrder &&
-      window.FOGON_DB?.isReady?.()
-    ) {
-      try {
-        await window.FOGON_DB.updateKioskPayment(
-          createdOrder.databaseId || createdOrder.id,
-          {
-            paymentStatus: finalFailureStatus,
-            paymentError: error?.message || String(error),
-            cloverExternalPaymentId:
-              error?.externalPaymentId || state.activeKioskPayment?.externalPaymentId || ""
-          }
-        );
-      } catch (_) {}
-    }
+    // Los pedidos kiosco se modifican únicamente desde Edge Functions.
 
     const kioskStep = $("#kioskPaymentStep");
     const paymentStep = $("#paymentMethodStep");
