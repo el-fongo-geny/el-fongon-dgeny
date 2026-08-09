@@ -6,7 +6,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#f6f6f3">
   <title>Gestor del menú | El Fogón D' Geny</title>
-  <link rel="stylesheet" href="menu-admin.css?v=98-security-checkout">
+  <link rel="stylesheet" href="menu-admin.css?v=100-i18n-kiosk-identity">
 </head>
 <body>
   <main id="loginScreen" class="login-screen">
@@ -200,103 +200,6 @@
           </div>
 
           <form id="businessSettingsForm" class="business-settings-form">
-            <div class="form-grid">
-              <label class="field">
-                <span>Título principal del menú</span>
-                <input id="businessMenuTitle" type="text" maxlength="120" placeholder="Haz tu pedido">
-              </label>
-              <label class="field">
-                <span>Subtítulo del menú</span>
-                <input id="businessMenuSubtitle" type="text" maxlength="220">
-              </label>
-            </div>
-
-            <div class="form-grid form-grid-textarea">
-              <label class="field">
-                <span>Título inferior</span>
-                <input id="businessFooterTitle" type="text" maxlength="220">
-              </label>
-              <label class="field">
-                <span>Dirección</span>
-                <input id="businessAddress" type="text" maxlength="260">
-              </label>
-              <label class="field">
-                <span>Primer texto informativo</span>
-                <textarea id="businessFooterParagraph1" rows="4" maxlength="1600"></textarea>
-              </label>
-              <label class="field">
-                <span>Segundo texto informativo</span>
-                <textarea id="businessFooterParagraph2" rows="4" maxlength="1600"></textarea>
-              </label>
-            </div>
-
-            <div class="form-grid">
-              <label class="field">
-                <span>Texto del enlace de ubicación</span>
-                <input id="businessMapsLabel" type="text" maxlength="160">
-              </label>
-              <label class="field">
-                <span>Enlace de Google Maps</span>
-                <input id="businessMapsUrl" type="url" maxlength="1200">
-              </label>
-            </div>
-
-            
-            <section class="kiosk-settings-card" aria-labelledby="kioskSettingsTitle">
-              <div class="kiosk-settings-copy">
-                <p class="eyebrow">Cobros y kiosco</p>
-                <h3 id="kioskSettingsTitle">Flujo de pago del menú</h3>
-                <p>El modo kiosco cobra en Clover antes de enviar el pedido a Cocina. Está preparado para una pantalla Android con Kiosk Browser y conexión HTTPS a Supabase.</p>
-              </div>
-
-              <label class="field">
-                <span>Modo de cobro</span>
-                <select id="businessCheckoutMode">
-                  <option value="pay_before_kitchen">Kiosco: pagar antes de Cocina</option>
-                  <option value="pay_at_counter">Respaldo: cobrar después en mostrador</option>
-                </select>
-              </label>
-
-              <div id="kioskConnectionFields" class="kiosk-connection-fields">
-                <label class="field">
-                  <span>Identificador del kiosco</span>
-                  <input id="businessKioskId" type="text" maxlength="80" value="kiosk-01" placeholder="kiosk-01">
-                </label>
-
-                <label class="field">
-                  <span>Función de pago en Supabase</span>
-                  <input id="businessKioskPaymentFunction" type="text" maxlength="120" value="clover-kiosk-payment" placeholder="clover-kiosk-payment">
-                  <small>Compatible con Android y Kiosk Browser mediante HTTPS. Cada pantalla debe abrir el menú con ?kiosk=kiosk-01, ?kiosk=kiosk-02, etc.</small>
-                </label>
-
-                <label class="switch-row">
-                  <span>
-                    <strong>Permitir efectivo como respaldo</strong>
-                    <small>El pedido en efectivo conserva el flujo de mostrador y entra a Cocina sin pago Clover.</small>
-                  </span>
-                  <input id="businessAllowCashBackup" type="checkbox">
-                  <span class="switch-control" aria-hidden="true"></span>
-                </label>
-
-                <div class="kiosk-status-box">
-                  <span>Estado del servicio de pago</span>
-                  <strong id="kioskPaymentServiceStatus">Sin comprobar</strong>
-                  <button id="testKioskPaymentServiceButton" class="button button-secondary" type="button">Comprobar conexión</button>
-                </div>
-                <section class="clover-device-map-card">
-                  <div>
-                    <strong>Asignación de pantallas a Clover Flex</strong>
-                    <p>Cada pantalla Android usa un kiosk_id y la función busca el número de serie del Flex correspondiente.</p>
-                  </div>
-                  <div class="clover-device-map-example">
-                    <code>kiosk-01 → Flex principal</code>
-                    <code>kiosk-02 → Flex secundario</code>
-                  </div>
-                  <small>La tabla se administra en Supabase: <code>clover_kiosk_devices</code>. El ZIP incluye el SQL y ejemplos.</small>
-                </section>
-
-              </div>
-            </section>
 
 <section class="tax-settings-card" aria-labelledby="taxSettingsTitle">
               <div class="tax-settings-copy">
@@ -329,6 +232,181 @@
                   <input id="businessTaxOnlyTaxable" type="checkbox" checked>
                   <span class="switch-control" aria-hidden="true"></span>
                 </label>
+              </div>
+            </section>
+
+
+            <section class="business-language-card" aria-labelledby="businessTranslationsTitle">
+              <div class="section-heading compact-heading">
+                <div>
+                  <p class="eyebrow">Textos del menú</p>
+                  <h3 id="businessTranslationsTitle">Contenido por idioma</h3>
+                  <p>
+                    Edita Español e Inglés por separado. El menú público mostrará automáticamente
+                    el texto correspondiente al idioma elegido por el cliente.
+                  </p>
+                </div>
+              </div>
+
+              <div class="business-language-tabs" role="tablist" aria-label="Idioma de los textos">
+                <button class="business-language-tab active" type="button" data-business-language="es" aria-selected="true">Español</button>
+                <button class="business-language-tab" type="button" data-business-language="en" aria-selected="false">English</button>
+              </div>
+
+              <div class="business-language-panel" data-business-language-panel="es">
+                <div class="form-grid">
+                  <label class="field">
+                    <span>Título principal</span>
+                    <input id="businessMenuTitleEs" type="text" maxlength="120" placeholder="Haz tu pedido">
+                  </label>
+                  <label class="field">
+                    <span>Subtítulo</span>
+                    <input id="businessMenuSubtitleEs" type="text" maxlength="220">
+                  </label>
+                </div>
+
+                <div class="form-grid form-grid-textarea">
+                  <label class="field">
+                    <span>Título inferior</span>
+                    <input id="businessFooterTitleEs" type="text" maxlength="220">
+                  </label>
+                  <label class="field">
+                    <span>Dirección</span>
+                    <input id="businessAddressEs" type="text" maxlength="260">
+                  </label>
+                  <label class="field">
+                    <span>Primer texto informativo</span>
+                    <textarea id="businessFooterParagraph1Es" rows="4" maxlength="1600"></textarea>
+                  </label>
+                  <label class="field">
+                    <span>Segundo texto informativo</span>
+                    <textarea id="businessFooterParagraph2Es" rows="4" maxlength="1600"></textarea>
+                  </label>
+                </div>
+
+                <label class="field">
+                  <span>Texto del enlace de ubicación</span>
+                  <input id="businessMapsLabelEs" type="text" maxlength="160">
+                </label>
+              </div>
+
+              <div class="business-language-panel" data-business-language-panel="en" hidden>
+                <div class="form-grid">
+                  <label class="field">
+                    <span>Main title</span>
+                    <input id="businessMenuTitleEn" type="text" maxlength="120" placeholder="Order here">
+                  </label>
+                  <label class="field">
+                    <span>Subtitle</span>
+                    <input id="businessMenuSubtitleEn" type="text" maxlength="220">
+                  </label>
+                </div>
+
+                <div class="form-grid form-grid-textarea">
+                  <label class="field">
+                    <span>Footer title</span>
+                    <input id="businessFooterTitleEn" type="text" maxlength="220">
+                  </label>
+                  <label class="field">
+                    <span>Address</span>
+                    <input id="businessAddressEn" type="text" maxlength="260">
+                  </label>
+                  <label class="field">
+                    <span>First information text</span>
+                    <textarea id="businessFooterParagraph1En" rows="4" maxlength="1600"></textarea>
+                  </label>
+                  <label class="field">
+                    <span>Second information text</span>
+                    <textarea id="businessFooterParagraph2En" rows="4" maxlength="1600"></textarea>
+                  </label>
+                </div>
+
+                <label class="field">
+                  <span>Location link text</span>
+                  <input id="businessMapsLabelEn" type="text" maxlength="160">
+                </label>
+              </div>
+
+              <label class="field">
+                <span>Enlace de Google Maps</span>
+                <input id="businessMapsUrl" type="url" maxlength="1200">
+                <small>La URL es la misma en todos los idiomas.</small>
+              </label>
+            </section>
+
+            
+            <section class="kiosk-settings-card" aria-labelledby="kioskSettingsTitle">
+              <div class="kiosk-settings-copy">
+                <p class="eyebrow">Cobros y kioscos</p>
+                <h3 id="kioskSettingsTitle">Flujo de pago y kioscos</h3>
+                <p>
+                  El modo kiosco cobra con el Clover Flex asignado a cada pantalla antes de enviar el pedido a Cocina.
+                  Puedes añadir nuevas pantallas sin editar SQL ni introducir datos técnicos de Clover.
+                </p>
+              </div>
+
+              <label class="field">
+                <span>Modo de cobro</span>
+                <select id="businessCheckoutMode">
+                  <option value="pay_before_kitchen">Kiosco: pagar antes de Cocina</option>
+                  <option value="pay_at_counter">Respaldo: cobrar después en mostrador</option>
+                </select>
+              </label>
+
+              <div id="kioskConnectionFields" class="kiosk-connection-fields">
+                <div class="kiosk-manager-toolbar">
+                  <div>
+                    <strong>Kioscos configurados</strong>
+                    <p>Cada pantalla queda asociada a su propio Clover Flex y a sus formas de pago.</p>
+                  </div>
+                  <button id="addKioskButton" class="button button-primary" type="button">
+                    + Añadir kiosco
+                  </button>
+                </div>
+
+                <div id="kioskManagerStatus" class="kiosk-manager-status" role="status" aria-live="polite">
+                  Cargando kioscos…
+                </div>
+
+                <div id="kioskDevicesList" class="kiosk-devices-list"></div>
+
+                <label class="field kiosk-default-field">
+                  <span>Kiosco predeterminado</span>
+                  <select id="businessKioskId">
+                    <option value="kiosk-01">kiosk-01</option>
+                  </select>
+                  <small>
+                    Solo se utiliza cuando la URL no contiene <code>?kiosk=...</code>.
+                    Cada pantalla instalada debe usar su URL propia.
+                  </small>
+                </label>
+
+                <input id="businessKioskPaymentFunction" type="hidden" value="clover-kiosk-payment">
+
+                <label class="switch-row">
+                  <span>
+                    <strong>Permitir efectivo como respaldo general</strong>
+                    <small>Los kioscos pueden tener además su propia configuración de Tarjeta/Efectivo.</small>
+                  </span>
+                  <input id="businessAllowCashBackup" type="checkbox">
+                  <span class="switch-control" aria-hidden="true"></span>
+                </label>
+
+                <div class="kiosk-status-box">
+                  <span>Servicio de pago Clover</span>
+                  <strong id="kioskPaymentServiceStatus">Sin comprobar</strong>
+                  <button id="testKioskPaymentServiceButton" class="button button-secondary" type="button">
+                    Comprobar servicio
+                  </button>
+                </div>
+
+                <div class="kiosk-security-note">
+                  <strong>Configuración protegida</strong>
+                  <p>
+                    RAID y Merchant ID no se muestran ni se envían al navegador. Supabase los aplica
+                    automáticamente cuando se registra un nuevo Clover Flex.
+                  </p>
+                </div>
               </div>
             </section>
 
@@ -422,7 +500,102 @@
       </section>
     </main>
 
-    <div id="mobileSidebarBackdrop" class="mobile-sidebar-backdrop" hidden></div>
+    
+    
+    <div id="kioskPairingModal" class="modal" hidden>
+      <div class="modal-backdrop" data-close-kiosk-pairing></div>
+      <section class="modal-card kiosk-pairing-card" role="dialog" aria-modal="true" aria-labelledby="kioskPairingTitle">
+        <div class="modal-heading">
+          <div>
+            <p class="eyebrow">Seguridad del dispositivo</p>
+            <h2 id="kioskPairingTitle">Vincular kiosco</h2>
+            <p>Introduce este código una sola vez en la pantalla Android.</p>
+          </div>
+          <button class="icon-button" type="button" data-close-kiosk-pairing aria-label="Cerrar">×</button>
+        </div>
+
+        <div class="kiosk-pairing-code" id="kioskPairingCode">--------</div>
+        <p id="kioskPairingExpires">Caduca en 10 minutos.</p>
+
+        <div class="security-note">
+          El código es temporal y de un solo uso. La credencial permanente se genera
+          dentro del dispositivo y nunca se guarda en GitHub.
+        </div>
+
+        <button class="button button-primary" type="button" data-close-kiosk-pairing>Entendido</button>
+      </section>
+    </div>
+
+<div id="kioskEditorModal" class="modal" hidden>
+      <div class="modal-backdrop" data-close-kiosk-editor></div>
+      <section class="modal-card kiosk-editor-modal-card" role="dialog" aria-modal="true" aria-labelledby="kioskEditorTitle">
+        <div class="modal-heading">
+          <div>
+            <p class="eyebrow">Pantalla y cobro</p>
+            <h2 id="kioskEditorTitle">Añadir kiosco</h2>
+            <p id="kioskEditorSubtitle">Asocia una pantalla Android a un Clover Flex.</p>
+          </div>
+          <button class="icon-button" type="button" data-close-kiosk-editor aria-label="Cerrar">×</button>
+        </div>
+
+        <form id="kioskEditorForm" class="kiosk-editor-form">
+          <input id="kioskEditorId" type="hidden">
+
+          <label class="field">
+            <span>Nombre de la pantalla *</span>
+            <input id="kioskDisplayName" type="text" maxlength="120" required placeholder="Ejemplo: Kiosco entrada">
+            <small>Un nombre fácil de reconocer por el personal.</small>
+          </label>
+
+          <label class="field">
+            <span>Serial del Clover Flex</span>
+            <input id="kioskCloverSerial" type="text" maxlength="160" autocomplete="off" placeholder="Serial del dispositivo Clover Flex">
+            <small>Solo es obligatorio si este kiosco acepta tarjeta.</small>
+          </label>
+
+          <fieldset class="kiosk-payment-methods">
+            <legend>Formas de pago</legend>
+
+            <label class="kiosk-payment-option">
+              <input id="kioskAllowCard" type="checkbox" checked>
+              <span>
+                <strong>Tarjeta en Clover Flex</strong>
+                <small>El pedido entra a Cocina solo cuando Clover confirma el pago.</small>
+              </span>
+            </label>
+
+            <label class="kiosk-payment-option">
+              <input id="kioskAllowCash" type="checkbox" checked>
+              <span>
+                <strong>Efectivo en ventanilla</strong>
+                <small>El pedido entra a Cocina y se cobra en el mostrador.</small>
+              </span>
+            </label>
+          </fieldset>
+
+          <label class="switch-row">
+            <span>
+              <strong>Kiosco activo</strong>
+              <small>Desactívalo temporalmente sin borrar su configuración.</small>
+            </span>
+            <input id="kioskEnabled" type="checkbox" checked>
+            <span class="switch-control" aria-hidden="true"></span>
+          </label>
+
+          <div class="kiosk-editor-technical" id="kioskGeneratedInfo" hidden>
+            <span>Identificador generado</span>
+            <strong id="kioskGeneratedId">—</strong>
+          </div>
+
+          <div class="management-form-actions">
+            <button class="button button-secondary" type="button" data-close-kiosk-editor>Cancelar</button>
+            <button id="saveKioskButton" class="button button-primary" type="submit">Guardar kiosco</button>
+          </div>
+        </form>
+      </section>
+    </div>
+
+<div id="mobileSidebarBackdrop" class="mobile-sidebar-backdrop" hidden></div>
   </div>
 
   <div id="drawerBackdrop" class="drawer-backdrop" hidden></div>
@@ -667,6 +840,6 @@
   </div>
 
   <script src="supabase-config.js?v=18-mobile-fixed"></script>
-  <script src="menu-admin.js?v=98-security-checkout"></script>
+  <script src="menu-admin.js?v=100-i18n-kiosk-identity"></script>
 </body>
 </html>
