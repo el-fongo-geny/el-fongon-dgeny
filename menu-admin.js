@@ -1,13 +1,13 @@
 (() => {
   "use strict";
 
-window.FOGON_MENU_ADMIN_BUILD = "98-security-checkout";
+window.FOGON_MENU_ADMIN_BUILD = "100-i18n-kiosk-identity";
 
   const $ = (selector) => document.querySelector(selector);
   const $$ = (selector) => Array.from(document.querySelectorAll(selector));
   const money = (value) => `$${Number(value || 0).toFixed(2)}`;
 
-  window.FOGON_MENU_ADMIN_BUILD = "98-security-checkout";
+  window.FOGON_MENU_ADMIN_BUILD = "100-i18n-kiosk-identity";
 
   const state = {
     pin: "",
@@ -34,7 +34,9 @@ window.FOGON_MENU_ADMIN_BUILD = "98-security-checkout";
     imageUploading: false,
     optionDraftGroups: [],
     availabilityQuery: "",
-    businessSettings: {}
+    businessSettings: {},
+    kioskDevices: [],
+    kioskEditorMode: "create"
   };
 
   function escapeHtml(value) {
@@ -612,6 +614,20 @@ window.FOGON_MENU_ADMIN_BUILD = "98-security-checkout";
     footer_paragraph_2: "Si buscas comida dominicana sabrosa, comida latina o un restaurante dominicano en San Jose, visita El Fogon D' Geny.",
     address: "796 S 1st St, San Jose, CA 95113",
     maps_label: "Ver ubicación en Google Maps",
+    menu_title_es: "Haz tu pedido",
+    menu_title_en: "Order here",
+    menu_subtitle_es: "Elige tus favoritos, personaliza y recoge en la ventanilla.",
+    menu_subtitle_en: "Choose your favorites, customize your order and pick it up at the counter.",
+    footer_title_es: "Comida dominicana y latina en San Jose, California",
+    footer_title_en: "Dominican and Latin food in San Jose, California",
+    footer_paragraph_1_es: "El Fogon D' Geny prepara autentica comida dominicana, latina y caribeña en el centro de San Jose.",
+    footer_paragraph_1_en: "El Fogon D' Geny serves authentic Dominican, Latin and Caribbean food in downtown San Jose.",
+    footer_paragraph_2_es: "Si buscas comida dominicana sabrosa, comida latina o un restaurante dominicano en San Jose, visita El Fogon D' Geny.",
+    footer_paragraph_2_en: "If you are looking for flavorful Dominican food, Latin food or a Dominican restaurant in San Jose, visit El Fogon D' Geny.",
+    address_es: "796 S 1st St, San Jose, CA 95113",
+    address_en: "796 S 1st St, San Jose, CA 95113",
+    maps_label_es: "Ver ubicación en Google Maps",
+    maps_label_en: "View location on Google Maps",
     maps_url: "https://www.google.com/maps/search/?api=1&query=El+Fogon+D%27+Geny+796+S+1st+St+San+Jose+CA+95113",
     tax_enabled: false,
     tax_rate: 10,
@@ -632,19 +648,34 @@ window.FOGON_MENU_ADMIN_BUILD = "98-security-checkout";
     if (!force && form.dataset.loaded === "true") return;
 
     const settings = currentBusinessSettings();
-    $("#businessMenuTitle").value = settings.menu_title || "";
-    $("#businessMenuSubtitle").value = settings.menu_subtitle || "";
-    $("#businessFooterTitle").value = settings.footer_title || "";
-    $("#businessFooterParagraph1").value = settings.footer_paragraph_1 || "";
-    $("#businessFooterParagraph2").value = settings.footer_paragraph_2 || "";
-    $("#businessAddress").value = settings.address || "";
-    $("#businessMapsLabel").value = settings.maps_label || "";
+    $("#businessMenuTitleEs").value = settings.menu_title_es || settings.menu_title || "";
+    $("#businessMenuTitleEn").value = settings.menu_title_en || "";
+    $("#businessMenuSubtitleEs").value = settings.menu_subtitle_es || settings.menu_subtitle || "";
+    $("#businessMenuSubtitleEn").value = settings.menu_subtitle_en || "";
+    $("#businessFooterTitleEs").value = settings.footer_title_es || settings.footer_title || "";
+    $("#businessFooterTitleEn").value = settings.footer_title_en || "";
+    $("#businessFooterParagraph1Es").value = settings.footer_paragraph_1_es || settings.footer_paragraph_1 || "";
+    $("#businessFooterParagraph1En").value = settings.footer_paragraph_1_en || "";
+    $("#businessFooterParagraph2Es").value = settings.footer_paragraph_2_es || settings.footer_paragraph_2 || "";
+    $("#businessFooterParagraph2En").value = settings.footer_paragraph_2_en || "";
+    $("#businessAddressEs").value = settings.address_es || settings.address || "";
+    $("#businessAddressEn").value = settings.address_en || settings.address || "";
+    $("#businessMapsLabelEs").value = settings.maps_label_es || settings.maps_label || "";
+    $("#businessMapsLabelEn").value = settings.maps_label_en || "";
     $("#businessMapsUrl").value = settings.maps_url || "";
     $("#businessTaxEnabled").checked = settings.tax_enabled === true;
     $("#businessTaxRate").value = Number(settings.tax_rate || 10).toFixed(3);
     $("#businessTaxOnlyTaxable").checked = settings.tax_only_taxable !== false;
     $("#businessCheckoutMode").value = settings.checkout_mode || "pay_before_kitchen";
-    $("#businessKioskId").value = settings.kiosk_id || "kiosk-01";
+    if ($("#businessKioskId")) {
+      $("#businessKioskId").dataset.preferredValue =
+        settings.kiosk_id || "kiosk-01";
+      if ([...$("#businessKioskId").options].some(
+        (option) => option.value === (settings.kiosk_id || "kiosk-01")
+      )) {
+        $("#businessKioskId").value = settings.kiosk_id || "kiosk-01";
+      }
+    }
     $("#businessKioskPaymentFunction").value = settings.kiosk_payment_function || "clover-kiosk-payment";
     $("#businessAllowCashBackup").checked = settings.allow_cash_backup === true;
     updateTaxSettingsUi();
@@ -661,6 +692,363 @@ window.FOGON_MENU_ADMIN_BUILD = "98-security-checkout";
     if (status) status.textContent = enabled ? "Activado" : "Desactivado";
   }
 
+
+
+  function kioskPublicUrl(kioskId) {
+    const origin = window.location.origin;
+    const basePath = window.location.pathname.replace(/\/menu-admin\.html.*$/i, "/");
+    return `${origin}${basePath}?kiosk=${encodeURIComponent(kioskId)}`;
+  }
+
+  function maskedSerial(value) {
+    const serial = String(value || "").trim();
+    if (!serial) return "Sin Clover asignado";
+    if (serial.length <= 6) return serial;
+    return `••••${serial.slice(-6)}`;
+  }
+
+  function kioskPaymentBadges(device) {
+    const badges = [];
+    if (device.allowCard === true) badges.push('<span class="kiosk-method-badge card">Tarjeta</span>');
+    if (device.allowCash === true) badges.push('<span class="kiosk-method-badge cash">Efectivo</span>');
+    return badges.join("");
+  }
+
+  function renderKioskDevices() {
+    const list = $("#kioskDevicesList");
+    const status = $("#kioskManagerStatus");
+    const defaultSelect = $("#businessKioskId");
+    if (!list || !defaultSelect) return;
+
+    const devices = Array.isArray(state.kioskDevices) ? state.kioskDevices : [];
+
+    if (status) {
+      const active = devices.filter((item) => item.enabled === true).length;
+      status.textContent = devices.length
+        ? `${devices.length} kiosco${devices.length === 1 ? "" : "s"} · ${active} activo${active === 1 ? "" : "s"}`
+        : "Todavía no hay kioscos configurados.";
+    }
+
+    const currentDefault = String(
+      defaultSelect.dataset.preferredValue ||
+      currentBusinessSettings().kiosk_id ||
+      defaultSelect.value ||
+      ""
+    );
+
+    defaultSelect.innerHTML = devices.length
+      ? devices.map((device) => `
+          <option value="${escapeHtml(device.kioskId)}">
+            ${escapeHtml(device.displayName)} · ${escapeHtml(device.kioskId)}
+          </option>
+        `).join("")
+      : '<option value="kiosk-01">kiosk-01</option>';
+
+    if (devices.some((device) => device.kioskId === currentDefault)) {
+      defaultSelect.value = currentDefault;
+    } else if (devices[0]) {
+      defaultSelect.value = devices[0].kioskId;
+    }
+
+    if (!devices.length) {
+      list.innerHTML = `
+        <div class="kiosk-empty-state">
+          <strong>No hay kioscos configurados</strong>
+          <p>Pulsa “Añadir kiosco” para registrar la primera pantalla y su Clover Flex.</p>
+        </div>
+      `;
+      return;
+    }
+
+    list.innerHTML = devices.map((device) => {
+      const url = kioskPublicUrl(device.kioskId);
+      const activeLabel = device.enabled ? "Activo" : "Desactivado";
+      const readiness = device.cardReady
+        ? "Clover listo"
+        : (device.allowCard ? "Clover pendiente" : "Solo efectivo");
+
+      return `
+        <article class="kiosk-device-card ${device.enabled ? "" : "is-disabled"}">
+          <div class="kiosk-device-card-head">
+            <div>
+              <span class="kiosk-id-label">${escapeHtml(device.kioskId)}</span>
+              <h4>${escapeHtml(device.displayName)}</h4>
+            </div>
+            <span class="kiosk-state-pill ${device.enabled ? "active" : ""}">
+              ${activeLabel}
+            </span>
+          </div>
+
+          <div class="kiosk-device-details">
+            <div>
+              <span>Clover Flex</span>
+              <strong>${escapeHtml(maskedSerial(device.cloverDeviceId))}</strong>
+            </div>
+            <div>
+              <span>Estado de pago</span>
+              <strong>${escapeHtml(readiness)}</strong>
+            </div>
+          </div>
+
+          <div class="kiosk-method-badges">
+            ${kioskPaymentBadges(device) || '<span class="kiosk-method-badge">Sin métodos</span>'}
+          </div>
+
+          <div class="kiosk-url-row">
+            <code>${escapeHtml(url)}</code>
+            <button class="button button-secondary button-small" type="button" data-copy-kiosk-url="${escapeHtml(device.kioskId)}">
+              Copiar URL
+            </button>
+          </div>
+
+          <div class="kiosk-device-security">
+            <span>Identidad del dispositivo</span>
+            <strong class="${device.devicePaired ? "paired" : "unpaired"}">
+              ${device.devicePaired ? "Vinculado" : "Sin vincular"}
+            </strong>
+          </div>
+
+          <div class="kiosk-device-actions kiosk-device-actions-grid">
+            <button class="button button-secondary" type="button" data-edit-kiosk="${escapeHtml(device.kioskId)}">
+              Editar
+            </button>
+
+            <button class="button button-secondary" type="button" data-pair-kiosk="${escapeHtml(device.kioskId)}">
+              ${device.devicePaired ? "Generar nuevo código" : "Vincular dispositivo"}
+            </button>
+
+            ${device.devicePaired ? `
+              <button class="button button-secondary kiosk-disable-button" type="button" data-reset-kiosk-identity="${escapeHtml(device.kioskId)}">
+                Revocar dispositivo
+              </button>
+            ` : ""}
+
+            <button
+              class="button ${device.enabled ? "button-secondary kiosk-disable-button" : "button-primary"}"
+              type="button"
+              data-toggle-kiosk="${escapeHtml(device.kioskId)}"
+              data-next-enabled="${device.enabled ? "false" : "true"}"
+            >
+              ${device.enabled ? "Desactivar" : "Activar"}
+            </button>
+          </div>
+        </article>
+      `;
+    }).join("");
+  }
+
+  async function loadKioskDevices({ quiet = false } = {}) {
+    const status = $("#kioskManagerStatus");
+    if (!quiet && status) status.textContent = "Cargando kioscos…";
+
+    try {
+      const result = await callAdminCatalog("list_kiosk_devices");
+      state.kioskDevices = Array.isArray(result.devices) ? result.devices : [];
+      renderKioskDevices();
+    } catch (error) {
+      console.error("No se pudieron cargar los kioscos:", error);
+      if (status) status.textContent = "No se pudieron cargar los kioscos.";
+      if (!quiet) {
+        toast(`No se pudieron cargar los kioscos. ${menuAdminErrorMessage(error)}`, "error");
+      }
+    }
+  }
+
+  function closeKioskEditor() {
+    const modal = $("#kioskEditorModal");
+    if (modal) modal.hidden = true;
+    $("#kioskEditorForm")?.reset();
+    $("#kioskEditorId").value = "";
+    $("#kioskGeneratedInfo").hidden = true;
+  }
+
+  function openKioskEditor(device = null) {
+    const modal = $("#kioskEditorModal");
+    if (!modal) return;
+
+    state.kioskEditorMode = device ? "edit" : "create";
+
+    $("#kioskEditorTitle").textContent = device ? "Editar kiosco" : "Añadir kiosco";
+    $("#kioskEditorSubtitle").textContent = device
+      ? "Actualiza la pantalla, el Clover Flex o las formas de pago."
+      : "Asocia una pantalla Android a un Clover Flex.";
+
+    $("#kioskEditorId").value = device?.kioskId || "";
+    $("#kioskDisplayName").value = device?.displayName || "";
+    $("#kioskCloverSerial").value = device?.cloverDeviceId || "";
+    $("#kioskAllowCard").checked = device ? device.allowCard === true : true;
+    $("#kioskAllowCash").checked = device ? device.allowCash === true : true;
+    $("#kioskEnabled").checked = device ? device.enabled === true : true;
+
+    if (device) {
+      $("#kioskGeneratedInfo").hidden = false;
+      $("#kioskGeneratedId").textContent = device.kioskId;
+    } else {
+      $("#kioskGeneratedInfo").hidden = true;
+      $("#kioskGeneratedId").textContent = "Se genera al guardar";
+    }
+
+    modal.hidden = false;
+    setTimeout(() => $("#kioskDisplayName")?.focus(), 30);
+  }
+
+  async function saveKioskDevice(event) {
+    event.preventDefault();
+
+    const kioskId = String($("#kioskEditorId")?.value || "").trim();
+    const displayName = String($("#kioskDisplayName")?.value || "").trim();
+    const cloverDeviceId = String($("#kioskCloverSerial")?.value || "").trim();
+    const allowCard = Boolean($("#kioskAllowCard")?.checked);
+    const allowCash = Boolean($("#kioskAllowCash")?.checked);
+    const enabled = Boolean($("#kioskEnabled")?.checked);
+
+    if (!displayName) {
+      toast("Escribe un nombre para la pantalla.", "error");
+      return;
+    }
+
+    if (!allowCard && !allowCash) {
+      toast("Selecciona al menos una forma de pago.", "error");
+      return;
+    }
+
+    if (allowCard && !cloverDeviceId) {
+      toast("Para aceptar tarjeta debes indicar el serial del Clover Flex.", "error");
+      return;
+    }
+
+    const button = $("#saveKioskButton");
+    if (button) button.disabled = true;
+
+    try {
+      const action = kioskId ? "update_kiosk_device" : "create_kiosk_device";
+      const result = await callAdminCatalog(action, {
+        kioskId,
+        displayName,
+        cloverDeviceId,
+        allowCard,
+        allowCash,
+        enabled
+      });
+
+      state.kioskDevices = Array.isArray(result.devices)
+        ? result.devices
+        : state.kioskDevices;
+
+      if (result.device?.kioskId) {
+        state.businessSettings = {
+          ...currentBusinessSettings(),
+          kiosk_id: currentBusinessSettings().kiosk_id || result.device.kioskId
+        };
+      }
+
+      renderKioskDevices();
+      closeKioskEditor();
+      toast(kioskId ? "Kiosco actualizado." : "Kiosco creado y asociado.");
+    } catch (error) {
+      console.error(error);
+      toast(`No se pudo guardar el kiosco. ${menuAdminErrorMessage(error)}`, "error");
+    } finally {
+      if (button) button.disabled = false;
+    }
+  }
+
+
+  function closeKioskPairing() {
+    const modal = $("#kioskPairingModal");
+    if (modal) modal.hidden = true;
+    if ($("#kioskPairingCode")) $("#kioskPairingCode").textContent = "--------";
+  }
+
+  async function issueKioskPairing(kioskId) {
+    try {
+      setBusy(true);
+
+      const result = await callAdminCatalog(
+        "issue_kiosk_pairing_code",
+        { kioskId }
+      );
+
+      const pairing = result.pairing || {};
+      $("#kioskPairingCode").textContent =
+        String(pairing.pairingCode || "--------");
+
+      $("#kioskPairingExpires").textContent =
+        "Caduca en 10 minutos. Abre el menú en esa pantalla e introduce este código.";
+
+      $("#kioskPairingModal").hidden = false;
+    } catch (error) {
+      toast(
+        `No se pudo generar el código. ${menuAdminErrorMessage(error)}`,
+        "error"
+      );
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function revokeKioskIdentity(kioskId) {
+    if (!confirm(
+      "¿Revocar la identidad de este dispositivo? La pantalla tendrá que vincularse de nuevo."
+    )) {
+      return;
+    }
+
+    try {
+      setBusy(true);
+
+      const result = await callAdminCatalog(
+        "reset_kiosk_identity",
+        { kioskId }
+      );
+
+      state.kioskDevices = Array.isArray(result.devices)
+        ? result.devices
+        : state.kioskDevices;
+
+      renderKioskDevices();
+      toast("Dispositivo revocado. Debe volver a vincularse.");
+    } catch (error) {
+      toast(
+        `No se pudo revocar. ${menuAdminErrorMessage(error)}`,
+        "error"
+      );
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function toggleKioskDevice(kioskId, enabled) {
+    try {
+      setBusy(true);
+      const result = await callAdminCatalog("set_kiosk_enabled", {
+        kioskId,
+        enabled
+      });
+
+      state.kioskDevices = Array.isArray(result.devices)
+        ? result.devices
+        : state.kioskDevices;
+
+      renderKioskDevices();
+      toast(enabled ? "Kiosco activado." : "Kiosco desactivado.");
+    } catch (error) {
+      toast(`No se pudo cambiar el estado. ${menuAdminErrorMessage(error)}`, "error");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function copyKioskUrl(kioskId) {
+    const url = kioskPublicUrl(kioskId);
+
+    try {
+      await navigator.clipboard.writeText(url);
+      toast("URL del kiosco copiada.");
+    } catch (_) {
+      window.prompt("Copia esta URL del kiosco:", url);
+    }
+  }
 
   function updateKioskSettingsUi() {
     const mode = String($("#businessCheckoutMode")?.value || "pay_before_kitchen");
@@ -721,13 +1109,29 @@ window.FOGON_MENU_ADMIN_BUILD = "98-security-checkout";
   async function saveBusinessSettings(event) {
     event.preventDefault();
     const settings = {
-      menu_title: String($("#businessMenuTitle")?.value || "").trim(),
-      menu_subtitle: String($("#businessMenuSubtitle")?.value || "").trim(),
-      footer_title: String($("#businessFooterTitle")?.value || "").trim(),
-      footer_paragraph_1: String($("#businessFooterParagraph1")?.value || "").trim(),
-      footer_paragraph_2: String($("#businessFooterParagraph2")?.value || "").trim(),
-      address: String($("#businessAddress")?.value || "").trim(),
-      maps_label: String($("#businessMapsLabel")?.value || "").trim(),
+      // Legacy Spanish keys are retained for compatibility.
+      menu_title: String($("#businessMenuTitleEs")?.value || "").trim(),
+      menu_subtitle: String($("#businessMenuSubtitleEs")?.value || "").trim(),
+      footer_title: String($("#businessFooterTitleEs")?.value || "").trim(),
+      footer_paragraph_1: String($("#businessFooterParagraph1Es")?.value || "").trim(),
+      footer_paragraph_2: String($("#businessFooterParagraph2Es")?.value || "").trim(),
+      address: String($("#businessAddressEs")?.value || "").trim(),
+      maps_label: String($("#businessMapsLabelEs")?.value || "").trim(),
+
+      menu_title_es: String($("#businessMenuTitleEs")?.value || "").trim(),
+      menu_title_en: String($("#businessMenuTitleEn")?.value || "").trim(),
+      menu_subtitle_es: String($("#businessMenuSubtitleEs")?.value || "").trim(),
+      menu_subtitle_en: String($("#businessMenuSubtitleEn")?.value || "").trim(),
+      footer_title_es: String($("#businessFooterTitleEs")?.value || "").trim(),
+      footer_title_en: String($("#businessFooterTitleEn")?.value || "").trim(),
+      footer_paragraph_1_es: String($("#businessFooterParagraph1Es")?.value || "").trim(),
+      footer_paragraph_1_en: String($("#businessFooterParagraph1En")?.value || "").trim(),
+      footer_paragraph_2_es: String($("#businessFooterParagraph2Es")?.value || "").trim(),
+      footer_paragraph_2_en: String($("#businessFooterParagraph2En")?.value || "").trim(),
+      address_es: String($("#businessAddressEs")?.value || "").trim(),
+      address_en: String($("#businessAddressEn")?.value || "").trim(),
+      maps_label_es: String($("#businessMapsLabelEs")?.value || "").trim(),
+      maps_label_en: String($("#businessMapsLabelEn")?.value || "").trim(),
       maps_url: String($("#businessMapsUrl")?.value || "").trim(),
       tax_enabled: Boolean($("#businessTaxEnabled")?.checked),
       tax_rate: Math.max(0, Math.min(20, Number($("#businessTaxRate")?.value || 10))),
@@ -1216,7 +1620,10 @@ window.FOGON_MENU_ADMIN_BUILD = "98-security-checkout";
     if (addProductButton) addProductButton.hidden = view !== "products";
     if (view === "schedule") renderWeeklySchedule();
     if (view === "availability-items") renderAvailabilityItems();
-    if (view === "business") fillBusinessSettingsForm(true);
+    if (view === "business") {
+      fillBusinessSettingsForm(true);
+      void loadKioskDevices({ quiet: true });
+    }
     if (view === "security") void loadSecurityStatus();
 
     closeMobileSidebar();
@@ -2554,6 +2961,76 @@ window.FOGON_MENU_ADMIN_BUILD = "98-security-checkout";
       renderAvailabilityItems();
     });
     $("#businessSettingsForm")?.addEventListener("submit", saveBusinessSettings);
+
+    document.addEventListener("click", (event) => {
+      const languageButton = event.target.closest("[data-business-language]");
+      if (!languageButton) return;
+
+      const language = languageButton.dataset.businessLanguage === "en" ? "en" : "es";
+
+      $$("[data-business-language]").forEach((button) => {
+        const active = button.dataset.businessLanguage === language;
+        button.classList.toggle("active", active);
+        button.setAttribute("aria-selected", active ? "true" : "false");
+      });
+
+      $$("[data-business-language-panel]").forEach((panel) => {
+        panel.hidden = panel.dataset.businessLanguagePanel !== language;
+      });
+    });
+    $("#kioskEditorForm")?.addEventListener("submit", saveKioskDevice);
+    $("#addKioskButton")?.addEventListener("click", () => openKioskEditor());
+
+    document.addEventListener("click", (event) => {
+      const closeButton = event.target.closest("[data-close-kiosk-editor]");
+      if (closeButton) {
+        closeKioskEditor();
+        return;
+      }
+
+      const editButton = event.target.closest("[data-edit-kiosk]");
+      if (editButton) {
+        const kioskId = String(editButton.dataset.editKiosk || "");
+        const device = state.kioskDevices.find(
+          (item) => item.kioskId === kioskId
+        );
+        if (device) openKioskEditor(device);
+        return;
+      }
+
+      const closePairingButton = event.target.closest("[data-close-kiosk-pairing]");
+      if (closePairingButton) {
+        closeKioskPairing();
+        return;
+      }
+
+      const pairButton = event.target.closest("[data-pair-kiosk]");
+      if (pairButton) {
+        void issueKioskPairing(String(pairButton.dataset.pairKiosk || ""));
+        return;
+      }
+
+      const resetIdentityButton = event.target.closest("[data-reset-kiosk-identity]");
+      if (resetIdentityButton) {
+        void revokeKioskIdentity(
+          String(resetIdentityButton.dataset.resetKioskIdentity || "")
+        );
+        return;
+      }
+
+      const toggleButton = event.target.closest("[data-toggle-kiosk]");
+      if (toggleButton) {
+        const kioskId = String(toggleButton.dataset.toggleKiosk || "");
+        const enabled = toggleButton.dataset.nextEnabled === "true";
+        void toggleKioskDevice(kioskId, enabled);
+        return;
+      }
+
+      const copyButton = event.target.closest("[data-copy-kiosk-url]");
+      if (copyButton) {
+        void copyKioskUrl(String(copyButton.dataset.copyKioskUrl || ""));
+      }
+    });
     $("#adminPanelPinForm")?.addEventListener("submit", submitAdminPanelPin);
     $("#menuAdminPinForm")?.addEventListener("submit", submitMenuAdminPin);
 
