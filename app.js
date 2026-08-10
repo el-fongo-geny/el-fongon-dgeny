@@ -1,4 +1,4 @@
-window.FOGON_MENU_BUILD = "102-kiosk-idempotency-mobile-categories";
+window.FOGON_MENU_BUILD = "103-menu-repair-category-bar";
 
 const state = {
   lang: localStorage.getItem("fogon_lang") || "",
