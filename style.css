@@ -2930,3 +2930,162 @@ body.cart-open .category-tabs.category-drawer-list {
     font-size: .9rem !important;
   }
 }
+
+
+/* =========================================================
+   V103.3 · RAIL DE CATEGORÍAS INTEGRADO EN EL MENÚ
+   La barra ya NO se superpone a las tarjetas.
+   ========================================================= */
+
+:root {
+  --category-rail-width: 58px;
+  --category-rail-gap: 8px;
+}
+
+@media (max-width: 900px) {
+  .menu-shell {
+    box-sizing: border-box !important;
+    padding-left:
+      calc(
+        max(10px, env(safe-area-inset-left)) +
+        var(--category-rail-width) +
+        var(--category-rail-gap)
+      ) !important;
+    padding-right: max(10px, env(safe-area-inset-right)) !important;
+  }
+
+  .category-drawer-toggle.category-drawer-handle {
+    left: max(6px, env(safe-area-inset-left)) !important;
+    width: 42px !important;
+    min-width: 42px !important;
+    max-width: 42px !important;
+
+    height: min(260px, 48dvh) !important;
+    min-height: 210px !important;
+    max-height: 260px !important;
+
+    top: 50% !important;
+    transform: translateY(-50%) !important;
+  }
+
+  body.category-drawer-open
+    .category-drawer-toggle.category-drawer-handle {
+    left: min(310px, 86vw) !important;
+  }
+
+  .menu-grid,
+  .category-section,
+  .category-products,
+  .site-header {
+    min-width: 0 !important;
+    max-width: 100% !important;
+  }
+
+  .product-card,
+  .product-trigger,
+  .product-info,
+  .product-image {
+    min-width: 0 !important;
+    max-width: 100% !important;
+  }
+
+  .product-image img {
+    max-width: 100% !important;
+  }
+}
+
+@media (max-width: 430px) {
+  :root {
+    --category-rail-width: 50px;
+    --category-rail-gap: 5px;
+  }
+
+  .menu-shell {
+    padding-left:
+      calc(
+        max(8px, env(safe-area-inset-left)) +
+        var(--category-rail-width) +
+        var(--category-rail-gap)
+      ) !important;
+    padding-right: max(8px, env(safe-area-inset-right)) !important;
+  }
+
+  .category-drawer-toggle.category-drawer-handle {
+    width: 38px !important;
+    min-width: 38px !important;
+    max-width: 38px !important;
+
+    height: min(235px, 44dvh) !important;
+    min-height: 190px !important;
+    max-height: 235px !important;
+
+    border-radius: 17px !important;
+  }
+
+  .category-drawer-arrow {
+    width: 30px !important;
+    height: 30px !important;
+    font-size: 1.75rem !important;
+  }
+
+  .product-trigger {
+    grid-template-columns:
+      clamp(104px, 34vw, 136px)
+      minmax(0, 1fr) !important;
+  }
+}
+
+@media (max-width: 359px) {
+  :root {
+    --category-rail-width: 44px;
+    --category-rail-gap: 4px;
+  }
+
+  .category-drawer-toggle.category-drawer-handle {
+    width: 34px !important;
+    min-width: 34px !important;
+    max-width: 34px !important;
+  }
+
+  .product-trigger {
+    grid-template-columns:
+      clamp(92px, 32vw, 116px)
+      minmax(0, 1fr) !important;
+  }
+
+  .product-info {
+    padding-left: 10px !important;
+    padding-right: 10px !important;
+  }
+}
+
+@media (min-width: 701px) and (max-width: 900px) {
+  :root {
+    --category-rail-width: 62px;
+    --category-rail-gap: 10px;
+  }
+
+  .category-drawer-toggle.category-drawer-handle {
+    width: 46px !important;
+    min-width: 46px !important;
+    max-width: 46px !important;
+    height: min(300px, 50dvh) !important;
+    min-height: 230px !important;
+    max-height: 300px !important;
+  }
+}
+
+@media (min-width: 901px) {
+  .category-drawer-toggle.category-drawer-handle {
+    left:
+      max(
+        8px,
+        calc((100vw - min(1180px, 100vw)) / 2 - 58px)
+      ) !important;
+  }
+
+  body.category-drawer-open
+    .category-drawer-toggle.category-drawer-handle {
+    left: min(330px, 88vw) !important;
+  }
+}
