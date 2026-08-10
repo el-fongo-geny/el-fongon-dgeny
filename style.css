@@ -2349,3 +2349,309 @@ body.category-drawer-open .category-drawer {
     top: calc(max(10px, env(safe-area-inset-top)) + 66px);
   }
 }
+
+
+/* =========================================================
+   V103 · REPARACIÓN MODIFICADORES + BARRA HORIZONTAL CATEGORÍAS
+   ========================================================= */
+
+/* Product customization: restore intentional layout on mobile/desktop. */
+.product-detail-sheet {
+  width: min(760px, 100%);
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
+.modifier-groups {
+  display: grid;
+  gap: 14px;
+  min-width: 0;
+}
+
+.modifier-group {
+  min-width: 0;
+  margin: 0;
+  padding: 15px;
+  border: 1px solid color-mix(in srgb, var(--line) 86%, var(--accent) 14%);
+  border-radius: 18px;
+  background: color-mix(in srgb, var(--surface) 97%, var(--accent) 3%);
+}
+
+.modifier-group legend {
+  max-width: calc(100% - 16px);
+  padding: 0 8px;
+  color: var(--ink);
+}
+
+.modifier-title {
+  font-weight: 950;
+  line-height: 1.2;
+}
+
+.modifier-badge {
+  display: inline-flex;
+  margin-left: 7px;
+  padding: 3px 7px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--line) 70%, transparent);
+  color: var(--muted);
+  font-size: .72rem;
+  font-weight: 850;
+}
+
+.modifier-badge.is-required {
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+  color: var(--accent);
+}
+
+.modifier-help {
+  margin: 2px 0 12px;
+  color: var(--muted);
+  font-size: .9rem;
+  line-height: 1.35;
+}
+
+.modifier-options {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
+.modifier-option {
+  position: relative;
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr);
+  align-items: center;
+  gap: 11px;
+  width: 100%;
+  min-width: 0;
+  min-height: 54px;
+  margin: 0;
+  padding: 10px 12px;
+  border: 1px solid color-mix(in srgb, var(--line) 88%, transparent);
+  border-radius: 13px;
+  background: var(--surface);
+  cursor: pointer;
+}
+
+.modifier-option:hover {
+  border-color: color-mix(in srgb, var(--accent) 46%, var(--line));
+}
+
+.modifier-option input {
+  position: absolute !important;
+  width: 1px !important;
+  height: 1px !important;
+  opacity: 0 !important;
+  pointer-events: none;
+}
+
+.modifier-control {
+  position: relative;
+  width: 24px;
+  height: 24px;
+  border: 2px solid color-mix(in srgb, var(--muted) 72%, var(--line));
+  border-radius: 7px;
+  background: var(--surface);
+  box-sizing: border-box;
+}
+
+.modifier-option input[type="radio"] + .modifier-control {
+  border-radius: 999px;
+}
+
+.modifier-option input:checked + .modifier-control {
+  border-color: var(--accent);
+  background: var(--accent);
+  box-shadow: inset 0 0 0 5px var(--surface);
+}
+
+.modifier-option input[type="checkbox"]:checked + .modifier-control {
+  box-shadow: none;
+}
+
+.modifier-option input[type="checkbox"]:checked + .modifier-control::after {
+  content: "✓";
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  color: white;
+  font-size: .9rem;
+  font-weight: 950;
+}
+
+.modifier-option-copy {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  min-width: 0;
+}
+
+.modifier-option-copy strong {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  color: var(--ink);
+  font-size: 1rem;
+  line-height: 1.25;
+}
+
+.modifier-option-copy small {
+  flex: 0 0 auto;
+  color: var(--muted);
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+/* Left-side HORIZONTAL taskbar. Closed = small tab; open = horizontal strip. */
+.category-drawer-toggle {
+  left: 0 !important;
+  top: 44% !important;
+  transform: translateY(-50%);
+  min-height: 48px !important;
+  border-left: 0 !important;
+  border-radius: 0 14px 14px 0 !important;
+  padding: 0 12px !important;
+  z-index: 35 !important;
+}
+
+.category-drawer-backdrop {
+  display: none !important;
+}
+
+.category-drawer {
+  inset: auto auto auto 0 !important;
+  top: 44% !important;
+  width: min(920px, calc(100vw - 14px)) !important;
+  max-width: calc(100vw - 14px) !important;
+  height: auto !important;
+  max-height: none !important;
+  padding: 10px 10px 10px 12px !important;
+  overflow: hidden !important;
+  display: grid !important;
+  grid-template-columns: auto minmax(0, 1fr) !important;
+  align-items: center !important;
+  gap: 10px !important;
+  border: 1px solid var(--line) !important;
+  border-left: 0 !important;
+  border-radius: 0 18px 18px 0 !important;
+  transform: translate(-102%, -50%) !important;
+  transition: transform .22s ease !important;
+  box-shadow: 14px 12px 38px rgba(0,0,0,.18) !important;
+}
+
+body.category-drawer-open .category-drawer {
+  transform: translate(0, -50%) !important;
+}
+
+body.category-drawer-open .category-drawer-toggle {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.category-drawer-head {
+  display: flex !important;
+  align-items: center !important;
+  gap: 9px !important;
+  margin: 0 !important;
+  padding-right: 8px;
+  border-right: 1px solid var(--line);
+  white-space: nowrap;
+}
+
+.category-drawer-head strong {
+  font-size: .9rem;
+  font-weight: 950;
+}
+
+.category-tabs.category-drawer-list {
+  display: flex !important;
+  flex-flow: row nowrap !important;
+  align-items: stretch !important;
+  gap: 8px !important;
+  overflow-x: auto !important;
+  overflow-y: hidden !important;
+  overscroll-behavior-x: contain;
+  scrollbar-width: thin;
+  padding: 1px 2px 4px !important;
+}
+
+.category-tabs.category-drawer-list .category-drawer-item {
+  flex: 0 0 auto !important;
+  display: grid !important;
+  grid-template-columns: 48px auto !important;
+  align-items: center !important;
+  gap: 8px !important;
+  width: auto !important;
+  min-width: 150px !important;
+  min-height: 58px !important;
+  padding: 5px 9px 5px 5px !important;
+  border-radius: 12px !important;
+  white-space: nowrap !important;
+}
+
+.category-drawer-image {
+  width: 48px !important;
+  height: 48px !important;
+  border-radius: 9px !important;
+}
+
+.category-drawer-label {
+  max-width: 150px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: .88rem !important;
+}
+
+@media (max-width: 620px) {
+  .product-detail-sheet {
+    width: 100%;
+  }
+
+  .modifier-group {
+    padding: 12px;
+    border-radius: 15px;
+  }
+
+  .modifier-option {
+    grid-template-columns: 26px minmax(0, 1fr);
+    min-height: 52px;
+    padding: 9px 10px;
+  }
+
+  .modifier-option-copy {
+    display: grid;
+    justify-content: stretch;
+    gap: 2px;
+  }
+
+  .modifier-option-copy small {
+    white-space: normal;
+  }
+
+  .category-drawer,
+  .category-drawer-toggle {
+    top: 42% !important;
+  }
+
+  .category-drawer {
+    width: calc(100vw - 8px) !important;
+    max-width: calc(100vw - 8px) !important;
+    grid-template-columns: 42px minmax(0, 1fr) !important;
+    padding: 8px 8px 8px 6px !important;
+  }
+
+  .category-drawer-head strong {
+    display: none;
+  }
+
+  .category-drawer-head {
+    padding-right: 4px;
+  }
+
+  .category-tabs.category-drawer-list .category-drawer-item {
+    min-width: 138px !important;
+  }
+}
