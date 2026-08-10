@@ -2658,181 +2658,142 @@ body.category-drawer-open .category-drawer-toggle {
 
 
 /* =========================================================
-   V103.1 · CATEGORÍAS
-   - Barra lateral redondeada SIN texto "Categorías"
-   - Panel horizontal
-   - Categorías en DOS FILAS horizontales
-   - Cada item es VERTICAL: imagen arriba + nombre abajo
+   V103.2 · CATEGORÍAS
+   Recupera la estructura visual V102:
+   - panel vertical
+   - categorías agrupadas una debajo de otra
+   - imagen izquierda + nombre derecha
+   Solo cambia el control lateral:
+   - barra ~3x más larga
+   - estrecha, redondeada
+   - solo flecha
    ========================================================= */
 
-/* El backdrop no bloquea el menú; el panel abre/cierra desde su barra o la X. */
 .category-drawer-backdrop {
+  display: block !important;
+  position: fixed !important;
+  inset: 0 !important;
+  z-index: 31 !important;
+  background: rgba(10,10,10,.36) !important;
+  backdrop-filter: blur(2px) !important;
+}
+
+.category-drawer-backdrop[hidden] {
   display: none !important;
 }
 
-/* Barra de tareas lateral: pequeña, redondeada y fija. */
-.category-drawer-toggle.category-taskbar {
-  position: fixed !important;
-  left: max(8px, env(safe-area-inset-left)) !important;
-  top: 43% !important;
-  transform: translateY(-50%) !important;
-  z-index: 40 !important;
-
-  width: 48px !important;
-  min-width: 48px !important;
-  height: 104px !important;
-  min-height: 104px !important;
-
-  display: flex !important;
-  flex-direction: column !important;
-  align-items: center !important;
-  justify-content: center !important;
-  gap: 12px !important;
-
-  padding: 0 !important;
-  border: 1px solid var(--line) !important;
-  border-radius: 16px !important;
-  background: color-mix(in srgb, var(--surface) 96%, var(--accent) 4%) !important;
-  color: var(--ink) !important;
-  box-shadow: 0 12px 34px rgba(0,0,0,.18) !important;
-  font-weight: 950 !important;
-}
-
-.category-taskbar-icon {
-  display: grid;
-  place-items: center;
-  width: 28px;
-  height: 28px;
-  font-size: 1.15rem;
-  line-height: 1;
-}
-
-.category-taskbar-arrow {
-  display: grid;
-  place-items: center;
-  width: 27px;
-  height: 27px;
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--ink) 8%, transparent);
-  font-size: 1.4rem;
-  line-height: 1;
-  transition: transform .2s ease;
-}
-
-body.category-drawer-open .category-taskbar-arrow {
-  transform: rotate(180deg);
-}
-
-/* La barra no desaparece cuando el panel está abierto: sirve también para cerrar. */
-body.category-drawer-open .category-drawer-toggle.category-taskbar {
-  opacity: 1 !important;
-  pointer-events: auto !important;
-}
-
-/* Panel horizontal que sale desde la izquierda. */
+/* Drawer igual a V102 */
 .category-drawer {
   position: fixed !important;
-  left: max(64px, calc(env(safe-area-inset-left) + 64px)) !important;
+  inset: 0 auto 0 0 !important;
+  top: 0 !important;
+  left: 0 !important;
   right: auto !important;
-  top: 43% !important;
-  bottom: auto !important;
+  bottom: 0 !important;
 
-  width: min(820px, calc(100vw - 88px)) !important;
-  max-width: calc(100vw - 88px) !important;
-  height: auto !important;
-  max-height: 292px !important;
+  z-index: 32 !important;
+  width: min(330px, 88vw) !important;
+  max-width: min(330px, 88vw) !important;
+  height: 100dvh !important;
+  max-height: 100dvh !important;
 
-  display: grid !important;
-  grid-template-rows: auto minmax(0, 1fr) !important;
-  gap: 8px !important;
+  display: block !important;
+  padding:
+    max(18px, env(safe-area-inset-top))
+    14px
+    max(18px, env(safe-area-inset-bottom)) !important;
 
-  padding: 10px 12px 12px !important;
-  overflow: hidden !important;
+  overflow-x: hidden !important;
+  overflow-y: auto !important;
 
-  border: 1px solid var(--line) !important;
-  border-radius: 20px !important;
-  background: color-mix(in srgb, var(--surface) 98%, var(--bg) 2%) !important;
-  box-shadow: 18px 16px 44px rgba(0,0,0,.22) !important;
-
-  transform: translate(-115%, -50%) !important;
+  transform: translateX(-104%) !important;
   transition: transform .22s ease !important;
-  z-index: 39 !important;
+
+  background: color-mix(in srgb, var(--surface) 97%, var(--bg) 3%) !important;
+  border: 0 !important;
+  border-right: 1px solid var(--line) !important;
+  border-radius: 0 !important;
+  box-shadow: 16px 0 44px rgba(0,0,0,.18) !important;
 }
 
 body.category-drawer-open .category-drawer {
-  transform: translate(0, -50%) !important;
+  transform: translateX(0) !important;
 }
 
-/* Cabecera pequeña; no es el control principal. */
 .category-drawer-head {
   display: flex !important;
-  align-items: center !important;
+  align-items: flex-start !important;
   justify-content: space-between !important;
-  gap: 10px !important;
-  margin: 0 !important;
-  min-height: 34px !important;
-  padding: 0 2px 2px 4px !important;
+  gap: 12px !important;
+  margin: 0 0 14px !important;
+  padding: 0 !important;
   border: 0 !important;
+  white-space: normal !important;
 }
 
-.category-drawer-head strong {
-  font-size: .86rem !important;
-  font-weight: 950 !important;
-  letter-spacing: .02em;
+.category-drawer-head h2 {
+  display: block !important;
+  margin: 2px 0 0 !important;
+  font-size: 1.5rem !important;
 }
 
-/* DOS FILAS horizontales. El scroll, si hace falta, es horizontal. */
+.category-drawer-head .eyebrow {
+  display: block !important;
+}
+
+/* Categorías agrupadas VERTICALMENTE como V102 */
 .category-tabs.category-drawer-list {
   position: static !important;
+
   display: grid !important;
-  grid-template-rows: repeat(2, 104px) !important;
-  grid-auto-flow: column !important;
-  grid-auto-columns: 118px !important;
+  grid-template-columns: 1fr !important;
+  grid-auto-flow: row !important;
+  grid-template-rows: none !important;
+  grid-auto-rows: auto !important;
 
-  align-items: stretch !important;
-  align-content: start !important;
-  gap: 8px !important;
-
+  gap: 9px !important;
   width: 100% !important;
-  margin: 0 !important;
-  padding: 2px 2px 7px !important;
 
-  overflow-x: auto !important;
-  overflow-y: hidden !important;
-  overscroll-behavior-x: contain;
-  scroll-snap-type: x proximity;
-  scrollbar-width: thin;
+  overflow: visible !important;
+  margin: 0 !important;
+  padding: 0 !important;
 
   background: transparent !important;
   backdrop-filter: none !important;
+  transform: none !important;
+  opacity: 1 !important;
+  pointer-events: auto !important;
+  scroll-snap-type: none !important;
 }
 
-/* Cada categoría es VERTICAL: imagen arriba, texto abajo. */
 .category-tabs.category-drawer-list .category-drawer-item {
   display: grid !important;
-  grid-template-columns: 1fr !important;
-  grid-template-rows: 66px minmax(0, 1fr) !important;
-  align-items: stretch !important;
+  grid-template-columns: 64px minmax(0, 1fr) !important;
+  grid-template-rows: 1fr !important;
+  align-items: center !important;
   justify-items: stretch !important;
-  gap: 5px !important;
+  gap: 11px !important;
 
-  width: 118px !important;
-  min-width: 118px !important;
-  height: 104px !important;
-  min-height: 104px !important;
+  width: 100% !important;
+  min-width: 0 !important;
+  height: auto !important;
+  min-height: 72px !important;
 
-  padding: 5px !important;
+  padding: 7px !important;
   border-radius: 14px !important;
-  text-align: center !important;
+
+  text-align: left !important;
   white-space: normal !important;
-  scroll-snap-align: start;
+  scroll-snap-align: none !important;
 }
 
 .category-drawer-image {
-  width: 100% !important;
-  height: 66px !important;
-  border-radius: 10px !important;
+  width: 64px !important;
+  height: 58px !important;
+  display: grid !important;
+  place-items: center !important;
   overflow: hidden !important;
+  border-radius: 11px !important;
 }
 
 .category-drawer-image img {
@@ -2842,22 +2803,87 @@ body.category-drawer-open .category-drawer {
 }
 
 .category-drawer-label {
-  display: -webkit-box !important;
+  display: block !important;
   min-width: 0 !important;
   max-width: none !important;
-  overflow: hidden !important;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  text-overflow: ellipsis !important;
-  white-space: normal !important;
+  overflow: visible !important;
 
-  font-size: .78rem !important;
-  line-height: 1.12 !important;
+  font-size: .95rem !important;
+  line-height: 1.22 !important;
   font-weight: 900 !important;
-  text-align: center !important;
+
+  text-align: left !important;
+  text-overflow: clip !important;
+  white-space: normal !important;
+  -webkit-line-clamp: unset !important;
 }
 
-/* Evita que reglas antiguas de scroll oculten esta navegación. */
+/* BARRA LATERAL: aprox. 3 veces más alta que la anterior */
+.category-drawer-toggle.category-drawer-handle {
+  position: fixed !important;
+  left: max(8px, env(safe-area-inset-left)) !important;
+  top: 50% !important;
+  transform: translateY(-50%) !important;
+  z-index: 34 !important;
+
+  width: 46px !important;
+  min-width: 46px !important;
+  max-width: 46px !important;
+
+  height: 300px !important;
+  min-height: 300px !important;
+  max-height: 300px !important;
+
+  display: grid !important;
+  place-items: center !important;
+
+  padding: 0 !important;
+  border: 1px solid var(--line) !important;
+  border-radius: 20px !important;
+
+  background: color-mix(in srgb, var(--surface) 96%, var(--accent) 4%) !important;
+  color: var(--ink) !important;
+
+  box-shadow: 0 14px 38px rgba(0,0,0,.18) !important;
+  opacity: 1 !important;
+  pointer-events: auto !important;
+
+  transition:
+    left .22s ease,
+    background .18s ease,
+    transform .22s ease !important;
+}
+
+/* Cuando abre, el handle queda pegado al borde derecho del drawer.
+   Así la misma barra sirve para cerrar. */
+body.category-drawer-open .category-drawer-toggle.category-drawer-handle {
+  left: min(330px, 88vw) !important;
+  opacity: 1 !important;
+  pointer-events: auto !important;
+}
+
+.category-drawer-arrow {
+  display: grid !important;
+  place-items: center !important;
+
+  width: 34px !important;
+  height: 34px !important;
+
+  border-radius: 999px !important;
+  background: color-mix(in srgb, var(--ink) 8%, transparent) !important;
+
+  font-size: 2rem !important;
+  line-height: 1 !important;
+  font-weight: 700 !important;
+
+  transition: transform .22s ease !important;
+}
+
+body.category-drawer-open .category-drawer-arrow {
+  transform: rotate(180deg) !important;
+}
+
+/* El comportamiento de ocultación del viejo nav horizontal no afecta al drawer. */
 body.is-scrolling-down .category-tabs.category-drawer-list,
 body.is-scrolling-up .category-tabs.category-drawer-list,
 body.cart-open .category-tabs.category-drawer-list {
@@ -2866,47 +2892,41 @@ body.cart-open .category-tabs.category-drawer-list {
   pointer-events: auto !important;
 }
 
-/* Ajuste para móviles: conserva las 2 filas y el item vertical. */
 @media (max-width: 700px) {
-  .category-drawer-toggle.category-taskbar {
-    left: max(6px, env(safe-area-inset-left)) !important;
-    top: 44% !important;
-    width: 44px !important;
-    min-width: 44px !important;
-    height: 92px !important;
-    min-height: 92px !important;
-    border-radius: 14px !important;
-  }
-
   .category-drawer {
-    left: max(56px, calc(env(safe-area-inset-left) + 56px)) !important;
-    top: 44% !important;
-    width: calc(100vw - 64px) !important;
-    max-width: calc(100vw - 64px) !important;
-    max-height: 264px !important;
-    border-radius: 17px !important;
-    padding: 8px 8px 10px !important;
+    width: min(310px, 86vw) !important;
+    max-width: min(310px, 86vw) !important;
   }
 
-  .category-tabs.category-drawer-list {
-    grid-template-rows: repeat(2, 94px) !important;
-    grid-auto-columns: 102px !important;
-    gap: 7px !important;
+  .category-drawer-toggle.category-drawer-handle {
+    left: max(6px, env(safe-area-inset-left)) !important;
+    width: 42px !important;
+    min-width: 42px !important;
+    max-width: 42px !important;
+
+    height: 260px !important;
+    min-height: 260px !important;
+    max-height: 260px !important;
+
+    border-radius: 18px !important;
+  }
+
+  body.category-drawer-open .category-drawer-toggle.category-drawer-handle {
+    left: min(310px, 86vw) !important;
   }
 
   .category-tabs.category-drawer-list .category-drawer-item {
-    width: 102px !important;
-    min-width: 102px !important;
-    height: 94px !important;
-    min-height: 94px !important;
-    grid-template-rows: 58px minmax(0, 1fr) !important;
+    grid-template-columns: 58px minmax(0, 1fr) !important;
+    min-height: 68px !important;
+    gap: 10px !important;
   }
 
   .category-drawer-image {
-    height: 58px !important;
+    width: 58px !important;
+    height: 54px !important;
   }
 
   .category-drawer-label {
-    font-size: .72rem !important;
+    font-size: .9rem !important;
   }
 }
