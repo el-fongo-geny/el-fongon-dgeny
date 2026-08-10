@@ -1565,3 +1565,21 @@ body.image-crop-open { overflow: hidden; }
     grid-template-columns: 1fr;
   }
 }
+
+
+/* V102 · eliminar kiosco */
+.kiosk-editor-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.kiosk-editor-action-spacer { flex: 1 1 auto; }
+.kiosk-delete-button {
+  border-color: #e2aaa4 !important;
+  color: #a52f26 !important;
+  background: #fff7f6 !important;
+}
+@media (max-width: 700px) {
+  .kiosk-editor-actions { display: grid; grid-template-columns: 1fr; }
+  .kiosk-editor-action-spacer { display: none; }
+}
