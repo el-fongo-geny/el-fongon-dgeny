@@ -2655,3 +2655,258 @@ body.category-drawer-open .category-drawer-toggle {
     min-width: 138px !important;
   }
 }
+
+
+/* =========================================================
+   V103.1 · CATEGORÍAS
+   - Barra lateral redondeada SIN texto "Categorías"
+   - Panel horizontal
+   - Categorías en DOS FILAS horizontales
+   - Cada item es VERTICAL: imagen arriba + nombre abajo
+   ========================================================= */
+
+/* El backdrop no bloquea el menú; el panel abre/cierra desde su barra o la X. */
+.category-drawer-backdrop {
+  display: none !important;
+}
+
+/* Barra de tareas lateral: pequeña, redondeada y fija. */
+.category-drawer-toggle.category-taskbar {
+  position: fixed !important;
+  left: max(8px, env(safe-area-inset-left)) !important;
+  top: 43% !important;
+  transform: translateY(-50%) !important;
+  z-index: 40 !important;
+
+  width: 48px !important;
+  min-width: 48px !important;
+  height: 104px !important;
+  min-height: 104px !important;
+
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 12px !important;
+
+  padding: 0 !important;
+  border: 1px solid var(--line) !important;
+  border-radius: 16px !important;
+  background: color-mix(in srgb, var(--surface) 96%, var(--accent) 4%) !important;
+  color: var(--ink) !important;
+  box-shadow: 0 12px 34px rgba(0,0,0,.18) !important;
+  font-weight: 950 !important;
+}
+
+.category-taskbar-icon {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  font-size: 1.15rem;
+  line-height: 1;
+}
+
+.category-taskbar-arrow {
+  display: grid;
+  place-items: center;
+  width: 27px;
+  height: 27px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--ink) 8%, transparent);
+  font-size: 1.4rem;
+  line-height: 1;
+  transition: transform .2s ease;
+}
+
+body.category-drawer-open .category-taskbar-arrow {
+  transform: rotate(180deg);
+}
+
+/* La barra no desaparece cuando el panel está abierto: sirve también para cerrar. */
+body.category-drawer-open .category-drawer-toggle.category-taskbar {
+  opacity: 1 !important;
+  pointer-events: auto !important;
+}
+
+/* Panel horizontal que sale desde la izquierda. */
+.category-drawer {
+  position: fixed !important;
+  left: max(64px, calc(env(safe-area-inset-left) + 64px)) !important;
+  right: auto !important;
+  top: 43% !important;
+  bottom: auto !important;
+
+  width: min(820px, calc(100vw - 88px)) !important;
+  max-width: calc(100vw - 88px) !important;
+  height: auto !important;
+  max-height: 292px !important;
+
+  display: grid !important;
+  grid-template-rows: auto minmax(0, 1fr) !important;
+  gap: 8px !important;
+
+  padding: 10px 12px 12px !important;
+  overflow: hidden !important;
+
+  border: 1px solid var(--line) !important;
+  border-radius: 20px !important;
+  background: color-mix(in srgb, var(--surface) 98%, var(--bg) 2%) !important;
+  box-shadow: 18px 16px 44px rgba(0,0,0,.22) !important;
+
+  transform: translate(-115%, -50%) !important;
+  transition: transform .22s ease !important;
+  z-index: 39 !important;
+}
+
+body.category-drawer-open .category-drawer {
+  transform: translate(0, -50%) !important;
+}
+
+/* Cabecera pequeña; no es el control principal. */
+.category-drawer-head {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: 10px !important;
+  margin: 0 !important;
+  min-height: 34px !important;
+  padding: 0 2px 2px 4px !important;
+  border: 0 !important;
+}
+
+.category-drawer-head strong {
+  font-size: .86rem !important;
+  font-weight: 950 !important;
+  letter-spacing: .02em;
+}
+
+/* DOS FILAS horizontales. El scroll, si hace falta, es horizontal. */
+.category-tabs.category-drawer-list {
+  position: static !important;
+  display: grid !important;
+  grid-template-rows: repeat(2, 104px) !important;
+  grid-auto-flow: column !important;
+  grid-auto-columns: 118px !important;
+
+  align-items: stretch !important;
+  align-content: start !important;
+  gap: 8px !important;
+
+  width: 100% !important;
+  margin: 0 !important;
+  padding: 2px 2px 7px !important;
+
+  overflow-x: auto !important;
+  overflow-y: hidden !important;
+  overscroll-behavior-x: contain;
+  scroll-snap-type: x proximity;
+  scrollbar-width: thin;
+
+  background: transparent !important;
+  backdrop-filter: none !important;
+}
+
+/* Cada categoría es VERTICAL: imagen arriba, texto abajo. */
+.category-tabs.category-drawer-list .category-drawer-item {
+  display: grid !important;
+  grid-template-columns: 1fr !important;
+  grid-template-rows: 66px minmax(0, 1fr) !important;
+  align-items: stretch !important;
+  justify-items: stretch !important;
+  gap: 5px !important;
+
+  width: 118px !important;
+  min-width: 118px !important;
+  height: 104px !important;
+  min-height: 104px !important;
+
+  padding: 5px !important;
+  border-radius: 14px !important;
+  text-align: center !important;
+  white-space: normal !important;
+  scroll-snap-align: start;
+}
+
+.category-drawer-image {
+  width: 100% !important;
+  height: 66px !important;
+  border-radius: 10px !important;
+  overflow: hidden !important;
+}
+
+.category-drawer-image img {
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: cover !important;
+}
+
+.category-drawer-label {
+  display: -webkit-box !important;
+  min-width: 0 !important;
+  max-width: none !important;
+  overflow: hidden !important;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  text-overflow: ellipsis !important;
+  white-space: normal !important;
+
+  font-size: .78rem !important;
+  line-height: 1.12 !important;
+  font-weight: 900 !important;
+  text-align: center !important;
+}
+
+/* Evita que reglas antiguas de scroll oculten esta navegación. */
+body.is-scrolling-down .category-tabs.category-drawer-list,
+body.is-scrolling-up .category-tabs.category-drawer-list,
+body.cart-open .category-tabs.category-drawer-list {
+  transform: none !important;
+  opacity: 1 !important;
+  pointer-events: auto !important;
+}
+
+/* Ajuste para móviles: conserva las 2 filas y el item vertical. */
+@media (max-width: 700px) {
+  .category-drawer-toggle.category-taskbar {
+    left: max(6px, env(safe-area-inset-left)) !important;
+    top: 44% !important;
+    width: 44px !important;
+    min-width: 44px !important;
+    height: 92px !important;
+    min-height: 92px !important;
+    border-radius: 14px !important;
+  }
+
+  .category-drawer {
+    left: max(56px, calc(env(safe-area-inset-left) + 56px)) !important;
+    top: 44% !important;
+    width: calc(100vw - 64px) !important;
+    max-width: calc(100vw - 64px) !important;
+    max-height: 264px !important;
+    border-radius: 17px !important;
+    padding: 8px 8px 10px !important;
+  }
+
+  .category-tabs.category-drawer-list {
+    grid-template-rows: repeat(2, 94px) !important;
+    grid-auto-columns: 102px !important;
+    gap: 7px !important;
+  }
+
+  .category-tabs.category-drawer-list .category-drawer-item {
+    width: 102px !important;
+    min-width: 102px !important;
+    height: 94px !important;
+    min-height: 94px !important;
+    grid-template-rows: 58px minmax(0, 1fr) !important;
+  }
+
+  .category-drawer-image {
+    height: 58px !important;
+  }
+
+  .category-drawer-label {
+    font-size: .72rem !important;
+  }
+}
