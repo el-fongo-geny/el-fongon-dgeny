@@ -1,4 +1,4 @@
-window.FOGON_MENU_BUILD = "101-secure-kiosk-orders";
+window.FOGON_MENU_BUILD = "102-kiosk-idempotency-mobile-categories";
 
 const state = {
   lang: localStorage.getItem("fogon_lang") || "",
@@ -831,7 +831,12 @@ function setLanguage(lang) {
   document.documentElement.lang = lang;
   applyText();
   renderCategories();
+  restoreCategoryDrawerState();
   renderMenu();
+
+  setInterval(() => {
+    renderCategories();
+  }, 60000);
   renderCart();
   syncAvailabilityFromBackend();
 }
@@ -875,13 +880,74 @@ function toggleTheme() {
   applyTheme();
 }
 
+const CATEGORY_DRAWER_STORAGE_KEY = "fogon_category_drawer_open";
+
+function categoryImageForHour(categoryId) {
+  const products = MENU_ITEMS.filter(
+    (item) =>
+      item.category === categoryId &&
+      item.visible !== false &&
+      String(item.image || "").trim()
+  );
+
+  if (!products.length) return "";
+
+  const hourBucket = Math.floor(Date.now() / 3600000);
+  let hash = 0;
+  const seed = `${categoryId}:${hourBucket}`;
+  for (let index = 0; index < seed.length; index += 1) {
+    hash = ((hash << 5) - hash + seed.charCodeAt(index)) | 0;
+  }
+
+  return products[Math.abs(hash) % products.length]?.image || "";
+}
+
 function renderCategories() {
   const tabs = $("#categoryTabs");
-  tabs.innerHTML = CATEGORIES.map((category) => `
-    <button class="${category.id === state.category ? "active" : ""}" data-category="${category.id}">
-      ${category[state.lang] || category.es}
-    </button>
-  `).join("");
+  if (!tabs) return;
+
+  tabs.innerHTML = CATEGORIES.map((category) => {
+    const image = categoryImageForHour(category.id);
+    return `
+      <button class="category-drawer-item ${category.id === state.category ? "active" : ""}" data-category="${escapeAttribute(category.id)}" type="button">
+        <span class="category-drawer-image ${image ? "has-image" : ""}">
+          ${image ? `<img src="${escapeAttribute(image)}" alt="" loading="lazy" decoding="async">` : `<span>FG</span>`}
+        </span>
+        <span class="category-drawer-label">${escapeHtml(category[state.lang] || category.es)}</span>
+      </button>
+    `;
+  }).join("");
+}
+
+function openCategoryDrawer({ persist = true } = {}) {
+  document.body.classList.add("category-drawer-open");
+  $("#categoryDrawer")?.setAttribute("aria-hidden", "false");
+  if ($("#categoryDrawerBackdrop")) $("#categoryDrawerBackdrop").hidden = false;
+  if (persist) localStorage.setItem(CATEGORY_DRAWER_STORAGE_KEY, "1");
+}
+
+function closeCategoryDrawer({ persist = true } = {}) {
+  document.body.classList.remove("category-drawer-open");
+  $("#categoryDrawer")?.setAttribute("aria-hidden", "true");
+  if ($("#categoryDrawerBackdrop")) $("#categoryDrawerBackdrop").hidden = true;
+  if (persist) localStorage.setItem(CATEGORY_DRAWER_STORAGE_KEY, "0");
+}
+
+function toggleCategoryDrawer() {
+  if (document.body.classList.contains("category-drawer-open")) {
+    closeCategoryDrawer();
+  } else {
+    openCategoryDrawer();
+  }
+}
+
+function restoreCategoryDrawerState() {
+  const saved = localStorage.getItem(CATEGORY_DRAWER_STORAGE_KEY);
+  if (saved === "1" && window.innerWidth > 700) {
+    openCategoryDrawer({ persist: false });
+  } else {
+    closeCategoryDrawer({ persist: false });
+  }
 }
 
 
@@ -1013,6 +1079,7 @@ function scrollToCategory(categoryId) {
   renderCategories();
   const section = document.getElementById(`cat-${categoryId}`);
   if (section) section.scrollIntoView({ behavior: "smooth", block: "start" });
+  if (window.innerWidth <= 900) closeCategoryDrawer();
 }
 
 function optionLabel(option) {
@@ -1559,23 +1626,21 @@ async function countActiveOrders() {
 
 
 
-function currentKioskId() {
+function explicitKioskId() {
   const params = new URLSearchParams(window.location.search);
-  const fromUrl = String(params.get("kiosk") || "").trim();
+  return String(params.get("kiosk") || "").trim();
+}
 
-  if (fromUrl) {
-    try {
-      localStorage.setItem("fogon_kiosk_id", fromUrl);
-    } catch (_) {}
-    return fromUrl;
-  }
+function hasExplicitKioskUrl() {
+  return Boolean(explicitKioskId());
+}
 
-  try {
-    const stored = String(localStorage.getItem("fogon_kiosk_id") || "").trim();
-    if (stored) return stored;
-  } catch (_) {}
-
-  return String(publicBusinessSettings.kiosk_id || "kiosk-01").trim() || "kiosk-01";
+function currentKioskId() {
+  return (
+    explicitKioskId() ||
+    publicBusinessSettings.kiosk_id ||
+    "kiosk-01"
+  ).trim();
 }
 
 function buildExternalPaymentId(order) {
@@ -1630,9 +1695,12 @@ function setKioskPaymentVisual(status, message = "") {
 }
 
 function isKioskCheckoutMode() {
-  return String(publicBusinessSettings.checkout_mode || "pay_at_counter")
-    .trim()
-    .toLowerCase() === "pay_before_kitchen";
+  return (
+    hasExplicitKioskUrl() &&
+    String(publicBusinessSettings.checkout_mode || "pay_at_counter")
+      .trim()
+      .toLowerCase() === "pay_before_kitchen"
+  );
 }
 
 function kioskPaymentFunctionName() {
@@ -1744,13 +1812,67 @@ async function callKioskSessionService(action, payload = {}) {
   return result;
 }
 
-async function ensureKioskSession() {
+let kioskPairingResolver = null;
+
+function setKioskActivationMessage(message = "", isError = false) {
+  const node = $("#kioskActivationMessage");
+  if (!node) return;
+  node.textContent = message;
+  node.classList.toggle("is-error", Boolean(isError));
+}
+
+function closeKioskActivationModal() {
+  const modal = $("#kioskActivationModal");
+  if (modal) {
+    modal.hidden = true;
+    modal.setAttribute("aria-hidden", "true");
+  }
+  const input = $("#kioskActivationCode");
+  if (input) input.value = "";
+  setKioskActivationMessage("");
+}
+
+function requestKioskPairingCode() {
+  if (!hasExplicitKioskUrl()) {
+    return Promise.reject(new Error("Esta página no es una URL de kiosco."));
+  }
+
+  const modal = $("#kioskActivationModal");
+  const input = $("#kioskActivationCode");
+  const idNode = $("#kioskActivationId");
+  if (!modal || !input) {
+    return Promise.reject(new Error("No se pudo abrir la vinculación del kiosco."));
+  }
+
+  if (idNode) idNode.textContent = currentKioskId();
+  modal.hidden = false;
+  modal.setAttribute("aria-hidden", "false");
+  setKioskActivationMessage(
+    state.lang === "en"
+      ? "Enter the 8-digit pairing code generated in the Admin Menu."
+      : "Introduce el código de 8 dígitos generado en Gestionar menú."
+  );
+
+  setTimeout(() => input.focus(), 50);
+
+  return new Promise((resolve, reject) => {
+    kioskPairingResolver = { resolve, reject };
+  });
+}
+
+async function ensureKioskSession({ interactive = true } = {}) {
+  if (!hasExplicitKioskUrl()) {
+    throw new Error(
+      state.lang === "en"
+        ? "This page is not configured as a kiosk."
+        : "Esta página no está configurada como kiosco."
+    );
+  }
+
   const kioskId = currentKioskId();
   const currentSession = storedKioskSession(kioskId);
 
-  if (currentSession) {
-    return currentSession;
-  }
+  if (currentSession) return currentSession;
 
   const credential = storedKioskCredential(kioskId);
 
@@ -1760,47 +1882,56 @@ async function ensureKioskSession() {
         deviceSecret: credential
       });
 
-      saveKioskIdentity(
-        kioskId,
-        "",
-        result.sessionToken,
-        result.expiresAt
-      );
-
+      saveKioskIdentity(kioskId, "", result.sessionToken, result.expiresAt);
+      closeKioskActivationModal();
       return result.sessionToken;
     } catch (error) {
-      if (error?.httpStatus !== 401 && error?.httpStatus !== 403) {
-        throw error;
-      }
+      if (error?.httpStatus !== 401 && error?.httpStatus !== 403) throw error;
+      try {
+        localStorage.removeItem(kioskCredentialStorageKey(kioskId));
+      } catch (_) {}
     }
   }
 
-  const pairingCode = window.prompt(
-    state.lang === "en"
-      ? "This kiosk is not activated. Enter the 8-digit pairing code generated in Admin Menu → Data → Kiosks."
-      : "Este kiosco no está activado. Introduce el código de 8 dígitos generado en Gestionar menú → Datos del menú → Kioscos."
-  );
-
-  if (!pairingCode) {
-    throw new Error(
-      state.lang === "en"
-        ? "Kiosk activation is required."
-        : "Es necesario activar este kiosco."
-    );
+  if (!interactive) {
+    throw new Error("kiosk_pairing_required");
   }
 
-  const result = await callKioskSessionService("pair", {
-    pairingCode: String(pairingCode).replace(/\D/g, "").slice(0, 8)
-  });
+  const pairingCode = await requestKioskPairingCode();
 
-  saveKioskIdentity(
-    kioskId,
-    result.deviceCredential,
-    result.sessionToken,
-    result.expiresAt
-  );
+  try {
+    const result = await callKioskSessionService("pair", {
+      pairingCode: String(pairingCode).replace(/\D/g, "").slice(0, 8)
+    });
 
-  return result.sessionToken;
+    saveKioskIdentity(
+      kioskId,
+      result.deviceCredential,
+      result.sessionToken,
+      result.expiresAt
+    );
+
+    closeKioskActivationModal();
+    return result.sessionToken;
+  } catch (error) {
+    setKioskActivationMessage(
+      state.lang === "en"
+        ? "The code is invalid, expired, or this kiosk is disabled."
+        : "El código es incorrecto, caducó o este kiosco está desactivado.",
+      true
+    );
+    throw error;
+  }
+}
+
+async function bootstrapKioskIdentity() {
+  if (!hasExplicitKioskUrl()) return;
+
+  try {
+    await ensureKioskSession({ interactive: true });
+  } catch (error) {
+    console.warn("El kiosco todavía no está vinculado:", error);
+  }
 }
 
 async function callKioskPaymentService(action, payload = {}) {
@@ -1873,6 +2004,8 @@ async function createSecureKioskOrder(order) {
       },
       body: JSON.stringify({
         kioskId: currentKioskId(),
+        checkoutId: order.checkoutId || order.id,
+        checkoutMode: order.checkoutMode || "pay_at_counter",
         customer: {
           name: order.customer?.name || "",
           phone: order.customer?.phone || ""
@@ -2030,14 +2163,19 @@ async function saveOrder(paymentMethod) {
       publicBusinessSettings.checkout_mode || "pay_at_counter"
     ).trim().toLowerCase();
 
-    const kioskMode = checkoutMode === "pay_before_kitchen";
+    const kioskPage = hasExplicitKioskUrl();
+    const kioskMode = kioskPage && checkoutMode === "pay_before_kitchen";
     const payWithCloverNow =
       kioskMode && paymentMethod === "card";
 
+    // Efectivo nunca depende de Clover. En una URL de kiosco sigue usando
+    // el creador seguro para evitar duplicados, pero entra a Cocina de inmediato.
+    const secureKioskOrder = kioskPage;
     const counterOrder = !payWithCloverNow;
 
     let order = {
       ...state.pendingOrder,
+      checkoutId: state.pendingOrder.checkoutId || state.pendingOrder.id,
       paymentMethod,
       orderType: state.orderType,
       checkoutMode: payWithCloverNow
@@ -2065,7 +2203,7 @@ async function saveOrder(paymentMethod) {
       );
     }
 
-    createdOrder = kioskMode
+    createdOrder = secureKioskOrder
       ? await createSecureKioskOrder(order)
       : await db.createOrder(order);
 
@@ -2111,24 +2249,15 @@ async function saveOrder(paymentMethod) {
 
       setKioskPaymentVisual("approved");
 
-      createdOrder = await db.updateKioskPayment(
-        createdOrder.databaseId || createdOrder.id,
-        {
-          status: "new",
-          paymentStatus: "paid",
-          paymentStartedAt:
-            paymentResult.startedAt || new Date().toISOString(),
-          paymentCompletedAt:
-            paymentResult.completedAt || new Date().toISOString(),
-          cloverPaymentId:
-            paymentResult.cloverPaymentId || "",
-          cloverExternalPaymentId:
-            paymentResult.externalPaymentId || "",
-          kioskId:
-            currentKioskId(),
-          checkoutMode: "pay_before_kitchen"
-        }
-      );
+      createdOrder = {
+        ...createdOrder,
+        status: "new",
+        paymentStatus: "paid",
+        checkoutMode: "pay_before_kitchen",
+        kitchenVisible: true,
+        cloverPaymentId: paymentResult.cloverPaymentId || "",
+        cloverExternalPaymentId: paymentResult.externalPaymentId || ""
+      };
 
       state.activeKioskPayment = null;
     }
@@ -2231,27 +2360,7 @@ function refreshModifierSelectionState(root = document) {
 
 
 function preventMenuZoomGestures() {
-  document.addEventListener("gesturestart", (event) => {
-    event.preventDefault();
-  }, { passive: false });
-
-  document.addEventListener("gesturechange", (event) => {
-    event.preventDefault();
-  }, { passive: false });
-
-  document.addEventListener("gestureend", (event) => {
-    event.preventDefault();
-  }, { passive: false });
-
-  let lastTouchEnd = 0;
-
-  document.addEventListener("touchend", (event) => {
-    const now = Date.now();
-    if (now - lastTouchEnd <= 280) {
-      event.preventDefault();
-    }
-    lastTouchEnd = now;
-  }, { passive: false });
+  // V102: pinch-zoom is allowed; CSS touch-action handles accidental double taps.
 }
 
 function bindLanguageButtons() {
@@ -2282,6 +2391,25 @@ function initEvents() {
     }
 
     if (event.target.closest("#themeToggleBtn")) toggleTheme();
+
+    if (event.target.closest("#cancelKioskActivationBtn")) {
+      if (kioskPairingResolver?.reject) {
+        kioskPairingResolver.reject(new Error("pairing_cancelled"));
+      }
+      kioskPairingResolver = null;
+      closeKioskActivationModal();
+      return;
+    }
+
+    if (event.target.closest("#categoryDrawerToggle")) {
+      toggleCategoryDrawer();
+      return;
+    }
+
+    if (event.target.closest("#categoryDrawerClose") || event.target.closest("#categoryDrawerBackdrop")) {
+      closeCategoryDrawer();
+      return;
+    }
 
     const categoryButton = event.target.closest("[data-category]");
     if (categoryButton) {
@@ -2404,7 +2532,27 @@ function initEvents() {
     }
   });
 
-  document.addEventListener("submit", (event) => {
+  document.addEventListener("submit", async (event) => {
+    if (event.target.id === "kioskActivationForm") {
+      event.preventDefault();
+      const code = String($("#kioskActivationCode")?.value || "")
+        .replace(/\D/g, "")
+        .slice(0, 8);
+
+      if (!/^\d{8}$/.test(code)) {
+        setKioskActivationMessage(
+          state.lang === "en" ? "Enter all 8 digits." : "Introduce los 8 dígitos.",
+          true
+        );
+        return;
+      }
+
+      const resolver = kioskPairingResolver;
+      kioskPairingResolver = null;
+      if (resolver?.resolve) resolver.resolve(code);
+      return;
+    }
+
     if (event.target.id === "productForm") {
       event.preventDefault();
       if (!event.target.checkValidity()) {
@@ -2429,6 +2577,7 @@ function initEvents() {
       const totals = getTotals();
       openPayment({
         id: nextSimpleOrderId(),
+        checkoutId: (crypto?.randomUUID?.() || `checkout-${Date.now()}-${Math.random().toString(36).slice(2)}`),
         createdAt: new Date().toISOString(),
         customer: {
           name: $("#customerName").value.trim(),
@@ -2445,9 +2594,9 @@ function initEvents() {
 async function init() {
   applyTheme();
   await loadPublicBusinessSettings();
-  preventMenuZoomGestures();
   initEvents();
   bindLanguageButtons();
+  void bootstrapKioskIdentity();
   window.addEventListener("storage", (event) => {
     if (event.key === "fogon_availability") refreshAvailabilityIfChanged(false);
   });
