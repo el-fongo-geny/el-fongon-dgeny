@@ -880,6 +880,9 @@ window.FOGON_MENU_ADMIN_BUILD = "100-i18n-kiosk-identity";
     $("#kioskAllowCash").checked = device ? device.allowCash === true : true;
     $("#kioskEnabled").checked = device ? device.enabled === true : true;
 
+    const deleteButton = $("#deleteKioskButton");
+    if (deleteButton) deleteButton.hidden = !device;
+
     if (device) {
       $("#kioskGeneratedInfo").hidden = false;
       $("#kioskGeneratedId").textContent = device.kioskId;
@@ -953,6 +956,35 @@ window.FOGON_MENU_ADMIN_BUILD = "100-i18n-kiosk-identity";
     }
   }
 
+
+  async function deleteKioskDevice() {
+    const kioskId = String($("#kioskEditorId")?.value || "").trim();
+    if (!kioskId) return;
+
+    const device = state.kioskDevices.find((item) => item.kioskId === kioskId);
+    const label = device?.displayName || kioskId;
+
+    if (!confirm(`¿Eliminar definitivamente “${label}”? La pantalla quedará desvinculada y sus sesiones se revocarán.`)) {
+      return;
+    }
+
+    if (!confirm("Confirma una segunda vez: esta acción elimina la configuración del kiosco, pero NO elimina sus pedidos históricos.")) {
+      return;
+    }
+
+    try {
+      setBusy(true);
+      const result = await callAdminCatalog("delete_kiosk_device", { kioskId });
+      state.kioskDevices = Array.isArray(result.devices) ? result.devices : [];
+      renderKioskDevices();
+      closeKioskEditor();
+      toast("Kiosco eliminado y dispositivo revocado.");
+    } catch (error) {
+      toast(`No se pudo eliminar el kiosco. ${menuAdminErrorMessage(error)}`, "error");
+    } finally {
+      setBusy(false);
+    }
+  }
 
   function closeKioskPairing() {
     const modal = $("#kioskPairingModal");
@@ -2980,6 +3012,7 @@ window.FOGON_MENU_ADMIN_BUILD = "100-i18n-kiosk-identity";
     });
     $("#kioskEditorForm")?.addEventListener("submit", saveKioskDevice);
     $("#addKioskButton")?.addEventListener("click", () => openKioskEditor());
+    $("#deleteKioskButton")?.addEventListener("click", () => void deleteKioskDevice());
 
     document.addEventListener("click", (event) => {
       const closeButton = event.target.closest("[data-close-kiosk-editor]");
