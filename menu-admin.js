@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-window.FOGON_MENU_ADMIN_BUILD = "100-i18n-kiosk-identity";
+window.FOGON_MENU_ADMIN_BUILD = "103-kiosk-qr";
 
   const $ = (selector) => document.querySelector(selector);
   const $$ = (selector) => Array.from(document.querySelectorAll(selector));
@@ -796,9 +796,14 @@ window.FOGON_MENU_ADMIN_BUILD = "100-i18n-kiosk-identity";
 
           <div class="kiosk-url-row">
             <code>${escapeHtml(url)}</code>
-            <button class="button button-secondary button-small" type="button" data-copy-kiosk-url="${escapeHtml(device.kioskId)}">
-              Copiar URL
-            </button>
+            <div class="kiosk-url-actions">
+              <button class="button button-secondary button-small" type="button" data-copy-kiosk-url="${escapeHtml(device.kioskId)}">
+                Copiar URL
+              </button>
+              <button class="button button-secondary button-small" type="button" data-qr-kiosk-url="${escapeHtml(device.kioskId)}">
+                Generar QR
+              </button>
+            </div>
           </div>
 
           <div class="kiosk-device-security">
@@ -1069,6 +1074,32 @@ window.FOGON_MENU_ADMIN_BUILD = "100-i18n-kiosk-identity";
     } finally {
       setBusy(false);
     }
+  }
+
+  function closeKioskQr() {
+    const modal = $("#kioskQrModal");
+    if (modal) modal.hidden = true;
+    const image = $("#kioskQrImage");
+    if (image) image.removeAttribute("src");
+  }
+
+  function showKioskQr(kioskId) {
+    const url = kioskPublicUrl(kioskId);
+    const modal = $("#kioskQrModal");
+    const image = $("#kioskQrImage");
+    const text = $("#kioskQrUrl");
+    const title = $("#kioskQrTitle");
+
+    if (!modal || !image || !text) return;
+
+    if (title) title.textContent = `QR · ${kioskId}`;
+    text.textContent = url;
+
+    // Only the public kiosk URL is sent to the QR image service.
+    // No token, credential, pairing code, RAID or secret is included.
+    image.src = `https://api.qrserver.com/v1/create-qr-code/?size=320x320&margin=12&data=${encodeURIComponent(url)}`;
+    image.alt = `Código QR para ${kioskId}`;
+    modal.hidden = false;
   }
 
   async function copyKioskUrl(kioskId) {
@@ -3056,6 +3087,18 @@ window.FOGON_MENU_ADMIN_BUILD = "100-i18n-kiosk-identity";
         const kioskId = String(toggleButton.dataset.toggleKiosk || "");
         const enabled = toggleButton.dataset.nextEnabled === "true";
         void toggleKioskDevice(kioskId, enabled);
+        return;
+      }
+
+      const closeQrButton = event.target.closest("[data-close-kiosk-qr]");
+      if (closeQrButton) {
+        closeKioskQr();
+        return;
+      }
+
+      const qrButton = event.target.closest("[data-qr-kiosk-url]");
+      if (qrButton) {
+        showKioskQr(String(qrButton.dataset.qrKioskUrl || ""));
         return;
       }
 
