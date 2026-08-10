@@ -6,6 +6,22 @@ const $$ = (selector) => Array.from(document.querySelectorAll(selector));
 
 const money = (value) => `$${Number(value || 0).toFixed(2)}`;
 
+function cleanOrderModifierLabel(value) {
+  let label = String(value || "").trim();
+  if (!label) return "Opción";
+
+  // The catalogue can contain instructional group names such as
+  // "Elige tu proteína". Kitchen/order cards should show data labels,
+  // not customer instructions.
+  label = label
+    .replace(/^(elige|elija|selecciona|seleccione|escoge|escoja)\s+(tu|tus|su|sus|una?|el|la|los|las)?\s*/i, "")
+    .replace(/^(choose|select|pick)\s+(your|a|an|the)?\s*/i, "")
+    .trim();
+
+  if (!label) return "Opción";
+  return label.charAt(0).toUpperCase() + label.slice(1);
+}
+
 const fallbackStorage = new Map();
 
 function safeLocalGet(key) {
@@ -76,7 +92,7 @@ function showLoginRuntimeError(error) {
   console.error("Error del administrador:", error);
 }
 
-window.FOGON_ADMIN_BUILD = "98.1-inventory-tabs-fix";
+window.FOGON_ADMIN_BUILD = "103-clean-modifier-labels";
 
 if (!window.CSS) window.CSS = {};
 if (!window.CSS.escape) {
@@ -2104,7 +2120,7 @@ function itemDetailsHtml(item, compact = false) {
   return `
     <div class="order-item-line">
       <strong>${escapeHtml(item.quantity)}x ${escapeHtml(itemNameEs)}</strong>
-      ${(item.selections || []).map((selection) => `<p>${escapeHtml(selection.groupEs || selection.group)}: ${escapeHtml(selection.nameEs || selection.name)}</p>`).join("")}
+      ${(item.selections || []).map((selection) => `<p>${escapeHtml(cleanOrderModifierLabel(selection.groupEs || selection.group))}: ${escapeHtml(selection.nameEs || selection.name)}</p>`).join("")}
       ${(item.extras || []).map((extra) => `<p>Extra: ${escapeHtml(extra.nameEs || extra.name)} +${money(extra.price)}</p>`).join("")}
       ${(item.removables || []).map((remove) => `<p>${escapeHtml(typeof remove === "string" ? remove : (remove.nameEs || remove.name))}</p>`).join("")}
       ${item.notes ? `<p><strong>Nota:</strong> ${escapeHtml(item.notes)}</p>` : ""}
@@ -2222,7 +2238,7 @@ function compactOrderItemHtml(item) {
 
   const details = [
     ...(item?.selections || []).map((selection) =>
-      `${selection.groupEs || selection.group}: ${selection.nameEs || selection.name}`
+      `${cleanOrderModifierLabel(selection.groupEs || selection.group)}: ${selection.nameEs || selection.name}`
     ),
     ...(item?.extras || []).map((extra) =>
       `Extra: ${extra.nameEs || extra.name}${Number(extra.price || 0) ? ` +${money(extra.price)}` : ""}`
