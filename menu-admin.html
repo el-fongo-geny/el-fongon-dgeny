@@ -6,7 +6,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#f6f6f3">
   <title>Gestor del menú | El Fogón D' Geny</title>
-  <link rel="stylesheet" href="menu-admin.css?v=100-i18n-kiosk-identity">
+  <link rel="stylesheet" href="menu-admin.css?v=103-kiosk-qr">
 </head>
 <body>
   <main id="loginScreen" class="login-screen">
@@ -820,6 +820,30 @@
     </section>
   </div>
 
+  <div id="kioskQrModal" class="modal" hidden>
+    <div class="modal-backdrop" data-close-kiosk-qr></div>
+    <section class="modal-card kiosk-qr-card" role="dialog" aria-modal="true" aria-labelledby="kioskQrTitle">
+      <header class="modal-header">
+        <div>
+          <p class="eyebrow">Instalación rápida</p>
+          <h2 id="kioskQrTitle">QR del kiosco</h2>
+          <p>Escanea este QR desde el Android para abrir su URL exacta.</p>
+        </div>
+        <button class="icon-button" type="button" data-close-kiosk-qr aria-label="Cerrar">×</button>
+      </header>
+      <div class="kiosk-qr-body">
+        <div class="kiosk-qr-image-wrap">
+          <img id="kioskQrImage" alt="Código QR del kiosco" width="320" height="320">
+        </div>
+        <code id="kioskQrUrl" class="kiosk-qr-url"></code>
+        <p class="kiosk-qr-security">El QR contiene únicamente la URL pública del kiosco. No contiene tokens ni credenciales.</p>
+      </div>
+      <footer class="modal-footer">
+        <button class="button button-primary" type="button" data-close-kiosk-qr>Listo</button>
+      </footer>
+    </section>
+  </div>
+
   <div id="categoryModal" class="modal" hidden>
     <div class="modal-backdrop" data-close-category-modal></div>
     <form id="categoryForm" class="modal-card" role="dialog" aria-modal="true" aria-labelledby="categoryModalTitle">
@@ -842,6 +866,6 @@
   </div>
 
   <script src="supabase-config.js?v=18-mobile-fixed"></script>
-  <script src="menu-admin.js?v=100-i18n-kiosk-identity"></script>
+  <script src="menu-admin.js?v=103-kiosk-qr"></script>
 </body>
 </html>
