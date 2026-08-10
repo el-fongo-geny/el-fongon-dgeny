@@ -1635,3 +1635,121 @@ body.image-crop-open { overflow: hidden; }
   font-size: .85rem;
   text-align: center;
 }
+
+
+/* =========================================================
+   V103.4 · EDITAR KIOSCO
+   El modal puede desplazarse en PC, móvil y tablet.
+   ========================================================= */
+
+#kioskEditorModal.modal {
+  overflow-x: hidden !important;
+  overflow-y: auto !important;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+
+  /* En vez de forzar centrado vertical de una tarjeta mayor al viewport,
+     permitimos que empiece arriba y pueda recorrerse completamente. */
+  align-items: start !important;
+  justify-items: center !important;
+  place-items: start center !important;
+
+  padding:
+    max(12px, env(safe-area-inset-top))
+    14px
+    max(18px, env(safe-area-inset-bottom)) !important;
+}
+
+#kioskEditorModal .modal-backdrop {
+  position: fixed !important;
+}
+
+#kioskEditorModal .kiosk-editor-modal-card {
+  width: min(620px, calc(100vw - 28px)) !important;
+  max-width: 620px !important;
+
+  /* El card también puede tener scroll propio si la pantalla es muy baja. */
+  max-height: calc(100dvh - 28px) !important;
+  overflow-x: hidden !important;
+  overflow-y: auto !important;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+
+  margin: 0 auto !important;
+}
+
+#kioskEditorModal .modal-heading {
+  position: sticky;
+  top: 0;
+  z-index: 4;
+  background: var(--surface);
+  padding-top: 14px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--line);
+}
+
+#kioskEditorModal .kiosk-editor-form {
+  padding-bottom: max(12px, env(safe-area-inset-bottom));
+}
+
+#kioskEditorModal .kiosk-editor-actions {
+  position: sticky;
+  bottom: 0;
+  z-index: 4;
+  margin: 4px -2px -2px;
+  padding: 12px 2px 2px;
+  background:
+    linear-gradient(
+      to bottom,
+      rgba(255,255,255,0),
+      var(--surface) 22%
+    );
+}
+
+.kiosk-editor-quick-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 9px;
+}
+
+.kiosk-editor-quick-actions[hidden] {
+  display: none !important;
+}
+
+@media (max-width: 620px) {
+  #kioskEditorModal.modal {
+    padding:
+      max(8px, env(safe-area-inset-top))
+      8px
+      max(10px, env(safe-area-inset-bottom)) !important;
+  }
+
+  #kioskEditorModal .kiosk-editor-modal-card {
+    width: 100% !important;
+    max-height: calc(100dvh - 16px) !important;
+    border-radius: 16px !important;
+  }
+
+  #kioskEditorModal .modal-heading {
+    padding-left: 2px;
+    padding-right: 2px;
+  }
+
+  .kiosk-editor-quick-actions {
+    grid-template-columns: 1fr;
+  }
+
+  #kioskEditorModal .kiosk-editor-actions {
+    display: grid !important;
+    grid-template-columns: 1fr 1fr !important;
+    gap: 8px !important;
+  }
+
+  #kioskEditorModal .kiosk-editor-action-spacer {
+    display: none !important;
+  }
+
+  #kioskEditorModal #deleteKioskButton {
+    grid-column: 1 / -1;
+  }
+}
