@@ -865,6 +865,8 @@ window.FOGON_MENU_ADMIN_BUILD = "103-kiosk-qr";
     $("#kioskEditorForm")?.reset();
     $("#kioskEditorId").value = "";
     $("#kioskGeneratedInfo").hidden = true;
+    const quickActions = $("#kioskEditorQuickActions");
+    if (quickActions) quickActions.hidden = true;
   }
 
   function openKioskEditor(device = null) {
@@ -888,15 +890,33 @@ window.FOGON_MENU_ADMIN_BUILD = "103-kiosk-qr";
     const deleteButton = $("#deleteKioskButton");
     if (deleteButton) deleteButton.hidden = !device;
 
+    const quickActions = $("#kioskEditorQuickActions");
+    if (quickActions) quickActions.hidden = !device;
+
     if (device) {
       $("#kioskGeneratedInfo").hidden = false;
       $("#kioskGeneratedId").textContent = device.kioskId;
+
+      const qrButton = $("#kioskEditorQrButton");
+      const copyButton = $("#kioskEditorCopyUrlButton");
+
+      if (qrButton) qrButton.dataset.kioskId = device.kioskId;
+      if (copyButton) copyButton.dataset.kioskId = device.kioskId;
     } else {
       $("#kioskGeneratedInfo").hidden = true;
       $("#kioskGeneratedId").textContent = "Se genera al guardar";
+
+      const qrButton = $("#kioskEditorQrButton");
+      const copyButton = $("#kioskEditorCopyUrlButton");
+
+      if (qrButton) delete qrButton.dataset.kioskId;
+      if (copyButton) delete copyButton.dataset.kioskId;
     }
 
     modal.hidden = false;
+
+    // El scroll pertenece al propio modal, no al body bloqueado.
+    modal.scrollTop = 0;
     setTimeout(() => $("#kioskDisplayName")?.focus(), 30);
   }
 
@@ -3024,6 +3044,16 @@ window.FOGON_MENU_ADMIN_BUILD = "103-kiosk-qr";
       renderAvailabilityItems();
     });
     $("#businessSettingsForm")?.addEventListener("submit", saveBusinessSettings);
+
+    $("#kioskEditorQrButton")?.addEventListener("click", () => {
+      const kioskId = String($("#kioskEditorQrButton")?.dataset.kioskId || "").trim();
+      if (kioskId) showKioskQr(kioskId);
+    });
+
+    $("#kioskEditorCopyUrlButton")?.addEventListener("click", () => {
+      const kioskId = String($("#kioskEditorCopyUrlButton")?.dataset.kioskId || "").trim();
+      if (kioskId) void copyKioskUrl(kioskId);
+    });
 
     document.addEventListener("click", (event) => {
       const languageButton = event.target.closest("[data-business-language]");
