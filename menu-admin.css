@@ -1753,3 +1753,123 @@ body.image-crop-open { overflow: hidden; }
     grid-column: 1 / -1;
   }
 }
+
+
+/* =========================================================
+   V104.7 · SUBOPCIONES DISPONIBLE / AGOTADO
+   ========================================================= */
+.product-suboptions-panel {
+  width: min(520px, 60vw);
+  margin-top: 11px;
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
+}
+.product-suboptions-heading {
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:10px;
+  margin-bottom:8px;
+}
+.product-suboptions-heading>span {
+  color:var(--ink);
+  font-size:.73rem;
+  font-weight:850;
+}
+.product-suboptions-heading>small {
+  color:var(--muted);
+  font-size:.66rem;
+  white-space:nowrap;
+}
+.product-suboptions-strip {
+  display:flex;
+  gap:8px;
+  width:100%;
+  padding:1px 2px 7px;
+  overflow-x:auto;
+  overflow-y:hidden;
+  overscroll-behavior-inline:contain;
+  scroll-snap-type:inline proximity;
+  -webkit-overflow-scrolling:touch;
+  scrollbar-width:thin;
+}
+.product-suboption-card {
+  flex:0 0 clamp(168px,19vw,216px);
+  min-width:0;
+  scroll-snap-align:start;
+  border:1px solid var(--line);
+  border-radius:12px;
+  padding:10px;
+  background:var(--surface-soft);
+}
+.product-suboption-card.is-sold-out {
+  border-color:#e7c5bf;
+  background:#fff6f4;
+}
+.product-suboption-copy {
+  display:grid;
+  gap:2px;
+  min-width:0;
+  margin-bottom:9px;
+}
+.product-suboption-copy small,
+.product-suboption-copy strong {
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+.product-suboption-copy small {
+  color:var(--muted);
+  font-size:.63rem;
+  font-weight:730;
+}
+.product-suboption-copy strong {
+  color:var(--ink);
+  font-size:.82rem;
+}
+.suboption-availability-switch {
+  position:relative;
+  display:inline-flex;
+  align-items:center;
+  gap:7px;
+  cursor:pointer;
+}
+.suboption-availability-switch input {
+  position:absolute;
+  opacity:0;
+  pointer-events:none;
+}
+.suboption-availability-switch input:checked + .status-switch-control {
+  background:var(--success);
+}
+.suboption-availability-switch input:checked + .status-switch-control::after {
+  transform:translateX(16px);
+}
+.suboption-availability-switch input:disabled ~ * {
+  opacity:.55;
+}
+.suboption-availability-label {
+  color:var(--muted);
+  font-size:.7rem;
+  font-weight:800;
+}
+.product-suboption-card.is-sold-out .suboption-availability-label {
+  color:var(--danger);
+}
+@media (max-width:620px) {
+  .data-table td:nth-child(4) { width:100% !important; }
+  .product-suboptions-panel {
+    width:100%;
+    max-width:none;
+    margin-top:12px;
+  }
+  .product-suboption-card {
+    flex-basis:min(72vw,210px);
+  }
+}
+@media (max-width:360px) {
+  .product-suboption-card {
+    flex-basis:min(78vw,188px);
+    padding:9px;
+  }
+}
