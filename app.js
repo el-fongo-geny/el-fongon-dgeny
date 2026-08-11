@@ -177,11 +177,21 @@ function orderingClosedMessage() {
 function updateOrderingUi() {
   const status = currentOrderingState();
   const submit = document.querySelector('#checkoutForm button[type="submit"]');
+
   if (submit) {
-    submit.disabled = !status.open;
+    /*
+      V104.8A.1:
+      No deshabilitamos físicamente el botón por un estado cacheado.
+      Un <button disabled> no genera submit/click, por lo que el cliente
+      no puede forzar una comprobación fresca de Supabase.
+      La validación definitiva ocurre en el submit.
+    */
+    submit.disabled = false;
     submit.setAttribute("aria-disabled", String(!status.open));
+    submit.classList.toggle("is-ordering-closed", !status.open);
     submit.title = status.open ? "" : orderingClosedMessage();
   }
+
   const notice = document.getElementById("orderingStatusNotice");
   if (notice) {
     notice.hidden = status.open;
@@ -1488,6 +1498,14 @@ function openCart() {
   updateCartFabCompact(true);
   document.body.classList.add("cart-open");
   $("#cartPanel").setAttribute("aria-hidden", "false");
+
+  // Refresca el estado real de apertura al entrar al carrito.
+  void syncAvailabilityFromBackend()
+    .then(() => updateOrderingUi())
+    .catch((error) => {
+      console.warn("No se pudo refrescar el estado de pedidos al abrir el carrito:", error);
+      updateOrderingUi();
+    });
 }
 
 function closeCart() {
@@ -2583,18 +2601,39 @@ function initEvents() {
 
     if (event.target.id === "checkoutForm") {
       event.preventDefault();
-      if (!currentOrderingState().open) {
-        alert(orderingClosedMessage());
+
+      const checkoutForm = event.target;
+      const submitButton = checkoutForm.querySelector('button[type="submit"]');
+
+      if (submitButton) {
+        submitButton.disabled = true;
+        submitButton.setAttribute("aria-busy", "true");
+      }
+
+      try {
+        /*
+          Fuente de verdad: Supabase.
+          Evita rechazar el pedido por un fogon_availability antiguo en
+          localStorage cuando el restaurante acaba de abrir manualmente.
+        */
+        await syncAvailabilityFromBackend();
         updateOrderingUi();
-        return;
-      }
-      if (!event.target.checkValidity()) {
-        event.target.reportValidity();
-        return;
-      }
-      if (!state.cart.length) return;
-      const totals = getTotals();
-      openPayment({
+
+        if (!currentOrderingState().open) {
+          alert(orderingClosedMessage());
+          updateOrderingUi();
+          return;
+        }
+
+        if (!checkoutForm.checkValidity()) {
+          checkoutForm.reportValidity();
+          return;
+        }
+
+        if (!state.cart.length) return;
+
+        const totals = getTotals();
+        openPayment({
         id: nextSimpleOrderId(),
         checkoutId: (crypto?.randomUUID?.() || `checkout-${Date.now()}-${Math.random().toString(36).slice(2)}`),
         createdAt: new Date().toISOString(),
@@ -2605,7 +2644,22 @@ function initEvents() {
         items: state.cart,
         totals,
         language: state.lang
-      });
+        });
+      } catch (error) {
+        console.error("No se pudo comprobar el estado del restaurante:", error);
+
+        alert(
+          state.lang === "en"
+            ? "We could not verify whether online ordering is open. Check your connection and try again."
+            : "No pudimos comprobar si los pedidos están abiertos. Revisa la conexión e inténtalo de nuevo."
+        );
+      } finally {
+        if (submitButton) {
+          submitButton.disabled = false;
+          submitButton.removeAttribute("aria-busy");
+        }
+        updateOrderingUi();
+      }
     }
   });
 }
