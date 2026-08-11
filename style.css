@@ -3446,3 +3446,172 @@ body.light-mode .modifier-sold-out {
   background:#ffe6e0;
   border-color:#efb4aa;
 }
+
+
+/* =========================================================
+   V104.8A.2 · CARRITO + PRIORIDAD DEL FLUJO DE PEDIDO
+   ========================================================= */
+
+/* Acciones de cada ítem: precio y Eliminar arriba; cantidad debajo. */
+.cart-item-actions {
+  display: grid !important;
+  align-content: start !important;
+  justify-items: end !important;
+  gap: 12px !important;
+  min-width: 154px !important;
+}
+
+.cart-item-actions-top {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: flex-end !important;
+  gap: 10px !important;
+  width: 100% !important;
+}
+
+.cart-line-total {
+  display: block !important;
+  margin: 0 !important;
+  font-size: clamp(1rem, 3.8vw, 1.15rem) !important;
+  line-height: 1 !important;
+  white-space: nowrap !important;
+}
+
+/* Eliminar queda arriba del control de cantidad. */
+.cart-remove-btn {
+  order: 0 !important;
+  width: auto !important;
+  min-width: 82px !important;
+  min-height: 40px !important;
+  margin: 0 !important;
+  padding: 7px 11px !important;
+  border-radius: 12px !important;
+  font-size: .86rem !important;
+  line-height: 1 !important;
+  white-space: nowrap !important;
+}
+
+/* Botones +/- grandes y cómodos para touch. */
+.cart-quantity-control {
+  display: grid !important;
+  grid-template-columns: 52px 44px 52px !important;
+  align-items: center !important;
+  justify-content: end !important;
+  gap: 5px !important;
+  width: max-content !important;
+  margin-left: auto !important;
+}
+
+.cart-quantity-btn {
+  display: grid !important;
+  place-items: center !important;
+  width: 52px !important;
+  min-width: 52px !important;
+  height: 52px !important;
+  min-height: 52px !important;
+  margin: 0 !important;
+  border: 1px solid var(--line) !important;
+  border-radius: 12px !important;
+  padding: 0 !important;
+  background: var(--surface) !important;
+  color: var(--ink) !important;
+  font-size: 1.65rem !important;
+  font-weight: 800 !important;
+  line-height: 1 !important;
+  touch-action: manipulation !important;
+}
+
+.cart-quantity-btn:active {
+  transform: scale(.96) !important;
+}
+
+.cart-quantity-value {
+  display: grid !important;
+  place-items: center !important;
+  width: 44px !important;
+  min-width: 44px !important;
+  min-height: 52px !important;
+  font-size: 1.2rem !important;
+  font-weight: 850 !important;
+  line-height: 1 !important;
+}
+
+/* El flujo Para aquí/Para llevar y pago SIEMPRE gana al carrito. */
+.payment-modal {
+  z-index: 1000 !important;
+  background: rgba(0, 0, 0, .56) !important;
+  backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(3px);
+}
+
+.payment-modal[aria-hidden="false"] {
+  display: grid !important;
+}
+
+.payment-card {
+  position: relative !important;
+  z-index: 1001 !important;
+}
+
+/* Defensa extra: aunque una transición deje cart-open por un instante,
+   el carrito nunca puede quedar por encima del flujo de pedido. */
+body.payment-open .cart-panel,
+body.payment-open #cartFab,
+body.payment-open .category-drawer,
+body.payment-open .category-drawer-toggle,
+body.payment-open .category-drawer-backdrop {
+  pointer-events: none !important;
+}
+
+body.payment-open .cart-panel {
+  z-index: 20 !important;
+}
+
+/* En móvil damos suficiente espacio al bloque derecho sin robar demasiado
+   ancho al nombre/subopciones del producto. */
+@media (max-width: 560px) {
+  .cart-item {
+    grid-template-columns: minmax(0, 1fr) 154px !important;
+    gap: 10px !important;
+  }
+
+  .cart-item-actions {
+    min-width: 154px !important;
+  }
+
+  .cart-item-actions-top {
+    flex-wrap: wrap !important;
+    row-gap: 8px !important;
+  }
+
+  .cart-remove-btn {
+    min-width: 88px !important;
+  }
+}
+
+@media (max-width: 390px) {
+  .cart-item {
+    grid-template-columns: minmax(0, 1fr) 142px !important;
+  }
+
+  .cart-item-actions {
+    min-width: 142px !important;
+  }
+
+  .cart-quantity-control {
+    grid-template-columns: 48px 38px 48px !important;
+  }
+
+  .cart-quantity-btn {
+    width: 48px !important;
+    min-width: 48px !important;
+    height: 50px !important;
+    min-height: 50px !important;
+  }
+
+  .cart-quantity-value {
+    width: 38px !important;
+    min-width: 38px !important;
+    min-height: 50px !important;
+  }
+}
