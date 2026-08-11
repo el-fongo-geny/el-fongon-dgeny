@@ -3089,3 +3089,326 @@ body.cart-open .category-tabs.category-drawer-list {
     left: min(330px, 88vw) !important;
   }
 }
+
+
+/* =========================================================
+   V104.6 · PULIDO RESPONSIVE DEL MENÚ PÚBLICO
+   - rail cerrado más estrecho
+   - controles superiores centrados
+   - carrito sin solapamientos
+   - CTA Agregar a ancho completo
+   ========================================================= */
+
+:root {
+  --category-rail-width: 36px !important;
+  --category-rail-gap: 4px !important;
+}
+
+/* ---------------------------------------------------------
+   CABECERA: modo + idioma realmente centrados.
+   El carrito conserva su zona independiente a la derecha.
+   --------------------------------------------------------- */
+.site-header {
+  position: relative !important;
+  padding-top: max(74px, calc(env(safe-area-inset-top) + 62px)) !important;
+  padding-right: max(14px, env(safe-area-inset-right)) !important;
+}
+
+.header-actions {
+  position: absolute !important;
+  top: max(10px, env(safe-area-inset-top)) !important;
+  left: 50% !important;
+  right: auto !important;
+  transform: translateX(-50%) !important;
+  width: max-content !important;
+  max-width: calc(100vw - 32px) !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: clamp(6px, 2vw, 10px) !important;
+  flex-wrap: nowrap !important;
+  z-index: 31 !important;
+}
+
+.theme-toggle {
+  white-space: nowrap !important;
+}
+
+.lang-switch {
+  flex: 0 0 auto !important;
+}
+
+/* ---------------------------------------------------------
+   RAIL CERRADO: ocupa mucho menos ancho real del contenido.
+   Conservamos el drawer completo al abrir.
+   --------------------------------------------------------- */
+@media (max-width: 900px) {
+  .menu-shell {
+    padding-left:
+      calc(
+        max(6px, env(safe-area-inset-left)) +
+        var(--category-rail-width) +
+        var(--category-rail-gap)
+      ) !important;
+    padding-right: max(8px, env(safe-area-inset-right)) !important;
+  }
+
+  .category-drawer-toggle.category-drawer-handle {
+    left: max(3px, env(safe-area-inset-left)) !important;
+    width: 29px !important;
+    min-width: 29px !important;
+    max-width: 29px !important;
+
+    height: clamp(142px, 32dvh, 190px) !important;
+    min-height: 142px !important;
+    max-height: 190px !important;
+
+    border-radius: 15px !important;
+  }
+
+  .category-drawer-arrow {
+    width: 23px !important;
+    height: 23px !important;
+    font-size: 1.45rem !important;
+  }
+
+  body.category-drawer-open
+    .category-drawer-toggle.category-drawer-handle {
+    left: min(310px, 86vw) !important;
+    width: 34px !important;
+    min-width: 34px !important;
+    max-width: 34px !important;
+    height: clamp(170px, 38dvh, 230px) !important;
+    max-height: 230px !important;
+  }
+}
+
+@media (max-width: 430px) {
+  :root {
+    --category-rail-width: 31px !important;
+    --category-rail-gap: 3px !important;
+  }
+
+  .menu-shell {
+    padding-left:
+      calc(
+        max(4px, env(safe-area-inset-left)) +
+        var(--category-rail-width) +
+        var(--category-rail-gap)
+      ) !important;
+    padding-right: max(6px, env(safe-area-inset-right)) !important;
+  }
+
+  .category-drawer-toggle.category-drawer-handle {
+    width: 26px !important;
+    min-width: 26px !important;
+    max-width: 26px !important;
+    height: clamp(132px, 29dvh, 172px) !important;
+    min-height: 132px !important;
+    max-height: 172px !important;
+    border-radius: 13px !important;
+  }
+
+  .category-drawer-arrow {
+    width: 21px !important;
+    height: 21px !important;
+    font-size: 1.35rem !important;
+  }
+
+  .site-header {
+    padding-top: max(70px, calc(env(safe-area-inset-top) + 58px)) !important;
+  }
+
+  .header-actions {
+    max-width: calc(100vw - 20px) !important;
+  }
+
+  .theme-toggle {
+    min-height: 36px !important;
+    padding-inline: 10px !important;
+    font-size: clamp(.76rem, 3.4vw, .88rem) !important;
+  }
+
+  .lang-switch button {
+    min-width: 34px !important;
+    min-height: 31px !important;
+    padding-inline: 7px !important;
+  }
+}
+
+@media (max-width: 359px) {
+  :root {
+    --category-rail-width: 28px !important;
+    --category-rail-gap: 2px !important;
+  }
+
+  .category-drawer-toggle.category-drawer-handle {
+    width: 24px !important;
+    min-width: 24px !important;
+    max-width: 24px !important;
+    height: clamp(118px, 27dvh, 154px) !important;
+    min-height: 118px !important;
+    max-height: 154px !important;
+  }
+
+  .category-drawer-arrow {
+    width: 19px !important;
+    height: 19px !important;
+    font-size: 1.2rem !important;
+  }
+
+  .header-actions {
+    gap: 4px !important;
+  }
+
+  .theme-toggle {
+    padding-inline: 8px !important;
+    font-size: .73rem !important;
+  }
+
+  .lang-switch button {
+    min-width: 31px !important;
+    padding-inline: 5px !important;
+  }
+}
+
+/* En escritorio el rail tampoco necesita una franja visual excesiva. */
+@media (min-width: 901px) {
+  .category-drawer-toggle.category-drawer-handle {
+    width: 32px !important;
+    min-width: 32px !important;
+    max-width: 32px !important;
+    height: clamp(160px, 34dvh, 220px) !important;
+    min-height: 160px !important;
+    max-height: 220px !important;
+  }
+}
+
+/* ---------------------------------------------------------
+   CARRITO ABIERTO:
+   - no aparece el rail de categorías
+   - no aparece el FAB del carrito
+   Así no tapa +/- ni datos del pedido.
+   --------------------------------------------------------- */
+body.cart-open .category-drawer-toggle,
+body.cart-open .category-drawer,
+body.cart-open .category-drawer-backdrop,
+body.cart-open #cartFab {
+  opacity: 0 !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
+}
+
+/* El panel del carrito siempre queda por delante de cualquier resto visual. */
+body.cart-open .cart-panel {
+  z-index: 120 !important;
+}
+
+/* ---------------------------------------------------------
+   FAB DEL CARRITO:
+   incluso en modo compacto mantiene el icono claramente visible.
+   --------------------------------------------------------- */
+.cart-fab,
+.cart-fab.is-compact {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+.cart-fab .cart-icon-wrap,
+.cart-fab.is-compact .cart-icon-wrap {
+  display: inline-grid !important;
+  place-items: center !important;
+  flex: 0 0 36px !important;
+  width: 36px !important;
+  height: 36px !important;
+  opacity: 1 !important;
+  visibility: visible !important;
+}
+
+.cart-fab .cart-svg,
+.cart-fab.is-compact .cart-svg {
+  display: block !important;
+  width: 23px !important;
+  height: 23px !important;
+  opacity: 1 !important;
+  visibility: visible !important;
+}
+
+/* El contador queda separado del icono y nunca lo sustituye. */
+.cart-fab #cartCount {
+  position: static !important;
+  flex: 0 0 auto !important;
+  min-width: 28px !important;
+  height: 28px !important;
+  display: grid !important;
+  place-items: center !important;
+  border-radius: 999px !important;
+}
+
+/* ---------------------------------------------------------
+   PRODUCTO: CTA AGREGAR A ANCHO COMPLETO.
+   Mantiene precio arriba y botón cómodo para pulgar/touch.
+   --------------------------------------------------------- */
+.product-submit-bar {
+  width: 100% !important;
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) !important;
+  gap: 9px !important;
+  align-items: stretch !important;
+  box-sizing: border-box !important;
+}
+
+.product-submit-price {
+  width: 100% !important;
+  display: flex !important;
+  align-items: baseline !important;
+  justify-content: flex-start !important;
+  gap: 8px !important;
+  box-sizing: border-box !important;
+}
+
+.product-submit-button {
+  width: 100% !important;
+  max-width: none !important;
+  min-width: 0 !important;
+  min-height: clamp(54px, 7dvh, 66px) !important;
+  margin: 0 !important;
+  padding: 13px 18px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  border-radius: 16px !important;
+  font-size: clamp(1rem, 4.2vw, 1.18rem) !important;
+  font-weight: 900 !important;
+  box-sizing: border-box !important;
+}
+
+/* En móviles extremadamente estrechos evitamos cualquier overflow. */
+.product-detail-sheet,
+.product-detail-form,
+.product-submit-bar,
+.product-submit-button {
+  min-width: 0 !important;
+  max-width: 100% !important;
+}
+
+/* ---------------------------------------------------------
+   CONSISTENCIA ENTRE TAMAÑOS:
+   evita tamaños rígidos que provoquen desbordes.
+   --------------------------------------------------------- */
+@media (max-width: 900px) {
+  .product-card,
+  .product-trigger,
+  .product-info,
+  .cart-panel,
+  .cart-item,
+  .checkout-form {
+    min-width: 0 !important;
+  }
+
+  .cart-panel {
+    width: min(100%, 560px) !important;
+    max-width: 100vw !important;
+  }
+}
