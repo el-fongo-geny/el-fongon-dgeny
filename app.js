@@ -1438,13 +1438,15 @@ function renderCart() {
           ${item.notes ? `<p>${item.notes}</p>` : ""}
         </div>
         <div class="cart-item-actions">
-          <strong class="cart-line-total">${money(item.lineTotal * item.quantity)}</strong>
+          <div class="cart-item-actions-top">
+            <strong class="cart-line-total">${money(item.lineTotal * item.quantity)}</strong>
+            <button class="text-btn cart-remove-btn" data-remove-cart="${item.id}" type="button" aria-label="${text("remove")} ${item.name}">${text("remove")}</button>
+          </div>
           <div class="cart-quantity-control" role="group" aria-label="${state.lang === "en" ? "Quantity" : "Cantidad"} ${item.name}">
             <button class="cart-quantity-btn" data-cart-quantity="-1" data-cart-line="${item.id}" type="button" aria-label="${state.lang === "en" ? "Decrease" : "Disminuir"} ${item.name}">−</button>
             <output class="cart-quantity-value" aria-live="polite">${item.quantity}</output>
             <button class="cart-quantity-btn" data-cart-quantity="1" data-cart-line="${item.id}" type="button" aria-label="${state.lang === "en" ? "Increase" : "Aumentar"} ${item.name}">+</button>
           </div>
-          <button class="text-btn cart-remove-btn" data-remove-cart="${item.id}" type="button" aria-label="${text("remove")} ${item.name}">${text("remove")}</button>
         </div>
       </div>
     `).join("");
@@ -1540,6 +1542,11 @@ function openPayment(order) {
   state.pendingOrder = order;
   state.orderType = "";
 
+  // V104.8A.2:
+  // El flujo de confirmación tiene prioridad absoluta sobre el carrito.
+  closeCart();
+  document.body.classList.add("payment-open", "modal-open");
+
   const orderTypeStep = $("#orderTypeStep");
   const paymentMethodStep = $("#paymentMethodStep");
   const orderThanksStep = $("#orderThanksStep");
@@ -1551,6 +1558,12 @@ function openPayment(order) {
   if (kioskPaymentStep) kioskPaymentStep.hidden = true;
 
   $("#paymentModal").setAttribute("aria-hidden", "false");
+}
+
+function closePaymentFlow() {
+  const modal = $("#paymentModal");
+  if (modal) modal.setAttribute("aria-hidden", "true");
+  document.body.classList.remove("payment-open", "modal-open");
 }
 
 function showOrderThanks(orderNumber, activeOrderCount = 0) {
@@ -1607,7 +1620,7 @@ function showOrderThanks(orderNumber, activeOrderCount = 0) {
 }
 
 function closePayment() {
-  $("#paymentModal").setAttribute("aria-hidden", "true");
+  closePaymentFlow();
 
   const orderTypeStep = $("#orderTypeStep");
   const paymentMethodStep = $("#paymentMethodStep");
