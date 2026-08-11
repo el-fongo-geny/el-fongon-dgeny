@@ -831,8 +831,11 @@ function setLanguage(lang) {
   document.documentElement.lang = lang;
   applyText();
   renderCategories();
-  restoreCategoryDrawerState();
   renderMenu();
+
+  // V104.6: cada selección explícita de idioma abre las categorías.
+  // Mantiene intacto el cierre/apertura manual posterior del usuario.
+  openCategoryDrawer({ persist: true });
 
   setInterval(() => {
     renderCategories();
