@@ -345,6 +345,85 @@ window.FOGON_MENU_ADMIN_BUILD = "103-kiosk-qr";
     });
   }
 
+  function productOptionGroups(productId) {
+    return state.catalog.optionGroups
+      .filter((group) => String(group.product_id) === String(productId))
+      .sort((a, b) => Number(a.sort_order || 0) - Number(b.sort_order || 0));
+  }
+
+  function productSuboptions(productId) {
+    const groups = productOptionGroups(productId);
+    const groupMap = new Map(groups.map((group) => [String(group.id), group]));
+
+    return state.catalog.options
+      .filter((option) => groupMap.has(String(option.option_group_id)))
+      .sort((a, b) => {
+        const ga = groupMap.get(String(a.option_group_id));
+        const gb = groupMap.get(String(b.option_group_id));
+        const gd = Number(ga?.sort_order || 0) - Number(gb?.sort_order || 0);
+        return gd || Number(a.sort_order || 0) - Number(b.sort_order || 0);
+      })
+      .map((option) => ({
+        ...option,
+        group: groupMap.get(String(option.option_group_id))
+      }));
+  }
+
+  function optionAvailabilityKey(groupId, optionId) {
+    return `option:${groupId}:${optionId}`;
+  }
+
+  function optionIsAvailable(groupId, optionId) {
+    const key = optionAvailabilityKey(groupId, optionId);
+    const availability = state.catalog.availability || {};
+    return !Object.prototype.hasOwnProperty.call(availability, key)
+      || availability[key] !== false;
+  }
+
+  function renderProductSuboptions(product) {
+    const options = productSuboptions(product.id);
+    if (!options.length) return "";
+
+    return `
+      <div class="product-suboptions-panel" aria-label="Disponibilidad de subopciones">
+        <div class="product-suboptions-heading">
+          <span>Subopciones</span>
+          <small>Desliza horizontalmente</small>
+        </div>
+        <div class="product-suboptions-strip">
+          ${options.map((option) => {
+            const groupId = String(option.option_group_id || "");
+            const available = optionIsAvailable(groupId, option.id);
+            const groupName = option.group?.name_es || option.group?.name_en || "Opción";
+            const optionName = option.name_es || option.name_en || option.id;
+
+            return `
+              <div class="product-suboption-card ${available ? "" : "is-sold-out"}">
+                <span class="product-suboption-copy">
+                  <small>${escapeHtml(groupName)}</small>
+                  <strong>${escapeHtml(optionName)}</strong>
+                </span>
+                <label class="suboption-availability-switch">
+                  <input
+                    type="checkbox"
+                    data-suboption-availability
+                    data-product-id="${escapeHtml(product.id)}"
+                    data-group-id="${escapeHtml(groupId)}"
+                    data-option-id="${escapeHtml(option.id)}"
+                    ${available ? "checked" : ""}
+                    aria-label="${available ? "Marcar agotado" : "Marcar disponible"}: ${escapeHtml(optionName)}"
+                  >
+                  <span class="status-switch-control" aria-hidden="true"></span>
+                  <span class="suboption-availability-label">${available ? "Disponible" : "Agotado"}</span>
+                </label>
+              </div>
+            `;
+          }).join("")}
+        </div>
+      </div>
+    `;
+  }
+
   function renderProducts() {
     renderSummary();
     renderCategoryFilter();
@@ -393,6 +472,7 @@ window.FOGON_MENU_ADMIN_BUILD = "103-kiosk-qr";
             </label>
             <span class="status-label">${product.visible ? "Visible" : "Oculto"}</span>
           </div>
+          ${renderProductSuboptions(product)}
         </td>
         <td class="align-right">
           <div class="row-actions">
@@ -1402,6 +1482,7 @@ window.FOGON_MENU_ADMIN_BUILD = "103-kiosk-qr";
         removables: result.catalog?.removables || [],
         productRemovables: result.catalog?.productRemovables || [],
         inventory: result.catalog?.inventory || [],
+        availability: result.catalog?.availability || {},
         settings: result.catalog?.settings || {}
       };
 
@@ -2898,6 +2979,45 @@ window.FOGON_MENU_ADMIN_BUILD = "103-kiosk-qr";
     }
   }
 
+  async function toggleSuboptionAvailability(input) {
+    const productId = String(input.dataset.productId || "").trim();
+    const groupId = String(input.dataset.groupId || "").trim();
+    const optionId = String(input.dataset.optionId || "").trim();
+    const available = Boolean(input.checked);
+
+    if (!productId || !groupId || !optionId) return;
+
+    input.disabled = true;
+
+    try {
+      const result = await callAdminCatalog("set_suboption_availability", {
+        productId,
+        groupId,
+        optionId,
+        available
+      });
+
+      if (!state.catalog.availability) state.catalog.availability = {};
+      state.catalog.availability[result.key] = result.available !== false;
+      renderProducts();
+
+      toast(
+        available
+          ? "Subopción disponible en el menú."
+          : "Subopción marcada como agotada."
+      );
+    } catch (error) {
+      console.error(error);
+      input.checked = !available;
+      toast(
+        `No se pudo cambiar la subopción. ${menuAdminErrorMessage(error)}`,
+        "error"
+      );
+    } finally {
+      input.disabled = false;
+    }
+  }
+
   function fillCategoryForm(category) {
     state.editingCategoryId = category.id;
     $("#categoryId").value = category.id;
@@ -3294,6 +3414,12 @@ window.FOGON_MENU_ADMIN_BUILD = "103-kiosk-qr";
     document.addEventListener("change", (event) => {
       const target = event.target instanceof Element ? event.target : null;
       if (!target) return;
+
+      const suboptionInput = target.closest("[data-suboption-availability]");
+      if (suboptionInput) {
+        toggleSuboptionAvailability(suboptionInput);
+        return;
+      }
 
       const input = target.closest("[data-product-visible]");
       if (input) {
