@@ -697,7 +697,7 @@ function isProductAvailable(item) {
 
   return (item.optionGroups || []).every((group) => {
     if (!group.required) return true;
-    return (group.options || []).some((option) => availabilityValue(optionAvailabilityKey(group, option)));
+    return (group.options || []).some((option) => isOptionAvailable(group, option));
   });
 }
 
@@ -1099,7 +1099,10 @@ function openProduct(itemId) {
   const modal = $("#productModal");
   const groups = (item.optionGroups || []).map((group) => ({
     ...group,
-    options: (group.options || []).filter((option) => isOptionAvailable(group, option))
+    options: (group.options || []).map((option) => ({
+      ...option,
+      available: isOptionAvailable(group, option)
+    }))
   })).filter((group) => group.options.length || group.required);
   const extras = (item.extras || []).filter((extra) => isExtraAvailable(extra));
   const removables = (item.removables || []).filter((remove) => isRemovableAvailable(remove));
@@ -1119,19 +1122,22 @@ function openProduct(itemId) {
       </p>
       <div class="modifier-options">
         ${group.options.length ? group.options.map((option, optionIndex) => `
-          <label class="modifier-option">
+          <label class="modifier-option ${option.available ? "" : "is-sold-out"}">
             <input
               type="${group.type === "multi" ? "checkbox" : "radio"}"
               name="${escapeAttribute(group.id)}"
               value="${escapeAttribute(option.id)}"
-              ${group.required ? "required" : ""}
+              ${group.required && option.available ? "required" : ""}
+              ${option.available ? "" : "disabled"}
             >
             <span class="modifier-control" aria-hidden="true"></span>
             <span class="modifier-option-copy">
               <strong>${escapeHtml(option[state.lang] || option.es)}</strong>
-              ${Number(option.price || 0) !== 0
-                ? `<small>${Number(option.price) > 0 ? "+" : ""}${money(option.price)}</small>`
-                : `<small>${state.lang === "en" ? "Included" : "Incluido"}</small>`}
+              ${option.available
+                ? (Number(option.price || 0) !== 0
+                  ? `<small>${Number(option.price) > 0 ? "+" : ""}${money(option.price)}</small>`
+                  : `<small>${state.lang === "en" ? "Included" : "Incluido"}</small>`)
+                : `<small class="modifier-sold-out">${state.lang === "en" ? "Sold out" : "Agotado"}</small>`}
             </span>
           </label>
         `).join("") : `<p class="choice-empty">${state.lang === "en" ? "Not available right now." : "No disponible por ahora."}</p>`}
