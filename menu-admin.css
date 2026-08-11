@@ -1873,3 +1873,172 @@ body.image-crop-open { overflow: hidden; }
     padding:9px;
   }
 }
+
+
+/* =========================================================
+   V104.7.1 · FIX DESKTOP PARA SUBOPCIONES
+   Mantiene intacto el comportamiento móvil de V104.7.
+   ========================================================= */
+
+@media (min-width: 901px) {
+  .data-table {
+    table-layout: auto !important;
+    width: 100% !important;
+  }
+
+  /* Columna Visible/Subopciones con espacio real en escritorio. */
+  .data-table th:nth-child(4),
+  .data-table td:nth-child(4) {
+    width: 430px !important;
+    min-width: 430px !important;
+    max-width: 430px !important;
+    vertical-align: top !important;
+  }
+
+  .product-suboptions-panel {
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    margin-top: 12px !important;
+    padding-top: 10px !important;
+    overflow: hidden !important;
+  }
+
+  .product-suboptions-heading {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    gap: 10px !important;
+    width: 100% !important;
+  }
+
+  .product-suboptions-heading > small {
+    display: inline-block !important;
+    white-space: nowrap !important;
+  }
+
+  .product-suboptions-strip {
+    display: flex !important;
+    flex-wrap: nowrap !important;
+    gap: 10px !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    overflow-x: auto !important;
+    overflow-y: hidden !important;
+    padding: 2px 2px 10px !important;
+    scroll-snap-type: x proximity !important;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin;
+  }
+
+  .product-suboption-card {
+    flex: 0 0 184px !important;
+    width: 184px !important;
+    min-width: 184px !important;
+    max-width: 184px !important;
+    display: grid !important;
+    grid-template-rows: auto auto !important;
+    align-content: start !important;
+    border: 1px solid var(--line) !important;
+    border-radius: 12px !important;
+    padding: 10px 11px !important;
+    background: var(--surface-soft) !important;
+    box-sizing: border-box !important;
+    scroll-snap-align: start !important;
+  }
+
+  .product-suboption-card.is-sold-out {
+    border-color: #e7c5bf !important;
+    background: #fff6f4 !important;
+  }
+
+  .product-suboption-copy {
+    display: grid !important;
+    gap: 3px !important;
+    margin-bottom: 10px !important;
+    min-width: 0 !important;
+  }
+
+  .product-suboption-copy small,
+  .product-suboption-copy strong {
+    display: block !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    white-space: nowrap !important;
+  }
+
+  .product-suboption-copy small {
+    font-size: .68rem !important;
+    line-height: 1.25 !important;
+  }
+
+  .product-suboption-copy strong {
+    font-size: .84rem !important;
+    line-height: 1.25 !important;
+  }
+
+  .suboption-availability-switch {
+    position: relative !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    gap: 8px !important;
+    width: max-content !important;
+    max-width: 100% !important;
+    cursor: pointer !important;
+  }
+
+  .suboption-availability-switch input {
+    position: absolute !important;
+    opacity: 0 !important;
+    width: 1px !important;
+    height: 1px !important;
+    pointer-events: none !important;
+  }
+
+  .suboption-availability-switch .status-switch-control {
+    display: inline-block !important;
+    flex: 0 0 46px !important;
+    width: 46px !important;
+    min-width: 46px !important;
+    height: 26px !important;
+  }
+
+  .suboption-availability-label {
+    display: inline-block !important;
+    white-space: nowrap !important;
+    font-size: .72rem !important;
+    font-weight: 800 !important;
+  }
+}
+
+@media (min-width: 901px) and (max-width: 1240px) {
+  .data-table th:nth-child(4),
+  .data-table td:nth-child(4) {
+    width: 350px !important;
+    min-width: 350px !important;
+    max-width: 350px !important;
+  }
+
+  .product-suboption-card {
+    flex-basis: 168px !important;
+    width: 168px !important;
+    min-width: 168px !important;
+    max-width: 168px !important;
+  }
+
+  .product-suboptions-heading > small {
+    font-size: .62rem !important;
+  }
+}
+
+@media (min-width: 1500px) {
+  .data-table th:nth-child(4),
+  .data-table td:nth-child(4) {
+    width: 500px !important;
+    min-width: 500px !important;
+    max-width: 500px !important;
+  }
+}
