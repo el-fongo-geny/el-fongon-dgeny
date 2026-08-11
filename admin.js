@@ -726,11 +726,21 @@ async function syncOrdersFromBackend() {
   }
 
   if (db?.isReady()) {
+    if (!adminPinInMemory) return;
+
     try {
-      const orders = await db.fetchOrders();
-      await applyOrdersIfChanged(Array.isArray(orders) ? orders : []);
+      const result = await callProtectedAdminFunction(
+        "admin-orders",
+        { action: "list_orders" }
+      );
+
+      const orders = (Array.isArray(result?.orders) ? result.orders : [])
+        .map(orderFromBackend)
+        .filter(Boolean);
+
+      await applyOrdersIfChanged(orders);
     } catch (error) {
-      console.warn("No se pudieron sincronizar pedidos desde Supabase:", error);
+      console.warn("No se pudieron sincronizar pedidos desde admin-orders:", error);
     }
     return;
   }
@@ -796,10 +806,18 @@ async function syncAvailabilityFromBackend() {
 }
 
 async function updateOrderStatusBackend(orderId, status, extra = {}) {
-  const db = window.FOGON_DB;
+  if (window.FOGON_DB?.isReady?.()) {
+    const order = findOrder(orderId);
 
-  if (db?.isReady()) {
-    await db.updateOrderStatus(orderId, status, extra);
+    await callProtectedAdminFunction(
+      "admin-orders",
+      {
+        action: "update_status",
+        order_id: order?.databaseId || orderId,
+        status,
+        ...extra
+      }
+    );
     return;
   }
 
@@ -811,10 +829,16 @@ async function updateOrderStatusBackend(orderId, status, extra = {}) {
 }
 
 async function deleteOrderBackend(orderId) {
-  const db = window.FOGON_DB;
+  if (window.FOGON_DB?.isReady?.()) {
+    const order = findOrder(orderId);
 
-  if (db?.isReady()) {
-    await db.deleteOrder(orderId);
+    await callProtectedAdminFunction(
+      "admin-orders",
+      {
+        action: "delete_order",
+        order_id: order?.databaseId || orderId
+      }
+    );
     return;
   }
 
@@ -835,9 +859,17 @@ async function setAvailability(itemId, available) {
   const db = window.FOGON_DB;
   if (db?.isReady()) {
     try {
-      await db.setAvailability(itemId, available);
+      await callProtectedAdminFunction(
+        "admin-orders",
+        {
+          action: "set_availability",
+          item_id: itemId,
+          available: Boolean(available)
+        }
+      );
     } catch (error) {
-      console.warn("No se pudo guardar disponibilidad en Supabase:", error);
+      console.warn("No se pudo guardar disponibilidad mediante admin-orders:", error);
+      throw error;
     }
     return;
   }
@@ -1183,18 +1215,17 @@ async function acceptOrder(orderId) {
     );
 
     if (unpaidKioskFallback) {
-      const db = window.FOGON_DB;
-
-      if (!db?.isReady?.()) {
+      if (!window.FOGON_DB?.isReady?.()) {
         throw new Error("Supabase no está disponible.");
       }
 
-      await db.updateKioskPayment(cleanOrderId, {
-        status: "accepted",
-        paymentStatus: "pending",
-        paymentError: "",
-        checkoutMode: "pay_at_counter"
-      });
+      await callProtectedAdminFunction(
+        "admin-orders",
+        {
+          action: "switch_to_counter",
+          order_id: requireDatabaseOrderId(currentOrder)
+        }
+      );
     } else {
       await updateOrderStatusBackend(
         cleanOrderId,
@@ -1578,34 +1609,15 @@ async function hidePaidOrder(orderId) {
   let removed = false;
 
   try {
-    try {
-      await callProtectedAdminFunction(
-        "admin-order-payment",
-        {
-          action: "hide_for_all",
-          order_id: requireDatabaseOrderId(order)
-        }
-      );
-
-      removed = true;
-    } catch (functionError) {
-      console.warn(
-        "admin-order-payment no respondió; intentando actualización directa:",
-        functionError
-      );
-
-      const db = window.FOGON_DB;
-
-      if (!db?.isReady?.() || typeof db.hideOrderForAll !== "function") {
-        throw functionError;
+    await callProtectedAdminFunction(
+      "admin-orders",
+      {
+        action: "hide_for_all",
+        order_id: requireDatabaseOrderId(order)
       }
+    );
 
-      await db.hideOrderForAll(
-        order.databaseId || order.id
-      );
-
-      removed = true;
-    }
+    removed = true;
 
     if (!removed) {
       throw new Error(
@@ -3186,10 +3198,13 @@ function init() {
 
         if (window.FOGON_DB?.isReady()) {
           try {
-            await window.FOGON_DB.clearOrders();
+            await callProtectedAdminFunction(
+              "admin-orders",
+              { action: "clear_orders" }
+            );
             await syncOrdersFromBackend();
           } catch (error) {
-            console.warn("No se pudieron limpiar los pedidos en Supabase:", error);
+            console.warn("No se pudieron limpiar los pedidos mediante admin-orders:", error);
           }
         }
       }
@@ -3328,7 +3343,11 @@ function init() {
   });
 
   if (window.FOGON_DB?.isReady()) {
-    window.FOGON_DB.subscribeOrders(() => syncOrdersFromBackend());
+    /*
+      V104.8A:
+      Los pedidos se consultan mediante admin-orders cada 5 segundos.
+      Ya no dependemos de acceso Realtime directo a public.orders.
+    */
     window.FOGON_DB.subscribeAvailability(() => syncAvailabilityFromBackend());
   }
 
