@@ -2046,20 +2046,29 @@ async function createSecureKioskOrder(order) {
 }
 
 async function startKioskBridgePayment(order) {
-  const externalPaymentId = buildExternalPaymentId(order);
+  const orderId = order.databaseId || order.id;
+
+  // V104.2: primero el servidor reclama/crea el intento de pago de forma atómica.
+  // El navegador nunca inventa el Idempotency-Key de Clover.
+  const prepared = await callKioskPaymentService("prepare", { orderId });
 
   state.activeKioskPayment = {
-    orderId: order.databaseId || order.id,
+    orderId,
     publicId: order.publicId || order.public_id || order.id,
-    externalPaymentId
+    paymentAttemptId: prepared.paymentAttemptId || "",
+    externalPaymentId: prepared.externalPaymentId || ""
   };
 
   const result = await callKioskPaymentService("start", {
-    externalPaymentId,
-    orderId: order.databaseId || order.id
+    orderId,
+    paymentAttemptId: prepared.paymentAttemptId
   });
 
-  return { ...result, externalPaymentId };
+  return {
+    ...result,
+    paymentAttemptId: prepared.paymentAttemptId,
+    externalPaymentId: prepared.externalPaymentId
+  };
 }
 
 async function cancelActiveKioskPayment() {
@@ -2081,7 +2090,8 @@ async function cancelActiveKioskPayment() {
   try {
     const result = await callKioskPaymentService("cancel", {
       kioskId: currentKioskId(),
-      externalPaymentId: payment.externalPaymentId
+      paymentAttemptId: payment.paymentAttemptId || "",
+      externalPaymentId: payment.externalPaymentId || ""
     });
 
     if (String(result?.status || "").toLowerCase() !== "cancelled") {
