@@ -3412,3 +3412,37 @@ body.cart-open .cart-panel {
     max-width: 100vw !important;
   }
 }
+
+
+/* =========================================================
+   V104.7 · SUBOPCIONES AGOTADAS
+   ========================================================= */
+.modifier-option.is-sold-out {
+  opacity:.72;
+  border-color:rgba(201,74,53,.45)!important;
+  background:linear-gradient(135deg,rgba(201,74,53,.08),rgba(255,255,255,.015))!important;
+  cursor:not-allowed!important;
+}
+.modifier-option.is-sold-out input { cursor:not-allowed!important; }
+.modifier-option.is-sold-out .modifier-control { opacity:.45; }
+.modifier-option.is-sold-out .modifier-option-copy strong { opacity:.72; }
+.modifier-sold-out {
+  display:inline-flex!important;
+  align-items:center;
+  width:max-content;
+  min-height:24px;
+  margin-top:3px;
+  padding:2px 9px;
+  border:1px solid rgba(228,91,63,.42);
+  border-radius:999px;
+  background:rgba(228,91,63,.12);
+  color:#ff8068!important;
+  font-size:.74rem!important;
+  font-weight:900!important;
+}
+body.light-mode .modifier-option.is-sold-out { background:#fff3f0!important; }
+body.light-mode .modifier-sold-out {
+  color:#b93b28!important;
+  background:#ffe6e0;
+  border-color:#efb4aa;
+}
