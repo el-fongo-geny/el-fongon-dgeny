@@ -36,6 +36,7 @@ window.FOGON_MENU_ADMIN_BUILD = "103-kiosk-qr";
     availabilityQuery: "",
     businessSettings: {},
     kioskDevices: [],
+    employeeCloverTerminal: null,
     kioskEditorMode: "create"
   };
 
@@ -773,6 +774,97 @@ window.FOGON_MENU_ADMIN_BUILD = "103-kiosk-qr";
   }
 
 
+
+  async function loadEmployeeCloverTerminal({ quiet = false } = {}) {
+    const status = $("#employeeCloverStatus");
+
+    try {
+      if (status && !quiet) status.textContent = "Cargando configuración…";
+
+      const result = await callAdminCatalog("get_employee_clover_terminal");
+      const terminal = result?.terminal || {
+        id: "employee-counter",
+        displayName: "Clover de caja del empleado",
+        cloverDeviceId: "",
+        enabled: false
+      };
+
+      state.employeeCloverTerminal = terminal;
+
+      if ($("#employeeCloverDeviceId")) {
+        $("#employeeCloverDeviceId").value = terminal.cloverDeviceId || "";
+      }
+
+      if ($("#employeeCloverEnabled")) {
+        $("#employeeCloverEnabled").checked = terminal.enabled === true;
+      }
+
+      if (status) {
+        if (terminal.enabled && terminal.cloverDeviceId) {
+          status.textContent = `Activo · ${terminal.cloverDeviceId}`;
+          status.classList.add("is-ready");
+        } else {
+          status.textContent = "Sin activar";
+          status.classList.remove("is-ready");
+        }
+      }
+    } catch (error) {
+      console.error("No se pudo cargar el Clover del empleado:", error);
+      if (status) {
+        status.textContent = `No se pudo cargar. ${menuAdminErrorMessage(error)}`;
+        status.classList.remove("is-ready");
+      }
+    }
+  }
+
+  async function saveEmployeeCloverTerminal(event) {
+    event?.preventDefault?.();
+
+    const deviceId = String($("#employeeCloverDeviceId")?.value || "").trim();
+    const enabled = Boolean($("#employeeCloverEnabled")?.checked);
+    const status = $("#employeeCloverStatus");
+
+    if (enabled && !deviceId) {
+      toast("Introduce el serial / Device ID del Clover de caja.", "error");
+      $("#employeeCloverDeviceId")?.focus();
+      return;
+    }
+
+    setBusy(true);
+
+    try {
+      const result = await callAdminCatalog(
+        "save_employee_clover_terminal",
+        {
+          cloverDeviceId: deviceId,
+          enabled
+        }
+      );
+
+      state.employeeCloverTerminal = result.terminal || null;
+
+      if (status) {
+        status.textContent =
+          result.terminal?.enabled && result.terminal?.cloverDeviceId
+            ? `Activo · ${result.terminal.cloverDeviceId}`
+            : "Sin activar";
+        status.classList.toggle(
+          "is-ready",
+          Boolean(result.terminal?.enabled && result.terminal?.cloverDeviceId)
+        );
+      }
+
+      toast("Clover de caja guardado.");
+    } catch (error) {
+      console.error(error);
+      toast(
+        `No se pudo guardar el Clover de caja. ${menuAdminErrorMessage(error)}`,
+        "error"
+      );
+    } finally {
+      setBusy(false);
+    }
+  }
 
   function kioskPublicUrl(kioskId) {
     const origin = window.location.origin;
@@ -1786,6 +1878,7 @@ window.FOGON_MENU_ADMIN_BUILD = "103-kiosk-qr";
     if (view === "availability-items") renderAvailabilityItems();
     if (view === "business") {
       fillBusinessSettingsForm(true);
+      void loadEmployeeCloverTerminal({ quiet: true });
       void loadKioskDevices({ quiet: true });
     }
     if (view === "security") void loadSecurityStatus();
@@ -3164,6 +3257,7 @@ window.FOGON_MENU_ADMIN_BUILD = "103-kiosk-qr";
       renderAvailabilityItems();
     });
     $("#businessSettingsForm")?.addEventListener("submit", saveBusinessSettings);
+    $("#employeeCloverForm")?.addEventListener("submit", saveEmployeeCloverTerminal);
 
     $("#kioskEditorQrButton")?.addEventListener("click", () => {
       const kioskId = String($("#kioskEditorQrButton")?.dataset.kioskId || "").trim();
