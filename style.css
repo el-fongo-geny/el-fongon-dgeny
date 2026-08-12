@@ -3563,6 +3563,17 @@ body.payment-open .category-drawer-backdrop {
   pointer-events: none !important;
 }
 
+.kiosk-review-staff-message {
+  margin: 0 !important;
+  border: 1px solid color-mix(in srgb, #d94a3a 36%, var(--line));
+  border-radius: 14px;
+  padding: 12px 14px;
+  background: color-mix(in srgb, #d94a3a 9%, var(--surface));
+  color: var(--ink);
+  font-weight: 800;
+  line-height: 1.45;
+}
+
 body.payment-open .cart-panel {
   z-index: 20 !important;
 }
