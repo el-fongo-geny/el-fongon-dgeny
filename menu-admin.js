@@ -843,18 +843,28 @@ window.FOGON_MENU_ADMIN_BUILD = "103-kiosk-qr";
 
       state.employeeCloverTerminal = result.terminal || null;
 
+      // Releer del servidor para que el estado mostrado sea exactamente
+      // el persistido en Supabase, no solo el valor local del interruptor.
+      await loadEmployeeCloverTerminal({ quiet: true });
+
+      const saved = state.employeeCloverTerminal;
+
       if (status) {
         status.textContent =
-          result.terminal?.enabled && result.terminal?.cloverDeviceId
-            ? `Activo · ${result.terminal.cloverDeviceId}`
+          saved?.enabled && saved?.cloverDeviceId
+            ? `Activo · ${saved.cloverDeviceId}`
             : "Sin activar";
         status.classList.toggle(
           "is-ready",
-          Boolean(result.terminal?.enabled && result.terminal?.cloverDeviceId)
+          Boolean(saved?.enabled && saved?.cloverDeviceId)
         );
       }
 
-      toast("Clover de caja guardado.");
+      toast(
+        saved?.enabled && saved?.cloverDeviceId
+          ? "Clover de caja guardado y activado."
+          : "Clover de caja guardado."
+      );
     } catch (error) {
       console.error(error);
       toast(
@@ -3257,7 +3267,19 @@ window.FOGON_MENU_ADMIN_BUILD = "103-kiosk-qr";
       renderAvailabilityItems();
     });
     $("#businessSettingsForm")?.addEventListener("submit", saveBusinessSettings);
-    $("#employeeCloverForm")?.addEventListener("submit", saveEmployeeCloverTerminal);
+
+    $("#saveEmployeeCloverButton")?.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      void saveEmployeeCloverTerminal(event);
+    });
+
+    $("#employeeCloverDeviceId")?.addEventListener("keydown", (event) => {
+      if (event.key !== "Enter") return;
+      event.preventDefault();
+      event.stopPropagation();
+      void saveEmployeeCloverTerminal(event);
+    });
 
     $("#kioskEditorQrButton")?.addEventListener("click", () => {
       const kioskId = String($("#kioskEditorQrButton")?.dataset.kioskId || "").trim();
