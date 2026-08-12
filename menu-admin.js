@@ -7,7 +7,7 @@ window.FOGON_MENU_ADMIN_BUILD = "103-kiosk-qr";
   const $$ = (selector) => Array.from(document.querySelectorAll(selector));
   const money = (value) => `$${Number(value || 0).toFixed(2)}`;
 
-  window.FOGON_MENU_ADMIN_BUILD = "100-i18n-kiosk-identity";
+  window.FOGON_MENU_ADMIN_BUILD = "105-multi-clover";
 
   const state = {
     pin: "",
@@ -36,7 +36,9 @@ window.FOGON_MENU_ADMIN_BUILD = "103-kiosk-qr";
     availabilityQuery: "",
     businessSettings: {},
     kioskDevices: [],
-    employeeCloverTerminal: null,
+    employeeCloverTerminals: [],
+    selectedEmployeeCloverTerminalId: "employee-counter",
+    employeeCloverEditorMode: "edit",
     kioskEditorMode: "create"
   };
 
@@ -775,41 +777,126 @@ window.FOGON_MENU_ADMIN_BUILD = "103-kiosk-qr";
 
 
 
-  async function loadEmployeeCloverTerminal({ quiet = false } = {}) {
+  function selectedEmployeeCloverTerminal() {
+    return state.employeeCloverTerminals.find(
+      (terminal) => terminal.id === state.selectedEmployeeCloverTerminalId
+    ) || null;
+  }
+
+  function renderEmployeeCloverTerminals() {
+    const list = $("#employeeCloverTerminalsList");
+    const status = $("#employeeCloverStatus");
+    const terminals = state.employeeCloverTerminals;
+
+    if (list) {
+      list.innerHTML = terminals.map((terminal) => {
+        const ready = terminal.enabled === true && Boolean(terminal.cloverDeviceId);
+        const selected = terminal.id === state.selectedEmployeeCloverTerminalId;
+
+        return `
+          <button
+            class="employee-clover-terminal-card${selected ? " is-selected" : ""}"
+            type="button"
+            data-employee-clover-edit="${escapeHtml(terminal.id)}"
+          >
+            <span class="employee-clover-terminal-head">
+              <strong>${escapeHtml(terminal.displayName || "Clover de caja")}</strong>
+              <span class="employee-clover-terminal-state${ready ? " is-ready" : ""}">
+                ${ready ? "Activo" : "Inactivo"}
+              </span>
+            </span>
+            <small>${escapeHtml(terminal.cloverDeviceId || "Sin Device ID")}</small>
+            ${terminal.isDefault ? "<small>Dispositivo predeterminado</small>" : ""}
+          </button>
+        `;
+      }).join("");
+    }
+
+    const activeCount = terminals.filter(
+      (terminal) => terminal.enabled && terminal.cloverDeviceId
+    ).length;
+
+    if (status && state.employeeCloverEditorMode !== "create") {
+      status.textContent = `${terminals.length} dispositivo${terminals.length === 1 ? "" : "s"} · ${activeCount} activo${activeCount === 1 ? "" : "s"}`;
+      status.classList.toggle("is-ready", activeCount > 0);
+    }
+  }
+
+  function fillEmployeeCloverEditor(terminal) {
+    const isDefault = terminal?.id === "employee-counter";
+    state.employeeCloverEditorMode = "edit";
+    state.selectedEmployeeCloverTerminalId = terminal?.id || "employee-counter";
+
+    if ($("#employeeCloverTerminalId")) {
+      $("#employeeCloverTerminalId").value = terminal?.id || "employee-counter";
+    }
+    if ($("#employeeCloverDisplayName")) {
+      $("#employeeCloverDisplayName").value = terminal?.displayName || "Clover de caja del empleado";
+    }
+    if ($("#employeeCloverDeviceId")) {
+      $("#employeeCloverDeviceId").value = terminal?.cloverDeviceId || "";
+    }
+    if ($("#employeeCloverEnabled")) {
+      $("#employeeCloverEnabled").checked = terminal?.enabled === true;
+    }
+    if ($("#employeeCloverEditorTitle")) {
+      $("#employeeCloverEditorTitle").textContent = `Editar ${terminal?.displayName || "Clover de caja"}`;
+    }
+    if ($("#employeeCloverDefaultBadge")) {
+      $("#employeeCloverDefaultBadge").hidden = !isDefault;
+    }
+    if ($("#cancelEmployeeCloverButton")) {
+      $("#cancelEmployeeCloverButton").hidden = true;
+    }
+
+    renderEmployeeCloverTerminals();
+  }
+
+  function openNewEmployeeCloverEditor() {
+    state.employeeCloverEditorMode = "create";
+    state.selectedEmployeeCloverTerminalId = "";
+
+    if ($("#employeeCloverTerminalId")) $("#employeeCloverTerminalId").value = "";
+    if ($("#employeeCloverDisplayName")) $("#employeeCloverDisplayName").value = "";
+    if ($("#employeeCloverDeviceId")) $("#employeeCloverDeviceId").value = "";
+    if ($("#employeeCloverEnabled")) $("#employeeCloverEnabled").checked = true;
+    if ($("#employeeCloverEditorTitle")) $("#employeeCloverEditorTitle").textContent = "Añadir dispositivo Clover";
+    if ($("#employeeCloverDefaultBadge")) $("#employeeCloverDefaultBadge").hidden = true;
+    if ($("#cancelEmployeeCloverButton")) $("#cancelEmployeeCloverButton").hidden = false;
+    if ($("#employeeCloverStatus")) {
+      $("#employeeCloverStatus").textContent = "Completa los datos del nuevo dispositivo.";
+      $("#employeeCloverStatus").classList.remove("is-ready");
+    }
+
+    renderEmployeeCloverTerminals();
+    $("#employeeCloverDisplayName")?.focus();
+  }
+
+  function cancelEmployeeCloverEditor() {
+    const fallback = state.employeeCloverTerminals.find((terminal) => terminal.isDefault) ||
+      state.employeeCloverTerminals[0] || null;
+    fillEmployeeCloverEditor(fallback);
+  }
+
+  async function loadEmployeeCloverTerminals({ quiet = false } = {}) {
     const status = $("#employeeCloverStatus");
 
     try {
-      if (status && !quiet) status.textContent = "Cargando configuración…";
+      if (status && !quiet) status.textContent = "Cargando dispositivos…";
 
-      const result = await callAdminCatalog("get_employee_clover_terminal");
-      const terminal = result?.terminal || {
-        id: "employee-counter",
-        displayName: "Clover de caja del empleado",
-        cloverDeviceId: "",
-        enabled: false
-      };
+      const result = await callAdminCatalog("list_employee_clover_terminals");
+      state.employeeCloverTerminals = Array.isArray(result?.terminals)
+        ? result.terminals
+        : [];
 
-      state.employeeCloverTerminal = terminal;
+      const selected = selectedEmployeeCloverTerminal() ||
+        state.employeeCloverTerminals.find((terminal) => terminal.isDefault) ||
+        state.employeeCloverTerminals[0] || null;
 
-      if ($("#employeeCloverDeviceId")) {
-        $("#employeeCloverDeviceId").value = terminal.cloverDeviceId || "";
-      }
-
-      if ($("#employeeCloverEnabled")) {
-        $("#employeeCloverEnabled").checked = terminal.enabled === true;
-      }
-
-      if (status) {
-        if (terminal.enabled && terminal.cloverDeviceId) {
-          status.textContent = `Activo · ${terminal.cloverDeviceId}`;
-          status.classList.add("is-ready");
-        } else {
-          status.textContent = "Sin activar";
-          status.classList.remove("is-ready");
-        }
-      }
+      if (selected) fillEmployeeCloverEditor(selected);
+      else openNewEmployeeCloverEditor();
     } catch (error) {
-      console.error("No se pudo cargar el Clover del empleado:", error);
+      console.error("No se pudieron cargar los Clover del empleado:", error);
       if (status) {
         status.textContent = `No se pudo cargar. ${menuAdminErrorMessage(error)}`;
         status.classList.remove("is-ready");
@@ -820,55 +907,53 @@ window.FOGON_MENU_ADMIN_BUILD = "103-kiosk-qr";
   async function saveEmployeeCloverTerminal(event) {
     event?.preventDefault?.();
 
-    const deviceId = String($("#employeeCloverDeviceId")?.value || "").trim();
+    const terminalId = String($("#employeeCloverTerminalId")?.value || "").trim();
+    const displayName = String($("#employeeCloverDisplayName")?.value || "").trim();
+    const cloverDeviceId = String($("#employeeCloverDeviceId")?.value || "").trim();
     const enabled = Boolean($("#employeeCloverEnabled")?.checked);
-    const status = $("#employeeCloverStatus");
 
-    if (enabled && !deviceId) {
-      toast("Introduce el serial / Device ID del Clover de caja.", "error");
+    if (!displayName) {
+      toast("Escribe un nombre para identificar el Clover.", "error");
+      $("#employeeCloverDisplayName")?.focus();
+      return;
+    }
+
+    if (enabled && !cloverDeviceId) {
+      toast("Introduce el serial / Device ID del Clover.", "error");
       $("#employeeCloverDeviceId")?.focus();
       return;
     }
 
+    const creating = state.employeeCloverEditorMode === "create";
+    const action = creating
+      ? "create_employee_clover_terminal"
+      : terminalId === "employee-counter"
+        ? "save_employee_clover_terminal"
+        : "update_employee_clover_terminal";
+
     setBusy(true);
 
     try {
-      const result = await callAdminCatalog(
-        "save_employee_clover_terminal",
-        {
-          cloverDeviceId: deviceId,
-          enabled
-        }
-      );
+      const result = await callAdminCatalog(action, {
+        terminalId,
+        displayName,
+        cloverDeviceId,
+        enabled
+      });
 
-      state.employeeCloverTerminal = result.terminal || null;
-
-      // Releer del servidor para que el estado mostrado sea exactamente
-      // el persistido en Supabase, no solo el valor local del interruptor.
-      await loadEmployeeCloverTerminal({ quiet: true });
-
-      const saved = state.employeeCloverTerminal;
-
-      if (status) {
-        status.textContent =
-          saved?.enabled && saved?.cloverDeviceId
-            ? `Activo · ${saved.cloverDeviceId}`
-            : "Sin activar";
-        status.classList.toggle(
-          "is-ready",
-          Boolean(saved?.enabled && saved?.cloverDeviceId)
-        );
-      }
+      state.selectedEmployeeCloverTerminalId = result?.terminal?.id || terminalId;
+      state.employeeCloverEditorMode = "edit";
+      await loadEmployeeCloverTerminals({ quiet: true });
 
       toast(
-        saved?.enabled && saved?.cloverDeviceId
-          ? "Clover de caja guardado y activado."
-          : "Clover de caja guardado."
+        creating
+          ? "Dispositivo Clover añadido."
+          : "Dispositivo Clover actualizado."
       );
     } catch (error) {
       console.error(error);
       toast(
-        `No se pudo guardar el Clover de caja. ${menuAdminErrorMessage(error)}`,
+        `No se pudo guardar el dispositivo Clover. ${menuAdminErrorMessage(error)}`,
         "error"
       );
     } finally {
@@ -1890,7 +1975,7 @@ window.FOGON_MENU_ADMIN_BUILD = "103-kiosk-qr";
     if (view === "availability-items") renderAvailabilityItems();
     if (view === "business") {
       fillBusinessSettingsForm(true);
-      void loadEmployeeCloverTerminal({ quiet: true });
+      void loadEmployeeCloverTerminals({ quiet: true });
       void loadKioskDevices({ quiet: true });
     }
     if (view === "security") void loadSecurityStatus();
@@ -3274,6 +3359,29 @@ window.FOGON_MENU_ADMIN_BUILD = "103-kiosk-qr";
       event.preventDefault();
       event.stopPropagation();
       void saveEmployeeCloverTerminal(event);
+    });
+
+    $("#addEmployeeCloverButton")?.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      openNewEmployeeCloverEditor();
+    });
+
+    $("#cancelEmployeeCloverButton")?.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      cancelEmployeeCloverEditor();
+    });
+
+    $("#employeeCloverTerminalsList")?.addEventListener("click", (event) => {
+      const button = event.target.closest("[data-employee-clover-edit]");
+      if (!button) return;
+
+      const terminal = state.employeeCloverTerminals.find(
+        (candidate) => candidate.id === button.dataset.employeeCloverEdit
+      );
+
+      if (terminal) fillEmployeeCloverEditor(terminal);
     });
 
     $("#employeeCloverDeviceId")?.addEventListener("keydown", (event) => {
