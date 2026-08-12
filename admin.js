@@ -92,7 +92,7 @@ function showLoginRuntimeError(error) {
   console.error("Error del administrador:", error);
 }
 
-window.FOGON_ADMIN_BUILD = "103-clean-modifier-labels";
+window.FOGON_ADMIN_BUILD = "105-multi-clover";
 
 if (!window.CSS) window.CSS = {};
 if (!window.CSS.escape) {
@@ -263,6 +263,7 @@ let automaticCloverQueueRunning = false;
 let automaticCloverQueueTimer = null;
 const automaticCloverAttemptedAt = new Map();
 const AUTOMATIC_CLOVER_RETRY_MS = 8000;
+let pendingCloverTerminalSelection = null;
 
 function applyAdminTheme() {
   const theme = safeLocalGet(STORAGE_ADMIN_THEME) || "dark";
@@ -1405,9 +1406,100 @@ function requireDatabaseOrderId(order) {
   return databaseId;
 }
 
+function closeCloverTerminalModal(terminalId = "") {
+  const modal = $("#cloverTerminalModal");
+  if (modal) modal.hidden = true;
+  document.body.classList.remove("clover-terminal-modal-open");
+
+  const resolve = pendingCloverTerminalSelection;
+  pendingCloverTerminalSelection = null;
+  if (resolve) resolve(String(terminalId || ""));
+}
+
+function showCloverTerminalModal(order, terminals) {
+  const modal = $("#cloverTerminalModal");
+  const choices = $("#cloverTerminalChoices");
+  const help = $("#cloverTerminalDialogHelp");
+
+  if (!modal || !choices) {
+    return Promise.resolve(String(terminals[0]?.id || ""));
+  }
+
+  if (pendingCloverTerminalSelection) {
+    return Promise.resolve("");
+  }
+
+  choices.innerHTML = terminals.map((terminal) => `
+    <button
+      class="clover-terminal-choice"
+      type="button"
+      data-clover-terminal-select="${escapeHtml(terminal.id)}"
+    >
+      <span>${escapeHtml(terminal.displayName || "Clover de caja")}</span>
+      ${terminal.isDefault ? "<small>Predeterminado</small>" : "<small>Seleccionar</small>"}
+    </button>
+  `).join("");
+
+  if (help) {
+    help.textContent = `Pedido #${order.id}: selecciona el Clover que está frente al cliente.`;
+  }
+
+  modal.hidden = false;
+  document.body.classList.add("clover-terminal-modal-open");
+  setTimeout(() => choices.querySelector("button")?.focus(), 30);
+
+  return new Promise((resolve) => {
+    pendingCloverTerminalSelection = resolve;
+  });
+}
+
+async function startManualCloverPayment(orderId) {
+  const order = findOrder(String(orderId || ""));
+
+  if (!order) {
+    alert("No se encontró el pedido.");
+    return;
+  }
+
+  if (paymentActionLocks.has(String(order.id))) return;
+
+  try {
+    const result = await callProtectedAdminFunction(
+      "clover-start-payment",
+      { action: "list_terminals" }
+    );
+    const terminals = Array.isArray(result?.terminals) ? result.terminals : [];
+
+    if (!terminals.length) {
+      alert(
+        "No hay ningún Clover de caja activo.\n\n" +
+        "Añádelo o actívalo en Gestionar menú → Datos del menú."
+      );
+      return;
+    }
+
+    const terminalId = terminals.length === 1
+      ? String(terminals[0].id || "")
+      : await showCloverTerminalModal(order, terminals);
+
+    if (!terminalId) return;
+
+    await startCloverPayment(order.id, {
+      automatic: false,
+      terminalId
+    });
+  } catch (error) {
+    console.error("No se pudieron cargar los Clover disponibles:", error);
+    alert(
+      `No se pudo preparar el cobro con Clover.\n\n${error?.message || error}`
+    );
+  }
+}
+
 async function startCloverPayment(orderId, options = {}) {
   const cleanOrderId = String(orderId || "");
   const automatic = options.automatic === true;
+  const terminalId = String(options.terminalId || "").trim();
 
   if (paymentActionLocks.has(cleanOrderId)) {
     return { ok: false, reason: "locked" };
@@ -1445,6 +1537,7 @@ async function startCloverPayment(orderId, options = {}) {
       "clover-start-payment",
       {
         order_id: requireDatabaseOrderId(order),
+        terminal_id: terminalId || undefined,
         queue_if_busy: true,
         priority: "latest"
       }
@@ -1462,11 +1555,26 @@ async function startCloverPayment(orderId, options = {}) {
     await syncOrdersFromBackend();
 
     const code = String(error?.payload?.error || "");
+    const indeterminate =
+      code === "payment_state_indeterminate" ||
+      code === "payment_requires_review";
     const busy =
       code === "clover_busy" ||
       code === "active_payment_exists" ||
-      Number(error?.status || 0) === 409 ||
       Boolean(error?.payload?.active_public_id);
+
+    if (!automatic && indeterminate) {
+      alert(
+        `No vuelvas a cobrar el pedido #${order.id} todavía.\n\n` +
+        "Revisa la transacción en Clover antes de repetirla."
+      );
+
+      return {
+        ok: false,
+        reason: "review",
+        error
+      };
+    }
 
     if (busy) {
       /*
@@ -1482,16 +1590,7 @@ async function startCloverPayment(orderId, options = {}) {
       };
     }
 
-    const indeterminate =
-      code === "payment_state_indeterminate" ||
-      code === "payment_requires_review";
-
-    if (!automatic && indeterminate) {
-      alert(
-        `No vuelvas a cobrar el pedido #${order.id} todavía.\n\n` +
-        "Revisa la transacción en Clover antes de repetirla."
-      );
-    } else if (!automatic) {
+    if (!automatic) {
       alert(`No se pudo enviar el cobro a Clover.\n\n${error?.message || error}`);
     }
 
@@ -1998,6 +2097,20 @@ function initKitchenGesturesAndMissingButton() {
   document.head.appendChild(style);
 
   document.addEventListener("click", (event) => {
+    const cloverTerminalChoice = event.target.closest("[data-clover-terminal-select]");
+    if (cloverTerminalChoice) {
+      event.preventDefault();
+      closeCloverTerminalModal(cloverTerminalChoice.dataset.cloverTerminalSelect);
+      return;
+    }
+
+    const cloverTerminalCancel = event.target.closest("[data-clover-terminal-cancel]");
+    if (cloverTerminalCancel) {
+      event.preventDefault();
+      closeCloverTerminalModal();
+      return;
+    }
+
     const missing = event.target.closest("#sendDailyMissingBtn");
     if (missing) {
       event.preventDefault();
@@ -3358,7 +3471,7 @@ function init() {
     const cloverPayButton = event.target.closest("[data-clover-pay]");
     if (cloverPayButton) {
       event.preventDefault();
-      void startCloverPayment(cloverPayButton.dataset.cloverPay, { automatic: false });
+      void startManualCloverPayment(cloverPayButton.dataset.cloverPay);
       return;
     }
 
@@ -3378,6 +3491,12 @@ function init() {
 
     const deliverButton = event.target.closest("[data-deliver-order]");
     if (deliverButton) removeOrderEverywhere(deliverButton.dataset.deliverOrder);
+  });
+
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && !$("#cloverTerminalModal")?.hidden) {
+      closeCloverTerminalModal();
+    }
   });
 
   window.addEventListener("storage", (event) => {
