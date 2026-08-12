@@ -339,7 +339,7 @@ function adminLoginErrorMessage(error) {
   const detail = String(payload?.detail || error?.message || error || "").trim();
 
   if (status === 401 && code === "invalid_admin_pin") {
-    return "PIN incorrecto. Confirma que coincide exactamente con el Secret ADMIN_PIN.";
+    return "PIN incorrecto. Usa el PIN actual del Admin Panel configurado desde Gestionar menú.";
   }
 
   if (code === "missing_admin_pin_secret") {
@@ -887,24 +887,6 @@ async function updateOrderStatusBackend(orderId, status, extra = {}) {
     method: "PATCH",
     body: JSON.stringify({ status, ...extra })
   });
-}
-
-async function deleteOrderBackend(orderId) {
-  if (window.FOGON_DB?.isReady?.()) {
-    const order = findOrder(orderId);
-
-    await callProtectedAdminFunction(
-      "admin-orders",
-      {
-        action: "delete_order",
-        order_id: order?.databaseId || orderId
-      }
-    );
-    return;
-  }
-
-  if (!BACKEND_URL) return;
-  await backendRequest(`/api/orders/${encodeURIComponent(orderId)}`, { method: "DELETE" });
 }
 
 function getAvailability() {
@@ -1625,7 +1607,7 @@ async function confirmCashPayment(orderId) {
 
   try {
     await callProtectedAdminFunction(
-      "admin-order-payment",
+      "admin-orders",
       {
         action: "confirm_cash",
         order_id: requireDatabaseOrderId(order)
