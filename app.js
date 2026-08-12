@@ -1107,7 +1107,7 @@ function scrollToCategory(categoryId) {
   renderCategories();
   const section = document.getElementById(`cat-${categoryId}`);
   if (section) section.scrollIntoView({ behavior: "smooth", block: "start" });
-  if (window.innerWidth <= 900) closeCategoryDrawer();
+  closeCategoryDrawer();
 }
 
 function optionLabel(option) {
