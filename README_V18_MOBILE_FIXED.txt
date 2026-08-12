@@ -34,4 +34,4 @@ Qué subir a GitHub:
 
 Panel iPad:
 /admin.html
-PIN: 5425
+
