@@ -7,7 +7,7 @@
   <meta name="theme-color" content="#111111">
   <title>Panel iPad | El Fogon D' Geny</title>
   <link rel="stylesheet" href="style.css?v=67-mobile-navigation-fixed">
-  <link rel="stylesheet" href="admin-payments.css?v=98-clean-cards-security">
+  <link rel="stylesheet" href="admin-payments.css?v=105-multi-clover">
   <style>
     .admin-build-label {
       margin: 12px 0 0;
@@ -122,7 +122,7 @@
         <p class="admin-help">
           Tarjeta: pulsa “Cobrar con Clover”; al aprobarse, el pedido desaparece automáticamente para todos.
           Efectivo: pulsa “Cobrar en efectivo” y después aparecerá “Quitar pedido para todos”.
-          Solo puede existir un cobro Clover activo a la vez.
+          Cada dispositivo Clover puede mostrar un cobro a la vez.
         </p>
         <div id="paymentsList" class="payments-list"></div>
       </div>
@@ -174,6 +174,34 @@
     </section>
   </main>
 
+  <div id="cloverTerminalModal" class="clover-terminal-modal" hidden>
+    <button
+      class="clover-terminal-backdrop"
+      type="button"
+      data-clover-terminal-cancel
+      aria-label="Cerrar selección de Clover"
+    ></button>
+    <section
+      class="clover-terminal-dialog"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="cloverTerminalDialogTitle"
+    >
+      <div class="clover-terminal-dialog-head">
+        <div>
+          <p class="eyebrow">Cobro con tarjeta</p>
+          <h2 id="cloverTerminalDialogTitle">Elige el dispositivo Clover</h2>
+        </div>
+        <button class="clover-terminal-close" type="button" data-clover-terminal-cancel aria-label="Cerrar">×</button>
+      </div>
+      <p id="cloverTerminalDialogHelp" class="admin-help">
+        Selecciona el Clover que está frente al cliente.
+      </p>
+      <div id="cloverTerminalChoices" class="clover-terminal-choices"></div>
+      <button class="secondary-btn full" type="button" data-clover-terminal-cancel>Cancelar</button>
+    </section>
+  </div>
+
   <script>
   // Compatibilidad básica para Safari/iPad antiguos.
   if (!Element.prototype.matches) Element.prototype.matches = Element.prototype.msMatchesSelector || Element.prototype.webkitMatchesSelector;
@@ -185,7 +213,7 @@
   <script src="supabase-client.js?v=105-security-consistency"></script>
   <script src="backend-config.js?v=18-mobile-fixed"></script>
   <script>
-  window.FOGON_ADMIN_EXPECTED_BUILD = "103-clean-modifier-labels";
+  window.FOGON_ADMIN_EXPECTED_BUILD = "105-multi-clover";
 
   window.reportAdminScriptLoadFailure = function () {
     var errorBox = document.getElementById("pinError");
@@ -203,7 +231,7 @@
     }
   };
   </script>
-  <script src="admin.js?v=105-security-consistency" onerror="window.reportAdminScriptLoadFailure()"></script>
+  <script src="admin.js?v=105-multi-clover" onerror="window.reportAdminScriptLoadFailure()"></script>
   <script>
   window.setTimeout(function () {
     if (window.FOGON_ADMIN_BUILD !== window.FOGON_ADMIN_EXPECTED_BUILD) {
