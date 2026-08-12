@@ -8,7 +8,7 @@ QUÉ HACE ESTA VERSIÓN
 - Disponibilidad en Supabase: tabla product_availability.
 - Contador 1-999 en Supabase: función next_order_public_id().
 - Teléfono obligatorio para enviar pedido.
-- PIN del panel: 5425.
+
 
 ANTES DE SUBIR A GITHUB
 1. Abre supabase-config.js.
