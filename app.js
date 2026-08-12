@@ -2044,6 +2044,13 @@ function setKioskPaymentStepVisible(visible, total = 0) {
 
   const totalNode = $("#kioskPaymentTotal");
   if (totalNode) totalNode.textContent = money(total);
+
+  const cancelButton = $("#cancelKioskPaymentButton");
+  const reviewMessage = $("#kioskReviewStaffMessage");
+  const leaveReviewButton = $("#leaveKioskReviewButton");
+  if (cancelButton) cancelButton.hidden = false;
+  if (reviewMessage) reviewMessage.hidden = true;
+  if (leaveReviewButton) leaveReviewButton.hidden = true;
 }
 
 
@@ -2242,6 +2249,19 @@ async function cancelActiveKioskPayment() {
   }
 }
 
+function leaveKioskPaymentReview() {
+  const kioskStep = $("#kioskPaymentStep");
+
+  if (kioskStep?.dataset.paymentStatus !== "review") return;
+
+  // El intento queda intacto en Supabase para que el personal lo revise.
+  // Limpiamos el carrito local para impedir que el cliente cree y pague
+  // accidentalmente un segundo pedido mientras el primero sigue incierto.
+  state.cart = [];
+  renderCart();
+  closePayment();
+}
+
 function isConfirmedCloverPayment(result) {
   return Boolean(
     result &&
@@ -2425,15 +2445,27 @@ async function saveOrder(paymentMethod) {
     const kioskStep = $("#kioskPaymentStep");
     const paymentStep = $("#paymentMethodStep");
     const cancelButton = $("#cancelKioskPaymentButton");
+    const reviewMessage = $("#kioskReviewStaffMessage");
+    const leaveReviewButton = $("#leaveKioskReviewButton");
 
     if (needsReview) {
       if (kioskStep) kioskStep.hidden = false;
       if (paymentStep) paymentStep.hidden = true;
       if (cancelButton) {
-        cancelButton.disabled = true;
-        cancelButton.textContent = state.lang === "en"
-          ? "Ask staff for help"
-          : "Solicita ayuda al personal";
+        cancelButton.hidden = true;
+        cancelButton.disabled = false;
+      }
+      if (reviewMessage) {
+        reviewMessage.hidden = false;
+        reviewMessage.textContent = state.lang === "en"
+          ? "The order was recorded. Ask staff to check the payment in Clover. Do not try to pay again."
+          : "El pedido quedó registrado. Avisa al personal para que compruebe el cobro en Clover. No intentes pagar otra vez.";
+      }
+      if (leaveReviewButton) {
+        leaveReviewButton.hidden = false;
+        leaveReviewButton.textContent = state.lang === "en"
+          ? "Back to menu"
+          : "Volver al menú";
       }
       setKioskPaymentVisual(
         "review",
@@ -2445,9 +2477,12 @@ async function saveOrder(paymentMethod) {
       if (kioskStep) kioskStep.hidden = true;
       if (paymentStep) paymentStep.hidden = false;
       if (cancelButton) {
+        cancelButton.hidden = false;
         cancelButton.disabled = false;
         cancelButton.textContent = state.lang === "en" ? "Cancel payment" : "Cancelar pago";
       }
+      if (reviewMessage) reviewMessage.hidden = true;
+      if (leaveReviewButton) leaveReviewButton.hidden = true;
       if (needsReauthorization) {
         setKioskPaymentVisual("reauthorization_required", error?.message || "");
       }
@@ -2635,6 +2670,11 @@ function initEvents() {
 
     if (event.target.closest("#cancelKioskPaymentButton")) {
       void cancelActiveKioskPayment();
+      return;
+    }
+
+    if (event.target.closest("#leaveKioskReviewButton")) {
+      leaveKioskPaymentReview();
       return;
     }
 
