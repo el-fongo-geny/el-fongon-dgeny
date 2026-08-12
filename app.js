@@ -238,6 +238,21 @@ function publicCatalogHeaders(anonKey) {
   return headers;
 }
 
+async function fetchEdgeFunction(functionName, url, options) {
+  try {
+    return await fetch(url, options);
+  } catch (cause) {
+    const error = new Error(
+      `No se pudo conectar con la función ${functionName}. ` +
+      "Comprueba que esté desplegada y que CORS/Verify JWT permitan esta web."
+    );
+    error.code = "edge_function_network_error";
+    error.functionName = functionName;
+    error.cause = cause;
+    throw error;
+  }
+}
+
 function rowHas(object, key) {
   return Object.prototype.hasOwnProperty.call(object || {}, key);
 }
@@ -1825,7 +1840,8 @@ function saveKioskIdentity(kioskId, credential, sessionToken, expiresAt) {
 async function callKioskSessionService(action, payload = {}) {
   const { supabaseUrl, anonKey } = publicCatalogFunctionConfig();
 
-  const response = await fetch(
+  const response = await fetchEdgeFunction(
+    "kiosk-device-session",
     `${supabaseUrl}/functions/v1/kiosk-device-session`,
     {
       method: "POST",
@@ -1990,7 +2006,7 @@ async function callKioskPaymentService(action, payload = {}) {
     headers["x-kiosk-session"] = sessionToken;
   }
 
-  const response = await fetch(`${supabaseUrl}/functions/v1/${functionName}`, {
+  const response = await fetchEdgeFunction(functionName, `${supabaseUrl}/functions/v1/${functionName}`, {
     method: "POST",
     cache: "no-store",
     headers,
@@ -2003,7 +2019,9 @@ async function callKioskPaymentService(action, payload = {}) {
 
   const result = await response.json().catch(() => ({}));
   if (!response.ok || result?.ok !== true) {
-    const error = new Error(result?.error || `HTTP ${response.status}`);
+    const error = new Error(
+      result?.detail || result?.error || result?.message || `HTTP ${response.status}`
+    );
     error.paymentStatus = String(result?.status || "failed");
     error.retrySafe = result?.retrySafe !== false;
     error.externalPaymentId = String(result?.externalPaymentId || "");
@@ -2086,7 +2104,8 @@ async function createSecureKioskOrder(order) {
   const { supabaseUrl, anonKey } = publicCatalogFunctionConfig();
   const sessionToken = await ensureKioskSession();
 
-  const response = await fetch(
+  const response = await fetchEdgeFunction(
+    "kiosk-order-create",
     `${supabaseUrl}/functions/v1/kiosk-order-create`,
     {
       method: "POST",
@@ -2129,7 +2148,7 @@ async function createSecureKioskOrder(order) {
 
   if (!response.ok || result?.ok !== true || !result?.order) {
     const error = new Error(
-      result?.detail || result?.error || `HTTP ${response.status}`
+      result?.detail || result?.error || result?.message || `HTTP ${response.status}`
     );
     error.httpStatus = response.status;
     throw error;
