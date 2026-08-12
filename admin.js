@@ -650,14 +650,75 @@ async function backendRequest(path, options = {}) {
 
 function orderFromBackend(row) {
   if (!row) return null;
+
+  /*
+    V104.8A.3:
+    admin-orders devuelve las filas reales de public.orders (snake_case).
+    El panel histórico trabaja con customer/totals como objetos.
+    Normalizamos aquí SIN cambiar la base de datos ni el resto del panel.
+  */
+  const legacyCustomer =
+    (row.customer && typeof row.customer === "object" ? row.customer : null)
+    || (row.raw?.customer && typeof row.raw.customer === "object" ? row.raw.customer : null)
+    || {};
+
+  const customer = {
+    ...legacyCustomer,
+    name: String(
+      row.customer_name
+      ?? row.customerName
+      ?? legacyCustomer.name
+      ?? ""
+    ).trim(),
+    phone: String(
+      row.customer_phone
+      ?? row.customerPhone
+      ?? legacyCustomer.phone
+      ?? ""
+    ).trim()
+  };
+
+  const legacyTotals =
+    (row.totals && typeof row.totals === "object" ? row.totals : null)
+    || (row.raw?.totals && typeof row.raw.totals === "object" ? row.raw.totals : null)
+    || {};
+
+  const numericValue = (...values) => {
+    for (const value of values) {
+      if (value === null || value === undefined || value === "") continue;
+      const number = Number(value);
+      if (Number.isFinite(number)) return number;
+    }
+    return 0;
+  };
+
+  const totals = {
+    ...legacyTotals,
+    subtotal: numericValue(
+      row.subtotal,
+      row.sub_total,
+      legacyTotals.subtotal
+    ),
+    tax: numericValue(
+      row.tax,
+      row.tax_amount,
+      legacyTotals.tax
+    ),
+    total: numericValue(
+      row.total,
+      row.grand_total,
+      legacyTotals.total
+    )
+  };
+
   return {
     ...(row.raw || {}),
     id: String(row.public_id ?? row.id),
     databaseId: row.id || row.databaseId || null,
     createdAt: row.created_at || row.createdAt || row.raw?.createdAt || new Date().toISOString(),
-    customer: row.customer || row.raw?.customer || {},
+    customer,
     items: row.items || row.raw?.items || [],
-    totals: row.totals || row.raw?.totals || {},
+    totals,
     paymentMethod: row.payment_method || row.raw?.paymentMethod || "",
     paymentStatus: row.payment_status || row.raw?.paymentStatus || "pending",
     paymentStartedAt: row.payment_started_at || row.raw?.paymentStartedAt || null,
