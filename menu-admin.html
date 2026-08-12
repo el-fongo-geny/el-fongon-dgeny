@@ -363,7 +363,7 @@
                   </p>
                 </div>
 
-                <form id="employeeCloverForm" class="employee-clover-form">
+                <div id="employeeCloverForm" class="employee-clover-form">
                   <label class="field">
                     <span>Serial / Device ID del Clover de caja</span>
                     <input
@@ -391,11 +391,15 @@
                     <span id="employeeCloverStatus" class="employee-clover-status" role="status">
                       Cargando configuración…
                     </span>
-                    <button class="button button-primary" type="submit">
+                    <button
+                      id="saveEmployeeCloverButton"
+                      class="button button-primary"
+                      type="button"
+                    >
                       Guardar Clover de caja
                     </button>
                   </div>
-                </form>
+                </div>
               </section>
 
               <div id="kioskConnectionFields" class="kiosk-connection-fields">
@@ -920,6 +924,6 @@
   </div>
 
   <script src="supabase-config.js?v=18-mobile-fixed"></script>
-  <script src="menu-admin.js?v=104.8a4-employee-clover"></script>
+  <script src="menu-admin.js?v=104.8a4.1-employee-clover-save-fix"></script>
 </body>
 </html>
