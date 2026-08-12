@@ -2042,3 +2042,80 @@ body.image-crop-open { overflow: hidden; }
     max-width: 500px !important;
   }
 }
+
+
+/* =========================================================
+   V104.8A.4 · CLOVER DE CAJA DEL EMPLEADO
+   ========================================================= */
+.employee-clover-card {
+  margin: 18px 0;
+  padding: clamp(16px, 2vw, 22px);
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: var(--surface-soft);
+}
+
+.employee-clover-copy {
+  display: grid;
+  gap: 5px;
+  margin-bottom: 16px;
+}
+
+.employee-clover-copy h4,
+.employee-clover-copy p {
+  margin: 0;
+}
+
+.employee-clover-copy h4 {
+  color: var(--ink);
+  font-size: clamp(1rem, 2vw, 1.2rem);
+}
+
+.employee-clover-copy p {
+  max-width: 760px;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.employee-clover-form {
+  display: grid;
+  gap: 14px;
+}
+
+.employee-clover-switch {
+  margin: 0;
+}
+
+.employee-clover-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding-top: 4px;
+}
+
+.employee-clover-status {
+  color: var(--muted);
+  font-size: .82rem;
+  font-weight: 800;
+}
+
+.employee-clover-status.is-ready {
+  color: var(--success);
+}
+
+@media (max-width: 620px) {
+  .employee-clover-card {
+    border-radius: 15px;
+    padding: 14px;
+  }
+
+  .employee-clover-footer {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .employee-clover-footer .button {
+    width: 100%;
+  }
+}
