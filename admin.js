@@ -92,7 +92,7 @@ function showLoginRuntimeError(error) {
   console.error("Error del administrador:", error);
 }
 
-window.FOGON_ADMIN_BUILD = "105-multi-clover";
+window.FOGON_ADMIN_BUILD = "105-order-state-fix";
 
 if (!window.CSS) window.CSS = {};
 if (!window.CSS.escape) {
@@ -1242,41 +1242,17 @@ async function acceptOrder(orderId) {
   const button = document.querySelector(
     `[data-accept-order="${CSS.escape(cleanOrderId)}"]`
   );
-  const currentOrder = getOrders().find(
-    (order) => String(order.id) === cleanOrderId
-  );
-
   if (button) {
     button.disabled = true;
     button.textContent = "Aceptando…";
   }
 
   try {
-    const unpaidKioskFallback = Boolean(
-      currentOrder &&
-      String(currentOrder.checkoutMode || "") === "pay_before_kitchen" &&
-      normalizePaymentStatus(currentOrder) !== "paid"
+    await updateOrderStatusBackend(
+      cleanOrderId,
+      "accepted",
+      { acceptedAt }
     );
-
-    if (unpaidKioskFallback) {
-      if (!window.FOGON_DB?.isReady?.()) {
-        throw new Error("Supabase no está disponible.");
-      }
-
-      await callProtectedAdminFunction(
-        "admin-orders",
-        {
-          action: "switch_to_counter",
-          order_id: requireDatabaseOrderId(currentOrder)
-        }
-      );
-    } else {
-      await updateOrderStatusBackend(
-        cleanOrderId,
-        "accepted",
-        { acceptedAt }
-      );
-    }
 
     const orders = getOrders().map((order) => (
       String(order.id) === cleanOrderId
@@ -1284,16 +1260,7 @@ async function acceptOrder(orderId) {
             ...order,
             status: "accepted",
             acceptedAt,
-            checkoutMode: unpaidKioskFallback
-              ? "pay_at_counter"
-              : order.checkoutMode,
-            kitchenVisible: true,
-            paymentStatus: unpaidKioskFallback
-              ? "pending"
-              : order.paymentStatus,
-            paymentError: unpaidKioskFallback
-              ? ""
-              : order.paymentError
+            kitchenVisible: true
           }
         : order
     ));
