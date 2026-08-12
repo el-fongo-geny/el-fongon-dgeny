@@ -213,7 +213,7 @@
   <script src="supabase-client.js?v=105-security-consistency"></script>
   <script src="backend-config.js?v=18-mobile-fixed"></script>
   <script>
-  window.FOGON_ADMIN_EXPECTED_BUILD = "105-multi-clover";
+  window.FOGON_ADMIN_EXPECTED_BUILD = "105-order-state-fix";
 
   window.reportAdminScriptLoadFailure = function () {
     var errorBox = document.getElementById("pinError");
@@ -231,7 +231,7 @@
     }
   };
   </script>
-  <script src="admin.js?v=105-multi-clover" onerror="window.reportAdminScriptLoadFailure()"></script>
+  <script src="admin.js?v=105-order-state-fix" onerror="window.reportAdminScriptLoadFailure()"></script>
   <script>
   window.setTimeout(function () {
     if (window.FOGON_ADMIN_BUILD !== window.FOGON_ADMIN_EXPECTED_BUILD) {
