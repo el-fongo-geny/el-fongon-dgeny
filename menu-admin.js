@@ -1514,6 +1514,7 @@ window.FOGON_MENU_ADMIN_BUILD = "103-kiosk-qr";
 
   async function submitAdminPanelPin(event) {
     event.preventDefault();
+    const form = event.currentTarget;
 
     try {
       setBusy(true);
@@ -1523,7 +1524,7 @@ window.FOGON_MENU_ADMIN_BUILD = "103-kiosk-qr";
         securityPinValue("#adminPanelConfirmPin")
       );
 
-      event.currentTarget.reset();
+      form?.reset();
       toast("Contraseña del Admin Panel actualizada.");
     } catch (error) {
       console.error(error);
@@ -1538,6 +1539,7 @@ window.FOGON_MENU_ADMIN_BUILD = "103-kiosk-qr";
 
   async function submitMenuAdminPin(event) {
     event.preventDefault();
+    const form = event.currentTarget;
 
     try {
       setBusy(true);
@@ -1547,7 +1549,7 @@ window.FOGON_MENU_ADMIN_BUILD = "103-kiosk-qr";
         securityPinValue("#menuAdminConfirmPin")
       );
 
-      event.currentTarget.reset();
+      form?.reset();
       toast("Contraseña del Admin Menu actualizada.");
     } catch (error) {
       console.error(error);
