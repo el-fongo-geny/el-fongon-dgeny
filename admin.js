@@ -92,7 +92,7 @@ function showLoginRuntimeError(error) {
   console.error("Error del administrador:", error);
 }
 
-window.FOGON_ADMIN_BUILD = "105-order-state-fix";
+window.FOGON_ADMIN_BUILD = "105-sound-watchdog";
 
 if (!window.CSS) window.CSS = {};
 if (!window.CSS.escape) {
@@ -253,6 +253,7 @@ let audioCtx = null;
 let soundUnlocked = false;
 let soundConfirmationPlayed = false;
 let lastSoundUnlockAttemptAt = 0;
+let adminWakeLock = null;
 let lastNewOrderSignature = "";
 let ordersRenderInitialized = false;
 let knownOrderIds = new Set();
@@ -632,6 +633,10 @@ function showLoginPanel(message = "") {
 
 function logoutAdmin(message = "") {
   stopAlarm();
+  if (adminWakeLock) {
+    void adminWakeLock.release().catch(() => {});
+    adminWakeLock = null;
+  }
   clearAdminSession({ forgetTrustedDevice: true });
   showLoginPanel(
     message || "Sesión cerrada. Introduce el PIN para volver a entrar."
@@ -967,7 +972,29 @@ function cleanKitchenHiddenIds(existingOrders) {
 }
 
 function newOrders(orders = getOrders()) {
-  return orders.filter((order) => order.status === "new" || !order.status);
+  return orders.filter((order) => {
+    if (order.hiddenForAll) return false;
+
+    const status = String(order.status || "new").toLowerCase();
+    const paymentStatus = normalizePaymentStatus(order);
+    const alreadyHandled = [
+      "accepted",
+      "ready",
+      "delivered",
+      "completed",
+      "paid"
+    ].includes(status);
+
+    if (alreadyHandled) return false;
+
+    // Además de una comanda nueva, una excepción de cobro necesita que el
+    // personal intervenga. Antes podía mostrarse en el panel sin hacer sonar
+    // la alarma porque su estado era awaiting_payment/unknown/review.
+    return (
+      status === "new" ||
+      ["review", "unknown", "failed", "cancelled"].includes(paymentStatus)
+    );
+  });
 }
 
 function kitchenOrders(orders = getOrders()) {
@@ -1004,6 +1031,29 @@ function setSoundBanner(message = "", forceVisible = null) {
     forceVisible === null
       ? soundUnlocked
       : !Boolean(forceVisible);
+}
+
+async function requestAdminWakeLock() {
+  if (
+    !adminPinInMemory ||
+    document.hidden ||
+    !("wakeLock" in navigator) ||
+    adminWakeLock
+  ) {
+    return Boolean(adminWakeLock);
+  }
+
+  try {
+    adminWakeLock = await navigator.wakeLock.request("screen");
+    adminWakeLock.addEventListener?.("release", () => {
+      adminWakeLock = null;
+    });
+    return true;
+  } catch (error) {
+    console.warn("No se pudo mantener la pantalla despierta:", error);
+    adminWakeLock = null;
+    return false;
+  }
 }
 
 function ensureAudioContext() {
@@ -1226,6 +1276,9 @@ function updateAlarm() {
   if (pending.length) {
     if (signature !== lastNewOrderSignature) {
       void beep();
+      if (typeof navigator.vibrate === "function") {
+        navigator.vibrate([250, 120, 250]);
+      }
     }
 
     startAlarm();
@@ -3253,6 +3306,7 @@ function init() {
   */
 
   const activateSoundFromGesture = () => {
+    void requestAdminWakeLock();
     void unlockSound({
       playTest: !soundConfirmationPlayed,
       announce: !soundUnlocked
@@ -3280,11 +3334,16 @@ function init() {
     activateSoundFromGesture
   );
 
-  const recoverAfterForeground = () => {
+  const recoverAfterForeground = async () => {
     if (document.hidden) return;
 
-    refreshSoundState();
-    void syncOrdersFromBackend();
+    await requestAdminWakeLock();
+    await unlockSound({ playTest: false, announce: false });
+    try {
+      await syncOrdersFromBackend();
+    } catch (error) {
+      console.warn("No se pudo actualizar al volver al panel:", error);
+    }
     updateAlarm();
   };
 
@@ -3491,6 +3550,25 @@ function init() {
       );
     }
   }, 30000);
+
+  // Vigilancia visible: recupera la alarma si el navegador suspendió timers
+  // o Web Audio mientras el panel estaba en segundo plano.
+  setInterval(() => {
+    if (!adminPinInMemory || document.hidden) return;
+
+    void requestAdminWakeLock();
+
+    if (newOrders().length) {
+      if (!alarmTimer) startAlarm();
+      if (!refreshSoundState()) {
+        setSoundBanner(
+          "<strong>Hay pedidos nuevos y el sonido está bloqueado</strong><br>" +
+          "Pulsa “Activar y probar sonido” para restablecer la alarma.",
+          true
+        );
+      }
+    }
+  }, 5000);
 
   setInterval(() => {
     if (window.FOGON_DB?.isReady() || BACKEND_URL) {
