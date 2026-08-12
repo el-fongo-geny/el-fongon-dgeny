@@ -84,64 +84,15 @@
       kitchenHidden: Boolean(row.kitchen_hidden),
       whatsappSent: Boolean(row.whatsapp_sent),
       cloverSynced: Boolean(row.clover_synced),
-      cloverOrderId: row.clover_order_id || null,
-      twilioMessageSid: row.twilio_message_sid || null,
-      twilioStatus: row.twilio_status || "",
-      twilioErrorCode: row.twilio_error_code || null,
-      twilioErrorMessage: row.twilio_error_message || null,
-      twilioSentAt: row.twilio_sent_at || null,
-      twilioDeliveredAt: row.twilio_delivered_at || null,
-      twilioLastAttemptAt: row.twilio_last_attempt_at || null,
-      twilioAttempts: Number(row.twilio_attempts || 0)
+      cloverOrderId: row.clover_order_id || null
     };
-  }
-
-  async function nextPublicId() {
-    if (!client) throw new Error("Supabase no está configurado.");
-    const { data, error } = await client.rpc(functions.nextOrderId);
-    if (error) throw error;
-    const value = Number(data);
-    if (!Number.isFinite(value) || value < 1) {
-      throw new Error("Supabase no devolvió un número de pedido válido.");
-    }
-    return value;
   }
 
   async function createOrder(order) {
-    if (!client) throw new Error("Supabase no está configurado.");
-    const publicId = await nextPublicId();
-    const totals = order.totals || {};
-    const payload = {
-      public_id: publicId,
-      customer_name: String(order.customer?.name || "").trim(),
-      customer_phone: String(order.customer?.phone || "").trim(),
-      language: order.language || "es",
-      payment_method: order.paymentMethod || order.payment_method || "",
-      status: order.status || "new",
-      payment_status: order.paymentStatus || "pending",
-      checkout_mode:
-        String(order.checkoutMode || "pay_at_counter") === "pay_before_kitchen"
-          ? "pay_before_kitchen"
-          : "pay_at_counter",
-      kiosk_id: order.kioskId || "",
-      kitchen_visible:
-        String(order.checkoutMode || "pay_at_counter") !== "pay_before_kitchen"
-          ? true
-          : order.paymentStatus === "paid",
-      subtotal: moneyNumber(totals.subtotal),
-      tax: moneyNumber(totals.tax),
-      total: moneyNumber(totals.total),
-      items: order.items || []
-    };
-
-    const { data, error } = await client
-      .from(tables.orders)
-      .insert(payload)
-      .select("*")
-      .single();
-
-    if (error) throw error;
-    return toOrder(data);
+    void order;
+    throw new Error(
+      "La creación directa de pedidos está desactivada. Usa public-order-create o kiosk-order-create."
+    );
   }
 
   async function fetchOrders() {
@@ -216,21 +167,14 @@
   }
 
   async function deleteOrder(orderId) {
-    if (!client) return;
-    let query = client.from(tables.orders).delete();
-    const publicId = numericOrderId(orderId);
-    query = publicId ? query.eq("public_id", publicId) : query.eq("id", orderId);
-    const { error } = await query;
-    if (error) throw error;
+    void orderId;
+    throw new Error("El borrado físico de ventas está desactivado.");
   }
 
   async function clearOrders() {
-    if (!client) return;
-    const { error } = await client
-      .from(tables.orders)
-      .delete()
-      .neq("id", "00000000-0000-0000-0000-000000000000");
-    if (error) throw error;
+    throw new Error(
+      "La limpieza directa está desactivada. Usa admin-orders/clear_orders."
+    );
   }
 
 
