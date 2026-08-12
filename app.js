@@ -2029,6 +2029,59 @@ function setKioskPaymentStepVisible(visible, total = 0) {
 }
 
 
+async function createSecurePublicOrder(order) {
+  const { supabaseUrl, anonKey } = publicCatalogFunctionConfig();
+
+  const response = await fetch(
+    `${supabaseUrl}/functions/v1/public-order-create`,
+    {
+      method: "POST",
+      cache: "no-store",
+      headers: {
+        ...publicCatalogHeaders(anonKey)
+      },
+      body: JSON.stringify({
+        checkoutId: order.checkoutId || order.id,
+        customer: {
+          name: order.customer?.name || "",
+          phone: order.customer?.phone || ""
+        },
+        language: order.language || state.lang || "es",
+        orderType: order.orderType || state.orderType || "takeout",
+        paymentMethod: order.paymentMethod || "card",
+        items: (order.items || []).map((item) => ({
+          productId: item.productId,
+          quantity: Number(item.quantity || 1),
+          notes: String(item.notes || "").slice(0, 500),
+          selections: (item.selections || []).map((selection) => ({
+            groupId: selection.groupId || "",
+            optionId: selection.optionId || ""
+          })),
+          extras: (item.extras || []).map((extra) => ({
+            id: extra.id || ""
+          })),
+          removables: (item.removables || []).map((remove) => ({
+            id: remove.id || ""
+          }))
+        }))
+      })
+    }
+  );
+
+  const result = await response.json().catch(() => ({}));
+
+  if (!response.ok || result?.ok !== true || !result?.order) {
+    const error = new Error(
+      result?.detail || result?.error || `HTTP ${response.status}`
+    );
+    error.httpStatus = response.status;
+    error.code = String(result?.error || "public_order_create_failed");
+    throw error;
+  }
+
+  return result.order;
+}
+
 async function createSecureKioskOrder(order) {
   const { supabaseUrl, anonKey } = publicCatalogFunctionConfig();
   const sessionToken = await ensureKioskSession();
@@ -2255,7 +2308,7 @@ async function saveOrder(paymentMethod) {
 
     createdOrder = secureKioskOrder
       ? await createSecureKioskOrder(order)
-      : await db.createOrder(order);
+      : await createSecurePublicOrder(order);
 
     createdOrder.orderType = state.orderType;
     createdOrder.checkoutMode = order.checkoutMode;
