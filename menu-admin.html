@@ -6,7 +6,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#f6f6f3">
   <title>Gestor del menú | El Fogón D' Geny</title>
-  <link rel="stylesheet" href="menu-admin.css?v=104.8a4-employee-clover">
+  <link rel="stylesheet" href="menu-admin.css?v=105-multi-clover">
 </head>
 <body>
   <main id="loginScreen" class="login-screen">
@@ -354,18 +354,44 @@
               </label>
 
               <section class="employee-clover-card" aria-labelledby="employeeCloverTitle">
-                <div class="employee-clover-copy">
-                  <span class="eyebrow">Panel del empleado</span>
-                  <h4 id="employeeCloverTitle">Clover del botón “Cobrar con Clover”</h4>
-                  <p>
-                    Este dispositivo es independiente de los Clover asignados a los kioscos.
-                    Los cobros iniciados desde Pedidos/Cobros se enviarán únicamente a este terminal.
-                  </p>
+                <div class="employee-clover-toolbar">
+                  <div class="employee-clover-copy">
+                    <span class="eyebrow">Panel del empleado</span>
+                    <h4 id="employeeCloverTitle">Clover del botón “Cobrar con Clover”</h4>
+                    <p>
+                      Estos dispositivos son independientes de los Clover asignados a los kioscos.
+                      Si hay más de uno activo, el empleado podrá elegirlo antes de cobrar.
+                    </p>
+                  </div>
+                  <button id="addEmployeeCloverButton" class="button button-primary" type="button">
+                    + Añadir dispositivo Clover
+                  </button>
                 </div>
 
+                <div id="employeeCloverTerminalsList" class="employee-clover-terminals-list"></div>
+
                 <div id="employeeCloverForm" class="employee-clover-form">
+                  <div class="employee-clover-editor-title">
+                    <strong id="employeeCloverEditorTitle">Editar Clover de caja</strong>
+                    <span id="employeeCloverDefaultBadge" class="employee-clover-default-badge">Predeterminado</span>
+                  </div>
+
+                  <input id="employeeCloverTerminalId" type="hidden" value="employee-counter">
+
                   <label class="field">
-                    <span>Serial / Device ID del Clover de caja</span>
+                    <span>Nombre del dispositivo</span>
+                    <input
+                      id="employeeCloverDisplayName"
+                      type="text"
+                      maxlength="80"
+                      autocomplete="off"
+                      placeholder="Ej. Clover mostrador principal"
+                    >
+                    <small>Este nombre aparecerá al empleado al pulsar “Cobrar con Clover”.</small>
+                  </label>
+
+                  <label class="field">
+                    <span>Serial / Device ID del Clover</span>
                     <input
                       id="employeeCloverDeviceId"
                       type="text"
@@ -374,14 +400,14 @@
                       placeholder="Ej. C012UQ12345678"
                     >
                     <small>
-                      Es el serial físico del dispositivo Clover que recibirá el cobro del empleado.
+                      Es el serial físico del dispositivo Clover que recibirá el cobro.
                     </small>
                   </label>
 
                   <label class="switch-row employee-clover-switch">
                     <span>
-                      <strong>Usar este Clover para el panel del empleado</strong>
-                      <small>Si está desactivado, el botón no enviará cobros a ningún dispositivo.</small>
+                      <strong>Permitir cobros en este dispositivo</strong>
+                      <small>Los dispositivos desactivados no aparecen al pulsar “Cobrar con Clover”.</small>
                     </span>
                     <input id="employeeCloverEnabled" type="checkbox">
                     <span class="switch-control" aria-hidden="true"></span>
@@ -389,15 +415,20 @@
 
                   <div class="employee-clover-footer">
                     <span id="employeeCloverStatus" class="employee-clover-status" role="status">
-                      Cargando configuración…
+                      Cargando dispositivos…
                     </span>
-                    <button
-                      id="saveEmployeeCloverButton"
-                      class="button button-primary"
-                      type="button"
-                    >
-                      Guardar Clover de caja
-                    </button>
+                    <div class="employee-clover-editor-actions">
+                      <button id="cancelEmployeeCloverButton" class="button button-secondary" type="button" hidden>
+                        Cancelar
+                      </button>
+                      <button
+                        id="saveEmployeeCloverButton"
+                        class="button button-primary"
+                        type="button"
+                      >
+                        Guardar dispositivo
+                      </button>
+                    </div>
                   </div>
                 </div>
               </section>
@@ -924,6 +955,6 @@
   </div>
 
   <script src="supabase-config.js?v=18-mobile-fixed"></script>
-  <script src="menu-admin.js?v=105-security-form-fix"></script>
+  <script src="menu-admin.js?v=105-multi-clover"></script>
 </body>
 </html>
