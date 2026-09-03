@@ -92,7 +92,7 @@ function showLoginRuntimeError(error) {
   console.error("Error del administrador:", error);
 }
 
-window.FOGON_ADMIN_BUILD = "105-sound-watchdog";
+window.FOGON_ADMIN_BUILD = "106-single-clover-hotfix";
 
 if (!window.CSS) window.CSS = {};
 if (!window.CSS.escape) {
@@ -1483,37 +1483,10 @@ async function startManualCloverPayment(orderId) {
 
   if (paymentActionLocks.has(String(order.id))) return;
 
-  try {
-    const result = await callProtectedAdminFunction(
-      "clover-start-payment",
-      { action: "list_terminals" }
-    );
-    const terminals = Array.isArray(result?.terminals) ? result.terminals : [];
-
-    if (!terminals.length) {
-      alert(
-        "No hay ningún Clover de caja activo.\n\n" +
-        "Añádelo o actívalo en Gestionar menú → Datos del menú."
-      );
-      return;
-    }
-
-    const terminalId = terminals.length === 1
-      ? String(terminals[0].id || "")
-      : await showCloverTerminalModal(order, terminals);
-
-    if (!terminalId) return;
-
-    await startCloverPayment(order.id, {
-      automatic: false,
-      terminalId
-    });
-  } catch (error) {
-    console.error("No se pudieron cargar los Clover disponibles:", error);
-    alert(
-      `No se pudo preparar el cobro con Clover.\n\n${error?.message || error}`
-    );
-  }
+  // La Edge Function desplegada usa el terminal único "employee-counter".
+  // Enviamos directamente el UUID del pedido; no le pedimos una lista de
+  // terminales porque esa acción no forma parte de su contrato actual.
+  await startCloverPayment(order.id, { automatic: false });
 }
 
 async function startCloverPayment(orderId, options = {}) {
